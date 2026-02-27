@@ -13,6 +13,7 @@ import (
 
 	"github.com/c2h5oh/datasize"
 	"github.com/rilldata/rill/cli/cmd/env"
+	"github.com/rilldata/rill/bratrax"
 	"github.com/rilldata/rill/cli/pkg/browser"
 	"github.com/rilldata/rill/cli/pkg/cmdutil"
 	"github.com/rilldata/rill/cli/pkg/pkce"
@@ -436,6 +437,10 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 		return runtimeServer.ServeHTTP(ctx, func(mux *http.ServeMux) {
 			// Inject local-only endpoints on the runtime server
 			localServer.RegisterHandlers(mux, httpPort, secure, enableUI)
+			// Register Bratrax proxy (non-fatal — most users won't have Flask running)
+			if err := bratrax.RegisterHandlers(mux, a.BaseLogger); err != nil {
+				a.Logger.Warnf("bratrax proxy not registered: %v", err)
+			}
 		}, enableUI)
 	})
 
