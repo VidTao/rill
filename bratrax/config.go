@@ -10,6 +10,8 @@ import (
 type Config struct {
 	// TargetURL is the parsed URL of the Flask API backend.
 	TargetURL *url.URL
+	// UsersDSN is the PostgreSQL connection string for the bratrax_users table.
+	UsersDSN string
 }
 
 // ConfigFromEnv reads Bratrax configuration from environment variables.
@@ -32,5 +34,13 @@ func ConfigFromEnv() (*Config, error) {
 		return nil, fmt.Errorf("bratrax: BRATRAX_API_URL %q must include a host", raw)
 	}
 
-	return &Config{TargetURL: u}, nil
+	usersDSN := os.Getenv("BRATRAX_USERS_DSN")
+	if usersDSN == "" {
+		usersDSN = "postgres://airflow:BratMaxPass@localhost:5434/airflow?sslmode=disable"
+	}
+
+	return &Config{
+		TargetURL: u,
+		UsersDSN:  usersDSN,
+	}, nil
 }

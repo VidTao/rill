@@ -72,6 +72,13 @@ func NewIssuer(issuerURL, signingKeyID string, jwksJSON []byte) (*Issuer, error)
 	}, nil
 }
 
+// PublicJWKS returns a copy of the serialized public JWKS JSON for local validation.
+func (i *Issuer) PublicJWKS() []byte {
+	out := make([]byte, len(i.publicJWKS))
+	copy(out, i.publicJWKS)
+	return out
+}
+
 // NewEphemeralIssuer creates an Issuer using a generated JWKS.
 // It is useful for development and testing, but should not be used in production.
 func NewEphemeralIssuer(issuerURL string) (*Issuer, error) {

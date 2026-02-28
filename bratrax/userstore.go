@@ -1,0 +1,137 @@
+package bratrax
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
+
+	_ "github.com/jackc/pgx/v4/stdlib" // pgx driver for database/sql
+)
+
+// User represents a row in the bratrax_users table.
+type User struct {
+	ID           int       `db:"id"            json:"id"`
+	Email        string    `db:"email"         json:"email"`
+	PasswordHash string    `db:"password_hash" json:"-"`
+	Name         string    `db:"name"          json:"name"`
+	Role         string    `db:"role"          json:"role"`
+	ProjectID    *string   `db:"project_id"    json:"project_id"`
+	CreatedAt    time.Time `db:"created_at"    json:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at"    json:"updated_at"`
+}
+
+// UserStoreInterface abstracts user persistence for testing.
+type UserStoreInterface interface {
+	Authenticate(ctx context.Context, email, password string) (*User, error)
+	GetByID(ctx context.Context, id int) (*User, error)
+	CreateUser(ctx context.Context, email, password, name, role string, projectID *string) (*User, error)
+	ListUsers(ctx context.Context) ([]User, error)
+}
+
+// UserStore provides CRUD operations on bratrax_users.
+type UserStore struct {
+	db *sqlx.DB
+}
+
+// NewUserStore connects to the users database and returns a UserStore.
+func NewUserStore(dsn string) (*UserStore, error) {
+	db, err := sqlx.Connect("pgx", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("bratrax userstore: failed to connect: %w", err)
+	}
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(30 * time.Minute)
+
+	return &UserStore{db: db}, nil
+}
+
+// DB returns the underlying database connection pool (used to share with ClientStore).
+func (s *UserStore) DB() *sqlx.DB {
+	return s.db
+}
+
+// Close closes the underlying database connection pool.
+func (s *UserStore) Close() error {
+	return s.db.Close()
+}
+
+// Authenticate verifies email+password and returns the user on success.
+// Returns (nil, nil) if credentials are invalid (prevents user enumeration).
+func (s *UserStore) Authenticate(ctx context.Context, email, password string) (*User, error) {
+	var u User
+	err := s.db.GetContext(ctx, &u,
+		"SELECT id, email, password_hash, name, role, project_id, created_at, updated_at FROM bratrax_users WHERE email = $1",
+		email,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("bratrax userstore: query failed: %w", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
+		return nil, nil
+	}
+
+	return &u, nil
+}
+
+// GetByID retrieves a user by primary key.
+func (s *UserStore) GetByID(ctx context.Context, id int) (*User, error) {
+	var u User
+	err := s.db.GetContext(ctx, &u,
+		"SELECT id, email, '' AS password_hash, name, role, project_id, created_at, updated_at FROM bratrax_users WHERE id = $1",
+		id,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("bratrax userstore: query failed: %w", err)
+	}
+	return &u, nil
+}
+
+// CreateUser inserts a new user with a bcrypt-hashed password.
+// Passwords longer than 72 bytes are rejected (bcrypt truncation limit).
+func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role string, projectID *string) (*User, error) {
+	if len(password) > 72 {
+		return nil, fmt.Errorf("bratrax userstore: password exceeds 72 bytes (bcrypt limit)")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("bratrax userstore: hash failed: %w", err)
+	}
+
+	var u User
+	err = s.db.QueryRowxContext(ctx,
+		`INSERT INTO bratrax_users (email, password_hash, name, role, project_id)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, email, '' AS password_hash, name, role, project_id, created_at, updated_at`,
+		email, string(hash), name, role, projectID,
+	).StructScan(&u)
+	if err != nil {
+		return nil, fmt.Errorf("bratrax userstore: insert failed: %w", err)
+	}
+
+	return &u, nil
+}
+
+// ListUsers returns all users, ordered by ID.
+func (s *UserStore) ListUsers(ctx context.Context) ([]User, error) {
+	var users []User
+	err := s.db.SelectContext(ctx, &users,
+		"SELECT id, email, '' AS password_hash, name, role, project_id, created_at, updated_at FROM bratrax_users ORDER BY id",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("bratrax userstore: query failed: %w", err)
+	}
+	return users, nil
+}
