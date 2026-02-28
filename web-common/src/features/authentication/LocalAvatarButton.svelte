@@ -12,6 +12,9 @@
   import Spinner from "@rilldata/web-common/features/entity-management/Spinner.svelte";
   import ThemeToggle from "@rilldata/web-common/features/themes/ThemeToggle.svelte";
 
+  export let externalUser: { email: string; name: string } | null = null;
+  export let onLogout: (() => void) | null = null;
+
   $: user = createLocalServiceGetCurrentUser({
     query: {
       // refetch in case user does a login/logout from outside of rill developer UI
@@ -37,7 +40,8 @@
     logoutUrl = u.toString();
   }
 
-  $: loggedIn = $user.isSuccess && $user.data?.user;
+  $: rillUser = $user.isSuccess && $user.data?.user;
+  $: loggedIn = externalUser || rillUser;
 
   $: if ($user.data?.user) {
     initPylonChat($user.data.user);
@@ -46,10 +50,19 @@
     window.Pylon("show");
   }
 
+  $: initials = externalUser
+    ? (externalUser.name || externalUser.email || "?")
+        .split(/[\s@]/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((s) => s[0].toUpperCase())
+        .join("")
+    : "";
+
   let photoUrlErrored = false;
 </script>
 
-{#if ($user.isLoading || $metadata.isLoading) && !$user.error && !$metadata.error}
+{#if !externalUser && ($user.isLoading || $metadata.isLoading) && !$user.error && !$metadata.error}
   <div class="flex flex-row items-center h-7 mx-1.5">
     <Spinner size="16px" status={EntityStatus.Running} />
   </div>
@@ -59,7 +72,13 @@
       class="flex-none w-7"
       aria-label="Avatar logged {loggedIn ? 'in' : 'out'}"
     >
-      {#if loggedIn && !photoUrlErrored && $user.data && $metadata.data}
+      {#if externalUser}
+        <div
+          class="h-7 w-7 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs font-medium"
+        >
+          {initials}
+        </div>
+      {:else if rillUser && !photoUrlErrored && $user.data && $metadata.data}
         <Avatar
           src={$user.data?.user?.photoUrl}
           alt={$user.data?.user?.displayName || $user.data?.user?.email}
@@ -70,27 +89,40 @@
       {/if}
     </DropdownMenu.Trigger>
     <DropdownMenu.Content class="p-1">
+      {#if externalUser}
+        <div class="px-3 py-1.5 text-xs text-gray-500">
+          {externalUser.email}
+        </div>
+        <DropdownMenu.Separator />
+      {/if}
+
       <ThemeToggle />
-      <DropdownMenu.Separator />
 
-      <DropdownMenu.Item
-        href="https://docs.rilldata.com"
-        target="_blank"
-        rel="noreferrer noopener"
-      >
-        Documentation
-      </DropdownMenu.Item>
-      <DropdownMenu.Separator />
+      {#if !externalUser}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item
+          href="https://docs.rilldata.com"
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          Documentation
+        </DropdownMenu.Item>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item
+          href="https://discord.gg/2ubRfjC7Rh"
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          Join us on Discord
+        </DropdownMenu.Item>
+      {/if}
 
-      <DropdownMenu.Item
-        href="https://discord.gg/2ubRfjC7Rh"
-        target="_blank"
-        rel="noreferrer noopener"
-      >
-        Join us on Discord
-      </DropdownMenu.Item>
-
-      {#if loggedIn}
+      {#if externalUser && onLogout}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item on:click={onLogout}>
+          Logout
+        </DropdownMenu.Item>
+      {:else if rillUser}
         <DropdownMenu.Item on:click={handlePylon}>
           Contact Rill support
         </DropdownMenu.Item>
@@ -98,7 +130,7 @@
         <DropdownMenu.Item href={logoutUrl} rel="external">
           Logout
         </DropdownMenu.Item>
-      {:else}
+      {:else if !externalUser}
         <DropdownMenu.Separator />
         <DropdownMenu.Item href={loginUrl} rel="external">
           Log in / Sign up

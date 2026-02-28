@@ -29,6 +29,8 @@
   const { deploy, developerChat, stickyDashboardState } = featureFlags;
 
   export let mode: string;
+  export let externalUser: { email: string; name: string } | null = null;
+  export let onLogout: (() => void) | null = null;
 
   $: ({ instanceId } = $runtime);
 
@@ -134,7 +136,7 @@
     {#if showDeployCTA}
       <DeployProjectCTA {hasValidDashboard} />
     {/if}
-    <LocalAvatarButton />
+    <LocalAvatarButton {externalUser} {onLogout} />
   </div>
 </header>
 

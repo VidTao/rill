@@ -28,6 +28,8 @@
   import { onMount } from "svelte";
   import type { LayoutData } from "./$types";
   import "@rilldata/web-common/app.css";
+  import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { bratraxLogout } from "$lib/bratrax/auth";
 
   export let data: LayoutData;
 
@@ -69,6 +71,12 @@
     return () => removeJavascriptListeners?.();
   });
 
+  async function handleBratraxLogout() {
+    await bratraxLogout();
+    bratraxUser.set(null);
+    window.location.href = "/login";
+  }
+
   $: ({ host, instanceId } = $runtime);
 
   $: ({ route } = $page);
@@ -82,7 +90,11 @@
       {#if data.initialized}
         <BannerCenter />
         <RepresentingUserBanner />
-        <ApplicationHeader {mode} />
+        <ApplicationHeader
+          {mode}
+          externalUser={$bratraxUser}
+          onLogout={handleBratraxLogout}
+        />
         {#if $deploy}
           <RemoteProjectManager />
         {/if}

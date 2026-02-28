@@ -26,6 +26,17 @@ const config = defineConfig({
     fs: {
       allow: ["."],
     },
+    proxy: {
+      "/bratrax": { target: "http://localhost:9009", changeOrigin: true },
+      "/v1": { target: "http://localhost:9009", changeOrigin: true },
+      "/rill.runtime.v1.RuntimeService": { target: "http://localhost:9009", changeOrigin: true },
+      "/rill.runtime.v1.QueryService": { target: "http://localhost:9009", changeOrigin: true },
+      "/rill.runtime.v1.ConnectorService": { target: "http://localhost:9009", changeOrigin: true },
+      "/rill.local.v1.LocalService": { target: "http://localhost:9009", changeOrigin: true },
+      "/mcp": { target: "http://localhost:9009", changeOrigin: true },
+      "/local": { target: "http://localhost:9009", changeOrigin: true },
+      "/auth": { target: "http://localhost:9009", changeOrigin: true },
+    },
   },
   define: {
     "import.meta.env.VITE_PLAYWRIGHT_TEST": process.env.PLAYWRIGHT_TEST,

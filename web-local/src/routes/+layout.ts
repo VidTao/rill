@@ -3,6 +3,8 @@ export const ssr = false;
 import { redirect } from "@sveltejs/kit";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
 import { get } from "svelte/store";
+import { bratraxGetMe } from "$lib/bratrax/auth";
+import { bratraxUser, bratraxAuthChecked } from "$lib/bratrax/auth-store";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient.js";
 import {
   getRuntimeServiceListFilesQueryKey,
@@ -14,8 +16,20 @@ import { Settings } from "luxon";
 
 Settings.defaultLocale = "en";
 
-export async function load({ url, depends, untrack }) {
+export async function load({ url, depends, untrack, fetch }) {
   depends("init");
+
+  if (url.pathname.startsWith("/login")) {
+    return { initialized: false };
+  }
+
+  const user = await bratraxGetMe(fetch);
+  bratraxUser.set(user);
+  bratraxAuthChecked.set(true);
+  if (!user) {
+    const redirectTo = encodeURIComponent(url.pathname + url.search);
+    throw redirect(307, `/login?redirect=${redirectTo}`);
+  }
 
   const instanceId = get(runtime).instanceId;
 
