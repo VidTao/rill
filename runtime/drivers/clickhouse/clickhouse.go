@@ -369,6 +369,7 @@ func (d driver) Open(instanceID string, config map[string]any, st *storage.Clien
 		config:          conf,
 		logger:          logger,
 		activity:        ac,
+		storage:         st,
 		instanceID:      instanceID,
 		supportSettings: supportSettings,
 		ctx:             ctx,
@@ -403,6 +404,7 @@ type Connection struct {
 	config          *configProperties
 	logger          *zap.Logger
 	activity        *activity.Client
+	storage         *storage.Client
 	instanceID      string
 	supportSettings bool
 
@@ -572,7 +574,7 @@ func (c *Connection) AsFileStore() (drivers.FileStore, bool) {
 
 // AsWarehouse implements drivers.Handle.
 func (c *Connection) AsWarehouse() (drivers.Warehouse, bool) {
-	return nil, false
+	return c, true
 }
 
 // AsNotifier implements drivers.Handle.
