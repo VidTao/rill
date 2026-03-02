@@ -16,13 +16,17 @@
     type WorkshopResults,
   } from "$lib/bratrax/workshop/types";
   import ResultsPanel from "./ResultsPanel.svelte";
+  import SourcesEditor from "./editors/SourcesEditor.svelte";
+  import OntologyEditor from "./editors/OntologyEditor.svelte";
+  import TrackingPlanEditor from "./editors/TrackingPlanEditor.svelte";
 
   export let data: { clientName: string };
 
   // ── State ──
   let files: ClientFiles = { config: "", sources: "", ontology: "", tracking_plan: "" };
-  let activeTab: FileKey = "config";
+  let activeTab: FileKey = "sources";
   let loading = true;
+  let viewMode: "visual" | "yaml" = "visual";
   let errorMessage = "";
   let saving = false;
   let dirty: Record<FileKey, boolean> = { config: false, sources: false, ontology: false, tracking_plan: false };
@@ -130,6 +134,14 @@
     files = { ...files, [activeTab]: target.value };
     dirty = { ...dirty, [activeTab]: true };
   }
+
+  function handleVisualChange(newContent: string) {
+    files = { ...files, [activeTab]: newContent };
+    dirty = { ...dirty, [activeTab]: true };
+  }
+
+  // Visual editors are available for sources, ontology, tracking_plan (not config)
+  $: hasVisualEditor = activeTab !== "config";
 </script>
 
 <div class="flex h-full flex-col overflow-hidden">
@@ -194,31 +206,61 @@
     <div class="flex flex-1 overflow-hidden">
       <!-- Left: YAML editor -->
       <div class="flex flex-1 flex-col overflow-hidden border-r border-gray-200">
-        <!-- Tabs -->
-        <div class="flex border-b border-gray-200 bg-gray-50">
-          {#each FILE_KEYS as key (key)}
-            <button
-              class="relative px-4 py-2 text-sm transition
-                {activeTab === key
-                  ? 'bg-white text-blue-600 font-medium'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}"
-              on:click={() => { activeTab = key; }}
-            >
-              {FILE_LABELS[key]}
-              {#if dirty[key]}
-                <span class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-yellow-500" />
-              {/if}
-            </button>
-          {/each}
+        <!-- Tabs + view toggle -->
+        <div class="flex items-center border-b border-gray-200 bg-gray-50">
+          <div class="flex flex-1">
+            {#each FILE_KEYS as key (key)}
+              <button
+                class="relative px-4 py-2 text-sm transition
+                  {activeTab === key
+                    ? 'bg-white text-blue-600 font-medium'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}"
+                on:click={() => { activeTab = key; }}
+              >
+                {FILE_LABELS[key]}
+                {#if dirty[key]}
+                  <span class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-yellow-500" />
+                {/if}
+              </button>
+            {/each}
+          </div>
+          {#if hasVisualEditor}
+            <div class="mr-2 flex rounded border border-gray-300 text-xs">
+              <button
+                class="px-2 py-1 transition {viewMode === 'visual' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'}"
+                on:click={() => { viewMode = "visual"; }}
+              >
+                Visual
+              </button>
+              <button
+                class="px-2 py-1 transition {viewMode === 'yaml' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'}"
+                on:click={() => { viewMode = "yaml"; }}
+              >
+                YAML
+              </button>
+            </div>
+          {/if}
         </div>
 
-        <!-- Editor -->
-        <textarea
-          class="flex-1 resize-none bg-white p-4 font-mono text-sm text-gray-800 focus:outline-none"
-          value={files[activeTab]}
-          on:input={handleEditorInput}
-          spellcheck="false"
-        />
+        <!-- Editor area -->
+        {#if viewMode === "yaml" || !hasVisualEditor}
+          <textarea
+            class="flex-1 resize-none bg-white p-4 font-mono text-sm text-gray-800 focus:outline-none"
+            value={files[activeTab]}
+            on:input={handleEditorInput}
+            spellcheck="false"
+          />
+        {:else}
+          <div class="flex-1 overflow-y-auto p-4">
+            {#if activeTab === "sources"}
+              <SourcesEditor content={files.sources} onChange={handleVisualChange} />
+            {:else if activeTab === "ontology"}
+              <OntologyEditor content={files.ontology} onChange={handleVisualChange} />
+            {:else if activeTab === "tracking_plan"}
+              <TrackingPlanEditor content={files.tracking_plan} onChange={handleVisualChange} />
+            {/if}
+          </div>
+        {/if}
       </div>
 
       <!-- Right: Results panel -->
