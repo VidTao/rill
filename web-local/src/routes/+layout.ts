@@ -31,6 +31,11 @@ export async function load({ url, depends, untrack, fetch }) {
     throw redirect(307, `/login?redirect=${redirectTo}`);
   }
 
+  // Skip Rill file initialization for /connectors pages
+  if (url.pathname.startsWith("/connectors")) {
+    return { initialized: false };
+  }
+
   const instanceId = get(runtime).instanceId;
 
   const files = await queryClient.fetchQuery<V1ListFilesResponse>({

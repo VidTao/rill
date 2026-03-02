@@ -82,6 +82,9 @@
   $: ({ route } = $page);
 
   $: mode = route.id?.includes("(viz)") ? "Preview" : "Developer";
+
+  $: onConnectorsPage = $page.url.pathname.startsWith("/connectors");
+  $: onWorkshopPage = $page.url.pathname.startsWith("/workshop");
 </script>
 
 <QueryClientProvider client={queryClient}>
@@ -98,6 +101,35 @@
         {#if $deploy}
           <RemoteProjectManager />
         {/if}
+      {/if}
+
+      {#if $bratraxUser}
+        <nav class="flex gap-4 border-b border-border px-4 py-1.5 text-sm">
+          <a
+            href="/"
+            class="text-fg-secondary hover:text-fg-primary"
+            class:font-medium={!onConnectorsPage && !onWorkshopPage}
+            class:text-fg-primary={!onConnectorsPage && !onWorkshopPage}
+          >
+            Developer
+          </a>
+          <a
+            href="/connectors"
+            class="text-fg-secondary hover:text-fg-primary"
+            class:font-medium={onConnectorsPage}
+            class:text-fg-primary={onConnectorsPage}
+          >
+            Connectors
+          </a>
+          <a
+            href="/workshop"
+            class="text-fg-secondary hover:text-fg-primary"
+            class:font-medium={onWorkshopPage}
+            class:text-fg-primary={onWorkshopPage}
+          >
+            Workshop
+          </a>
+        </nav>
       {/if}
 
       <slot />
