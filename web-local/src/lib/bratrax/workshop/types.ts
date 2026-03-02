@@ -81,6 +81,38 @@ export interface TemplateSummary {
   description: string;
 }
 
+// ── Catalog types ──
+
+export interface CatalogField {
+  name: string;
+  type: string;
+  nullable: boolean;
+  singer_types: string[];
+}
+
+export interface CatalogStream {
+  name: string;
+  fields: CatalogField[];
+}
+
+export interface CatalogSource {
+  source_name: string;
+  label: string;
+  category: string;
+  source_type: "meltano" | "webhook";
+  raw_table: string;
+  streams: CatalogStream[];
+}
+
+export interface CatalogSearchResult {
+  field: string;
+  type: string;
+  stream: string;
+  tap: string;
+  label: string;
+  source_ref: string;
+}
+
 export type WorkshopPhase = "idle" | "validating" | "compiling" | "deploying";
 
 export interface WorkshopResults {

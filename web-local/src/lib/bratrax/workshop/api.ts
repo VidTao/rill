@@ -8,6 +8,8 @@ import type {
   CompileResult,
   DeployResult,
   TemplateSummary,
+  CatalogSource,
+  CatalogSearchResult,
 } from "./types";
 
 function getBaseUrl(): string {
@@ -107,4 +109,19 @@ export async function deployClient(
 export async function listTemplates(): Promise<TemplateSummary[]> {
   const res = await apiFetch<{ templates: TemplateSummary[] }>("/bratrax/api/v1/templates");
   return res.templates;
+}
+
+// ── Catalogs ──
+
+export async function listCatalogs(): Promise<CatalogSource[]> {
+  const res = await apiFetch<{ catalogs: CatalogSource[] }>("/bratrax/api/v1/catalogs");
+  return res.catalogs;
+}
+
+export async function searchCatalog(
+  query: string,
+): Promise<{ results: CatalogSearchResult[]; count: number }> {
+  return apiFetch<{ results: CatalogSearchResult[]; count: number }>(
+    `/bratrax/api/v1/catalogs/search?q=${encodeURIComponent(query)}`,
+  );
 }

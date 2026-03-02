@@ -60,15 +60,23 @@
         Manage client data models — edit, compile, and deploy
       </p>
     </div>
-    <button
-      class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-      on:click={() => {
-        showNewModal = true;
-      }}
-      disabled={loading}
-    >
-      New Client
-    </button>
+    <div class="flex items-center gap-2">
+      <a
+        href="/workshop/catalogs"
+        class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+      >
+        Source Catalogs
+      </a>
+      <button
+        class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        on:click={() => {
+          showNewModal = true;
+        }}
+        disabled={loading}
+      >
+        New Client
+      </button>
+    </div>
   </div>
 
   {#if errorMessage}
