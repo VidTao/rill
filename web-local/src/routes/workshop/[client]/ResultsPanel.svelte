@@ -45,6 +45,8 @@
   </div>
 {:else if results.phase === "compile" && results.compile}
   {@const c = results.compile}
+  {@const rillLayers = Object.entries(c.summary).filter(([k]) => k.startsWith("rill_"))}
+  {@const rillArtifacts = c.artifacts}
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       {#if c.success}
@@ -60,26 +62,26 @@
     </div>
 
     <div class="flex flex-wrap gap-2 text-xs">
-      {#each Object.entries(c.summary).filter(([k]) => k !== "total") as [layer, count]}
+      {#each rillLayers as [layer, count]}
         {#if count > 0}
-          <span class="rounded bg-gray-100 px-2 py-0.5 text-gray-600">
+          <span class="rounded bg-teal-100 px-2 py-0.5 text-teal-700">
             {layer}: {count}
           </span>
         {/if}
       {/each}
     </div>
 
-    {#if c.artifacts.length > 0}
+    {#if rillArtifacts.length > 0}
       <details class="text-xs">
-        <summary class="cursor-pointer text-gray-500 hover:text-gray-700">
-          Show artifacts ({c.artifacts.length})
+        <summary class="cursor-pointer text-teal-600 hover:text-teal-800">
+          Artifacts ({rillArtifacts.length})
         </summary>
-        <ul class="mt-2 max-h-[50vh] space-y-1 overflow-y-auto">
-          {#each c.artifacts as artifact}
+        <ul class="mt-2 max-h-[30vh] space-y-1 overflow-y-auto">
+          {#each rillArtifacts as artifact}
             <li class="rounded bg-gray-50 px-3 py-2">
               <div class="flex items-center gap-2">
                 <span
-                  class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-blue-700"
+                  class="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-teal-700"
                 >
                   {artifact.layer}
                 </span>

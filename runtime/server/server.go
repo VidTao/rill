@@ -229,6 +229,10 @@ func (s *Server) HTTPHandler(ctx context.Context, registerAdditionalHandlers fun
 	observability.MuxHandle(httpMux, "/v1/instances/{instance_id}/mcp/sse", mcpHandler)     // Backwards compatibility
 	observability.MuxHandle(httpMux, "/v1/instances/{instance_id}/mcp/message", mcpHandler) // Backwards compatibility
 
+	// Plain JSON MCP endpoint for clients that don't support Streamable HTTP / SSE framing (e.g. Claude Code).
+	mcpJSON := observability.Middleware("runtime", s.logger, auth.HTTPMiddleware(s.aud, mcpJSONHandler(s.mcpHandler())))
+	observability.MuxHandle(httpMux, "/mcp/json", mcpJSON)
+
 	// Build CORS options for runtime server
 
 	// If the AllowedOrigins contains a "*" we want to return the requester's origin instead of "*" in the "Access-Control-Allow-Origin" header.

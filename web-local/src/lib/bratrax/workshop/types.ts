@@ -55,10 +55,9 @@ export interface CompileResult {
   success: boolean;
   artifacts: CompileArtifact[];
   summary: {
-    flatten: number;
-    activity_stream: number;
-    dim: number;
-    meltano: number;
+    rill_source: number;
+    rill_model: number;
+    rill_metrics: number;
     total: number;
   };
   validation: ValidationResult;

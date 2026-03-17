@@ -73,6 +73,23 @@ func NewRunner(rt *runtime.Runtime, activity *activity.Client) *Runner {
 
 	RegisterTool(r, &Navigate{})
 
+	// Bratrax workshop tools
+	RegisterTool(r, &WorkshopListClients{Runtime: rt})
+	RegisterTool(r, &WorkshopCreateClient{Runtime: rt})
+	RegisterTool(r, &WorkshopReadClient{Runtime: rt})
+	RegisterTool(r, &WorkshopWriteYaml{Runtime: rt})
+	RegisterTool(r, &WorkshopValidate{Runtime: rt})
+	RegisterTool(r, &WorkshopCompile{Runtime: rt})
+	RegisterTool(r, &WorkshopDeploy{Runtime: rt})
+	RegisterTool(r, &WorkshopListTemplates{Runtime: rt})
+	RegisterTool(r, &WorkshopGetCatalogs{Runtime: rt})
+
+	// Bratrax catalog tools
+	RegisterTool(r, &CatalogListTaps{Runtime: rt})
+	RegisterTool(r, &CatalogGetStreams{Runtime: rt})
+	RegisterTool(r, &CatalogGetFields{Runtime: rt})
+	RegisterTool(r, &CatalogSearchFields{Runtime: rt})
+
 	return r
 }
 

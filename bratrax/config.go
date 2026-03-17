@@ -15,11 +15,11 @@ type Config struct {
 }
 
 // ConfigFromEnv reads Bratrax configuration from environment variables.
-// BRATRAX_API_URL defaults to "http://localhost:8081" if not set.
+// BRATRAX_API_URL defaults to "http://localhost:8082" if not set.
 func ConfigFromEnv() (*Config, error) {
 	raw := os.Getenv("BRATRAX_API_URL")
 	if raw == "" {
-		raw = "http://localhost:8081"
+		raw = "http://localhost:8082"
 	}
 
 	u, err := url.Parse(raw)
