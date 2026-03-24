@@ -58,20 +58,32 @@ export interface CompileResult {
     rill_source: number;
     rill_model: number;
     rill_metrics: number;
+    ch_flatten: number;
+    ch_activity_stream: number;
+    ch_dims: number;
     total: number;
   };
   validation: ValidationResult;
 }
 
 export interface DeployAction {
-  action: "CREATE" | "UPDATE";
+  action: "CREATE" | "UPDATE" | "EXECUTE";
   target: string;
+}
+
+export interface ChExecutionResult {
+  file: string;
+  statement: number;
+  type: string;
+  ok: boolean;
+  error: string;
 }
 
 export interface DeployResult {
   plan: DeployAction[];
   applied: boolean;
   pr_url: string | null;
+  ch_results: ChExecutionResult[];
 }
 
 export interface TemplateSummary {

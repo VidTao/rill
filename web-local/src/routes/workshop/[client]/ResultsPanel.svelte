@@ -46,7 +46,9 @@
 {:else if results.phase === "compile" && results.compile}
   {@const c = results.compile}
   {@const rillLayers = Object.entries(c.summary).filter(([k]) => k.startsWith("rill_"))}
-  {@const rillArtifacts = c.artifacts}
+  {@const chLayers = Object.entries(c.summary).filter(([k]) => k.startsWith("ch_"))}
+  {@const rillArtifacts = c.artifacts.filter((a) => a.layer.startsWith("rill_"))}
+  {@const chArtifacts = c.artifacts.filter((a) => a.layer.startsWith("ch_"))}
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       {#if c.success}
@@ -69,12 +71,19 @@
           </span>
         {/if}
       {/each}
+      {#each chLayers as [layer, count]}
+        {#if count > 0}
+          <span class="rounded bg-orange-100 px-2 py-0.5 text-orange-700">
+            {layer}: {count}
+          </span>
+        {/if}
+      {/each}
     </div>
 
     {#if rillArtifacts.length > 0}
       <details class="text-xs">
         <summary class="cursor-pointer text-teal-600 hover:text-teal-800">
-          Artifacts ({rillArtifacts.length})
+          Rill Artifacts ({rillArtifacts.length})
         </summary>
         <ul class="mt-2 max-h-[30vh] space-y-1 overflow-y-auto">
           {#each rillArtifacts as artifact}
@@ -82,6 +91,28 @@
               <div class="flex items-center gap-2">
                 <span
                   class="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-teal-700"
+                >
+                  {artifact.layer}
+                </span>
+                <span class="font-mono text-gray-700">{artifact.path}</span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </details>
+    {/if}
+
+    {#if chArtifacts.length > 0}
+      <details class="text-xs">
+        <summary class="cursor-pointer text-orange-600 hover:text-orange-800">
+          ClickHouse DDL ({chArtifacts.length})
+        </summary>
+        <ul class="mt-2 max-h-[30vh] space-y-1 overflow-y-auto">
+          {#each chArtifacts as artifact}
+            <li class="rounded bg-gray-50 px-3 py-2">
+              <div class="flex items-center gap-2">
+                <span
+                  class="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-orange-700"
                 >
                   {artifact.layer}
                 </span>
@@ -105,6 +136,9 @@
   </div>
 {:else if results.phase === "deploy" && results.deploy}
   {@const d = results.deploy}
+  {@const chResults = d.ch_results || []}
+  {@const chFailed = chResults.filter((r) => !r.ok)}
+  {@const chOk = chResults.filter((r) => r.ok)}
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       <span
@@ -135,22 +169,59 @@
       </a>
     {/if}
 
+    {#if chResults.length > 0}
+      <div class="flex items-center gap-2 text-xs">
+        <span class="font-medium text-gray-600">ClickHouse DDL:</span>
+        <span class="rounded bg-green-100 px-2 py-0.5 text-green-700">
+          {chOk.length} OK
+        </span>
+        {#if chFailed.length > 0}
+          <span class="rounded bg-red-100 px-2 py-0.5 text-red-700">
+            {chFailed.length} failed
+          </span>
+        {/if}
+      </div>
+      {#if chFailed.length > 0}
+        <details class="text-xs" open>
+          <summary class="cursor-pointer text-red-600 hover:text-red-800">
+            Failed statements ({chFailed.length})
+          </summary>
+          <ul class="mt-2 max-h-[20vh] space-y-1 overflow-y-auto">
+            {#each chFailed as r}
+              <li class="rounded border border-red-200 bg-red-50 px-3 py-2 text-red-800">
+                <span class="font-mono font-medium">{r.file}[{r.statement}]</span>
+                <span class="ml-1">({r.type})</span>
+                <div class="mt-1 text-red-600">{r.error}</div>
+              </li>
+            {/each}
+          </ul>
+        </details>
+      {/if}
+    {/if}
+
     {#if d.plan.length > 0}
-      <ul class="max-h-[50vh] space-y-1 overflow-y-auto">
-        {#each d.plan as action}
-          <li class="flex items-center gap-2 rounded bg-gray-50 px-3 py-2 text-xs">
-            <span
-              class="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase {action.action ===
-              'CREATE'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-yellow-100 text-yellow-700'}"
-            >
-              {action.action}
-            </span>
-            <span class="font-mono text-gray-700">{action.target}</span>
-          </li>
-        {/each}
-      </ul>
+      <details class="text-xs">
+        <summary class="cursor-pointer text-gray-600 hover:text-gray-800">
+          All actions ({d.plan.length})
+        </summary>
+        <ul class="mt-2 max-h-[30vh] space-y-1 overflow-y-auto">
+          {#each d.plan as action}
+            <li class="flex items-center gap-2 rounded bg-gray-50 px-3 py-2">
+              <span
+                class="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase {action.action ===
+                'CREATE'
+                  ? 'bg-green-100 text-green-700'
+                  : action.action === 'EXECUTE'
+                    ? 'bg-orange-100 text-orange-700'
+                    : 'bg-yellow-100 text-yellow-700'}"
+              >
+                {action.action}
+              </span>
+              <span class="font-mono text-gray-700">{action.target}</span>
+            </li>
+          {/each}
+        </ul>
+      </details>
     {/if}
   </div>
 {/if}
