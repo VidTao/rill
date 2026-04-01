@@ -34,7 +34,7 @@ func (t *WorkshopListTemplates) Spec() *mcp.Tool {
 }
 
 func (t *WorkshopListTemplates) CheckAccess(ctx context.Context) (bool, error) {
-	return checkBratraxAccess(ctx)
+	return checkBratraxWriteAccess(ctx)
 }
 
 func (t *WorkshopListTemplates) Handler(ctx context.Context, _ *WorkshopListTemplatesArgs) (*WorkshopListTemplatesResult, error) {

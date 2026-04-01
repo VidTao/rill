@@ -37,7 +37,7 @@ func (t *CatalogGetStreams) Spec() *mcp.Tool {
 }
 
 func (t *CatalogGetStreams) CheckAccess(ctx context.Context) (bool, error) {
-	return checkBratraxAccess(ctx)
+	return checkBratraxWriteAccess(ctx)
 }
 
 func (t *CatalogGetStreams) Handler(ctx context.Context, args *CatalogGetStreamsArgs) (*CatalogGetStreamsResult, error) {

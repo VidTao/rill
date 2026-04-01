@@ -34,7 +34,7 @@ func (t *CatalogListTaps) Spec() *mcp.Tool {
 }
 
 func (t *CatalogListTaps) CheckAccess(ctx context.Context) (bool, error) {
-	return checkBratraxAccess(ctx)
+	return checkBratraxWriteAccess(ctx)
 }
 
 func (t *CatalogListTaps) Handler(ctx context.Context, _ *CatalogListTapsArgs) (*CatalogListTapsResult, error) {

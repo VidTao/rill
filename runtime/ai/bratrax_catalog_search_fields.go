@@ -40,7 +40,7 @@ func (t *CatalogSearchFields) Spec() *mcp.Tool {
 }
 
 func (t *CatalogSearchFields) CheckAccess(ctx context.Context) (bool, error) {
-	return checkBratraxAccess(ctx)
+	return checkBratraxWriteAccess(ctx)
 }
 
 func (t *CatalogSearchFields) Handler(ctx context.Context, args *CatalogSearchFieldsArgs) (*CatalogSearchFieldsResult, error) {

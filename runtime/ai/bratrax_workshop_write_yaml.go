@@ -40,7 +40,7 @@ func (t *WorkshopWriteYaml) Spec() *mcp.Tool {
 }
 
 func (t *WorkshopWriteYaml) CheckAccess(ctx context.Context) (bool, error) {
-	return checkBratraxAccess(ctx)
+	return checkBratraxWriteAccess(ctx)
 }
 
 func (t *WorkshopWriteYaml) Handler(ctx context.Context, args *WorkshopWriteYamlArgs) (*WorkshopWriteYamlResult, error) {

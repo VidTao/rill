@@ -30,6 +30,24 @@ export async function bratraxLogin(
   return res.json();
 }
 
+export async function bratraxSignup(
+  email: string,
+  password: string,
+  companyName: string,
+): Promise<{ user: BratraxUser }> {
+  const res = await fetch(`${getBaseUrl()}/bratrax/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password, company_name: companyName }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Signup failed (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function bratraxLogout(): Promise<void> {
   await fetch(`${getBaseUrl()}/bratrax/auth/logout`, {
     method: "POST",

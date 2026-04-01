@@ -52,8 +52,15 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		// 1. Extract cookie
 		cookie, err := r.Cookie(bratraxCookieName)
 		if err != nil {
-			writeJSONError(w, http.StatusUnauthorized, "authentication required")
-			return
+			// Also check Authorization header as fallback (for popup OAuth flows
+			// where cookies may not be sent due to browser restrictions)
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				cookie = &http.Cookie{Value: strings.TrimPrefix(authHeader, "Bearer ")}
+			} else {
+				writeJSONError(w, http.StatusUnauthorized, "authentication required")
+				return
+			}
 		}
 
 		// 2. Parse and validate JWT
@@ -95,16 +102,25 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		}
 
 		// 4. Resolve client based on role
+		//    Viewers without project_id are allowed through for onboarding routes
+		//    (they don't have a client yet — it's created by /onboard/start).
 		var client *Client
+		isOnboardRoute := strings.HasPrefix(r.URL.Path, "/bratrax/onboard/") ||
+			strings.HasPrefix(r.URL.Path, "/onboard/") ||
+			strings.HasPrefix(r.URL.Path, "/bratrax/connectors/")
 		switch user.Role {
 		case "admin":
 			client, err = a.clientStore.GetDefault(r.Context())
 		case "viewer":
 			if user.ProjectID == nil {
-				writeJSONError(w, http.StatusUnauthorized, "viewer has no project assigned")
-				return
+				if !isOnboardRoute {
+					writeJSONError(w, http.StatusUnauthorized, "viewer has no project assigned")
+					return
+				}
+				// Allow through without client for onboarding
+			} else {
+				client, err = a.clientStore.GetByRillProjectID(r.Context(), *user.ProjectID)
 			}
-			client, err = a.clientStore.GetByRillProjectID(r.Context(), *user.ProjectID)
 		default:
 			writeJSONError(w, http.StatusForbidden, fmt.Sprintf("unsupported role: %s", user.Role))
 			return
@@ -114,7 +130,7 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			writeJSONError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
-		if client == nil {
+		if client == nil && !isOnboardRoute {
 			writeJSONError(w, http.StatusForbidden, "no client associated with user")
 			return
 		}
@@ -126,8 +142,12 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		// 6. Set identity headers for Flask
 		r.Header.Set("user-id", strconv.Itoa(user.ID))
 		r.Header.Set("X-Bratrax-User-Id", strconv.Itoa(user.ID))
-		r.Header.Set("X-Bratrax-Client-Id", client.ClientID)
-		r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(client.OrganizationID))
+		if client != nil {
+			r.Header.Set("X-Bratrax-Client-Id", client.ClientID)
+			r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(client.OrganizationID))
+		} else {
+			r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(user.ID))
+		}
 		r.Header.Set("X-Bratrax-User-Email", user.Email)
 		r.Header.Set("X-Bratrax-User-Role", user.Role)
 

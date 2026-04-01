@@ -17,6 +17,7 @@ import (
 //   - POST /bratrax/auth/login    — email+password login
 //   - POST /bratrax/auth/logout   — clear auth cookie
 //   - GET  /bratrax/auth/me       — current user info
+//   - POST /bratrax/auth/signup   — self-serve signup (public, creates user + sets JWT)
 //   - POST /bratrax/auth/users    — create user (admin only)
 //   - GET  /bratrax/.well-known/jwks.json — public JWKS
 //   - GET  /bratrax/health        — local health check
@@ -65,6 +66,8 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) error {
 		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleMe)))
 	observability.MuxHandle(mux, "POST /bratrax/auth/users",
 		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleCreateUser)))
+	observability.MuxHandle(mux, "POST /bratrax/auth/signup",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleSignup)))
 
 	// JWKS endpoint for token validation
 	observability.MuxHandle(mux, "GET /bratrax/.well-known/jwks.json",

@@ -1,0 +1,70 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { page } from "$app/stores";
+  import { get } from "svelte/store";
+  import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+  import { onboardConnect, onboardMe } from "$lib/bratrax/onboarding/api";
+
+  let status = "Completing Shopify connection...";
+  let error = "";
+
+  onMount(async () => {
+    const code = $page.url.searchParams.get("code");
+    const shopParam = $page.url.searchParams.get("shop");
+    const shop = shopParam || sessionStorage.getItem("onboard_shopify_shop") || "";
+
+    if (!code || !shop) {
+      error = "Missing authorization code or shop. Please try connecting again.";
+      return;
+    }
+
+    try {
+      // Step 1: Exchange code for access token via Lite endpoint
+      // (skips legacy write_key/CRM tables that cause FK violations)
+      status = "Exchanging authorization code...";
+      const host = get(runtime).host;
+      const me = await onboardMe();
+      const clientId = me?.client_id || sessionStorage.getItem("onboard_client_id") || "";
+      const tokenRes = await fetch(`${host}/bratrax/onboard/shopify/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code, shop, client_id: clientId }),
+      });
+
+      if (!tokenRes.ok) {
+        const body = await tokenRes.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to connect Shopify");
+      }
+
+      // Step 2: Redirect to Build Your Stack (Screen 3)
+      // (connection is already recorded by the token endpoint)
+      status = "Connected! Redirecting...";
+      await goto("/onboard/stack");
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  });
+</script>
+
+<div class="flex h-screen w-screen items-center justify-center bg-surface">
+  <div class="w-full max-w-sm rounded-lg border border-border bg-white p-8 shadow-sm text-center">
+    {#if error}
+      <div class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        {error}
+      </div>
+      <a
+        href="/onboard/shopify"
+        class="text-sm text-indigo-600 hover:underline"
+      >
+        Try again
+      </a>
+    {:else}
+      <div class="mb-4">
+        <div class="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600"></div>
+      </div>
+      <p class="text-sm text-fg-secondary">{status}</p>
+    {/if}
+  </div>
+</div>

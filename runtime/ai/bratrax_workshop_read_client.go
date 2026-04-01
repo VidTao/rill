@@ -37,7 +37,7 @@ func (t *WorkshopReadClient) Spec() *mcp.Tool {
 }
 
 func (t *WorkshopReadClient) CheckAccess(ctx context.Context) (bool, error) {
-	return checkBratraxAccess(ctx)
+	return checkBratraxWriteAccess(ctx)
 }
 
 func (t *WorkshopReadClient) Handler(ctx context.Context, args *WorkshopReadClientArgs) (*WorkshopReadClientResult, error) {

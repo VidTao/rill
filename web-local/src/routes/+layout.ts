@@ -19,7 +19,12 @@ Settings.defaultLocale = "en";
 export async function load({ url, depends, untrack, fetch }) {
   depends("init");
 
-  if (url.pathname.startsWith("/login")) {
+  // Public routes — no authentication required
+  const isPublicRoute =
+    url.pathname.startsWith("/login") ||
+    url.pathname.startsWith("/signup") ||
+    url.pathname.startsWith("/onboard");
+  if (isPublicRoute) {
     return { initialized: false };
   }
 

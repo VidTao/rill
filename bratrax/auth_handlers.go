@@ -1,14 +1,21 @@
 package bratrax
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/mail"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/MicahParks/keyfunc"
+	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/rilldata/rill/runtime"
 	"github.com/rilldata/rill/runtime/server/auth"
@@ -34,9 +41,21 @@ type AuthService struct {
 	logger *zap.Logger
 }
 
-// NewAuthService creates an AuthService with an ephemeral JWT issuer.
+// jwksKeyFile is the path where the dev JWT signing key is persisted.
+// Tokens survive Rill restarts so users don't have to re-signup during development.
+var jwksKeyFile = filepath.Join(os.Getenv("HOME"), ".bratrax", "jwt_dev_key.json")
+
+// persistedJWKS is the on-disk format for the saved key.
+type persistedJWKS struct {
+	KeyID    string          `json:"key_id"`
+	JwksJSON json.RawMessage `json:"jwks_json"`
+}
+
+// NewAuthService creates an AuthService with a persistent JWT issuer.
+// The signing key is saved to ~/.bratrax/jwt_dev_key.json on first run
+// and reused on subsequent runs so tokens survive restarts.
 func NewAuthService(store UserStoreInterface, logger *zap.Logger) (*AuthService, error) {
-	issuer, err := auth.NewEphemeralIssuer(bratraxIssuerURL)
+	issuer, err := loadOrCreateIssuer(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +72,58 @@ func NewAuthService(store UserStoreInterface, logger *zap.Logger) (*AuthService,
 		jwks:   jwks,
 		logger: logger,
 	}, nil
+}
+
+// loadOrCreateIssuer loads a persisted JWKS from disk, or generates and saves a new one.
+func loadOrCreateIssuer(logger *zap.Logger) (*auth.Issuer, error) {
+	// Try to load existing key
+	data, err := os.ReadFile(jwksKeyFile)
+	if err == nil {
+		var saved persistedJWKS
+		if jsonErr := json.Unmarshal(data, &saved); jsonErr == nil {
+			issuer, issErr := auth.NewIssuer(bratraxIssuerURL, saved.KeyID, saved.JwksJSON)
+			if issErr == nil {
+				logger.Info("loaded persistent JWT key", zap.String("file", jwksKeyFile))
+				return issuer, nil
+			}
+			logger.Warn("failed to load saved JWT key, generating new one", zap.Error(issErr))
+		}
+	}
+
+	// Generate new key (same logic as auth.NewEphemeralIssuer)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+	jwk := jose.JSONWebKey{
+		Key:       rsaKey,
+		Algorithm: string(jose.RS256),
+		Use:       "sig",
+	}
+	thumb, err := jwk.Thumbprint(crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+	jwk.KeyID = base64.URLEncoding.EncodeToString(thumb)
+
+	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{jwk}}
+	jwksJSON, err := json.Marshal(jwks)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save to disk before creating issuer
+	saved := persistedJWKS{KeyID: jwk.KeyID, JwksJSON: jwksJSON}
+	savedJSON, _ := json.MarshalIndent(saved, "", "  ")
+	if mkErr := os.MkdirAll(filepath.Dir(jwksKeyFile), 0700); mkErr == nil {
+		if writeErr := os.WriteFile(jwksKeyFile, savedJSON, 0600); writeErr == nil {
+			logger.Info("saved new JWT key", zap.String("file", jwksKeyFile))
+		} else {
+			logger.Warn("failed to save JWT key", zap.Error(writeErr))
+		}
+	}
+
+	return auth.NewIssuer(bratraxIssuerURL, jwk.KeyID, jwksJSON)
 }
 
 // Issuer returns the underlying JWT issuer (used for JWKS endpoint).
@@ -224,6 +295,75 @@ func (s *AuthService) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"user": user})
 }
 
+// HandleSignup handles POST /bratrax/auth/signup.
+// Public endpoint (no authentication required) for Lite self-serve signup.
+// Creates user with viewer role and sets JWT cookie in one step.
+func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+	var req struct {
+		Email       string `json:"email"`
+		Password    string `json:"password"`
+		CompanyName string `json:"company_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Email == "" || req.Password == "" || req.CompanyName == "" {
+		writeJSONError(w, http.StatusBadRequest, "email, password, and company_name are required")
+		return
+	}
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid email format")
+		return
+	}
+	if len(req.Password) < minPasswordLength {
+		writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("password must be at least %d characters", minPasswordLength))
+		return
+	}
+	if len(req.Password) > maxPasswordLength {
+		writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("password must be at most %d characters", maxPasswordLength))
+		return
+	}
+
+	// Create user as viewer (Lite users never get admin)
+	user, err := s.store.CreateUser(r.Context(), req.Email, req.Password, req.CompanyName, "viewer", nil)
+	if err != nil {
+		s.logger.Error("signup: create user failed", zap.Error(err))
+		writeJSONError(w, http.StatusConflict, "email already registered")
+		return
+	}
+
+	// Issue JWT and set cookie (same as login)
+	token, err := s.issueToken(user)
+	if err != nil {
+		s.logger.Error("signup: token issuance failed", zap.Error(err))
+		writeJSONError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     bratraxCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(bratraxTokenTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   bratraxSecureCookie,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	s.logger.Info("signup: user created", zap.String("email", req.Email), zap.Int("user_id", user.ID))
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"token": token,
+		"user":  user,
+	})
+}
+
 // authenticateRequest extracts and validates the JWT from the auth cookie,
 // then resolves the user from the store.
 func (s *AuthService) authenticateRequest(r *http.Request) (*User, error) {
@@ -295,6 +435,7 @@ func permissionsForRole(role string) []runtime.Permission {
 			runtime.ReadOLAP,
 			runtime.ReadMetrics,
 			runtime.ReadAPI,
+			runtime.UseAI, // Lite paid users need Claude chat access
 		}
 	default:
 		return nil
