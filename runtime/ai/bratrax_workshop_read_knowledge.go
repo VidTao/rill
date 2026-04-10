@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rilldata/rill/runtime"
@@ -17,7 +18,7 @@ type WorkshopReadKnowledge struct {
 var _ Tool[*WorkshopReadKnowledgeArgs, *WorkshopReadKnowledgeResult] = (*WorkshopReadKnowledge)(nil)
 
 type WorkshopReadKnowledgeArgs struct {
-	Name     string `json:"name" jsonschema:"Client name"`
+	Name     string `json:"name,omitempty" jsonschema:"Client name (auto-resolved if not provided)"`
 	Filepath string `json:"filepath" jsonschema:"File path relative to knowledge/ (e.g., index.md, profile.md, insights/roas_analysis.md)"`
 }
 
@@ -43,8 +44,30 @@ func (t *WorkshopReadKnowledge) CheckAccess(ctx context.Context) (bool, error) {
 }
 
 func (t *WorkshopReadKnowledge) Handler(ctx context.Context, args *WorkshopReadKnowledgeArgs) (*WorkshopReadKnowledgeResult, error) {
+	// Resolve client name: explicit arg > session claims > fallback
+	clientName := args.Name
+	if clientName == "" || clientName == "client" {
+		clientName = getBratraxClientID(ctx)
+	}
+	if clientName == "" {
+		// Fall back to instance display name (from rill.yaml)
+		s := GetSession(ctx)
+		if s != nil {
+			inst, err := t.Runtime.Instance(ctx, s.InstanceID())
+			if err == nil && inst != nil {
+				clientName = inst.ProjectDisplayName
+				// Strip " Analytics" suffix if present (e.g., "Ziva Analytics" → "Ziva")
+				clientName = strings.TrimSuffix(clientName, " Analytics")
+				clientName = strings.ToLower(clientName)
+			}
+		}
+	}
+	if clientName == "" {
+		return nil, fmt.Errorf("could not determine client name — pass it explicitly or ensure the session has a client_id")
+	}
+
 	// Flask route uses <path:filepath> so slashes must NOT be escaped
-	path := fmt.Sprintf("/clients/%s/knowledge/%s", args.Name, args.Filepath)
+	path := fmt.Sprintf("/clients/%s/knowledge/%s", clientName, args.Filepath)
 
 	var result struct {
 		Path    string `json:"path"`

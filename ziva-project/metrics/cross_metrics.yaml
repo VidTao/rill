@@ -1,0 +1,52 @@
+# Metrics: Cross-Object (Attribution)
+# Auto-generated from ontology cross-object metrics
+# Joins orders + ad performance via attribution_weights
+
+type: metrics_view
+display_name: Attribution Analytics
+description: 'Cross-object metrics: ROAS, CPA, attributed revenue (joins orders + ads via attribution_weights)'
+model: cross_metrics
+timeseries: date
+dimensions:
+- name: campaign_id
+  display_name: Campaign ID
+  column: campaign_id
+- name: channel
+  display_name: Channel
+  column: channel
+- name: attribution_model
+  display_name: Attribution Model
+  column: attribution_model
+- name: date
+  display_name: Date
+  column: date
+measures:
+- name: record_count
+  display_name: Touchpoints
+  expression: count(*)
+  format_preset: humanize
+- name: metric_roas
+  display_name: Roas
+  expression: SUM(total_price * weight) / NULLIF(SUM(spend), 0)
+  description: Return on ad spend (attributed revenue / ad spend)
+  format_preset: humanize
+- name: metric_cpa
+  display_name: Cpa
+  expression: SUM(spend) / NULLIF(COUNT(DISTINCT order_id), 0)
+  description: Cost per acquisition (ad spend / attributed orders)
+  format_preset: currency_usd
+- name: metric_attributed_revenue
+  display_name: Attributed Revenue
+  expression: SUM(total_price * weight)
+  description: Revenue attributed to ad campaigns
+  format_preset: currency_usd
+- name: metric_attributed_orders
+  display_name: Attributed Orders
+  expression: COUNT(DISTINCT order_id)
+  description: Orders attributed to ad campaigns
+  format_preset: currency_usd
+- name: metric_new_customer_roas
+  display_name: New Customer Roas
+  expression: SUM(CASE WHEN orders_count = 1 THEN total_price * weight ELSE 0 END) / NULLIF(SUM(spend), 0)
+  description: ROAS from first-time customers only
+  format_preset: currency_usd
