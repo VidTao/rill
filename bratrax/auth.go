@@ -101,37 +101,24 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 4. Resolve client based on role
-		//    Viewers without project_id are allowed through for onboarding routes
-		//    (they don't have a client yet — it's created by /onboard/start).
-		var client *Client
+		// 4. Resolve client by strict 1:1 user.id == organization_id mapping (admin & viewer alike).
+		//    Users without a matching client are allowed through for onboarding routes
+		//    (their client is created by /onboard/start).
 		isOnboardRoute := strings.HasPrefix(r.URL.Path, "/bratrax/onboard/") ||
 			strings.HasPrefix(r.URL.Path, "/onboard/") ||
 			strings.HasPrefix(r.URL.Path, "/bratrax/connectors/")
-		switch user.Role {
-		case "admin":
-			client, err = a.clientStore.GetDefault(r.Context())
-		case "viewer":
-			if user.ProjectID == nil {
-				if !isOnboardRoute {
-					writeJSONError(w, http.StatusUnauthorized, "viewer has no project assigned")
-					return
-				}
-				// Allow through without client for onboarding
-			} else {
-				client, err = a.clientStore.GetByRillProjectID(r.Context(), *user.ProjectID)
-			}
-		default:
+		if user.Role != "admin" && user.Role != "viewer" {
 			writeJSONError(w, http.StatusForbidden, fmt.Sprintf("unsupported role: %s", user.Role))
 			return
 		}
+		client, err := a.clientStore.GetByOrganizationID(r.Context(), user.ID)
 		if err != nil {
 			a.logger.Error("client lookup failed", zap.Error(err))
 			writeJSONError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if client == nil && !isOnboardRoute {
-			writeJSONError(w, http.StatusForbidden, "no client associated with user")
+			writeJSONError(w, http.StatusForbidden, "no client provisioned for this user")
 			return
 		}
 
@@ -154,6 +141,49 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		// 7. Forward to next handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ResolveClientFromCookie validates the bratrax_auth JWT cookie on the request and returns
+// the authenticated user and their associated client. Returns (nil, nil, nil) if no cookie
+// or invalid token. Returns (user, nil, nil) if the user has no provisioned client yet.
+// Reusable from other middleware (e.g. the per-user instance router).
+func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, error) {
+	cookie, err := r.Cookie(bratraxCookieName)
+	if err != nil {
+		// Authorization header fallback (popup OAuth flows)
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			cookie = &http.Cookie{Value: strings.TrimPrefix(authHeader, "Bearer ")}
+		} else {
+			return nil, nil, nil
+		}
+	}
+
+	claims := &bratraxClaims{}
+	_, err = jwt.ParseWithClaims(cookie.Value, claims, a.jwks.Keyfunc, jwt.WithValidMethods([]string{"RS256"}))
+	if err != nil {
+		return nil, nil, nil
+	}
+	if !claims.VerifyIssuer(bratraxIssuerURL, true) || !claims.VerifyAudience(bratraxAudienceURL, true) {
+		return nil, nil, nil
+	}
+
+	userID, err := strconv.Atoi(claims.Subject)
+	if err != nil {
+		return nil, nil, nil
+	}
+	user, err := a.userStore.GetByID(r.Context(), userID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("user lookup: %w", err)
+	}
+	if user == nil {
+		return nil, nil, nil
+	}
+	client, err := a.clientStore.GetByOrganizationID(r.Context(), user.ID)
+	if err != nil {
+		return user, nil, fmt.Errorf("client lookup: %w", err)
+	}
+	return user, client, nil
 }
 
 // stripBratraxHeaders removes all Bratrax identity headers from a request

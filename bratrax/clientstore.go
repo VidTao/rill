@@ -24,6 +24,7 @@ type Client struct {
 type ClientStoreInterface interface {
 	GetByRillProjectID(ctx context.Context, projectID string) (*Client, error)
 	GetDefault(ctx context.Context) (*Client, error)
+	GetByOrganizationID(ctx context.Context, orgID int) (*Client, error)
 }
 
 // ClientStore provides read operations on bratrax_clients.
@@ -59,6 +60,25 @@ func (s *ClientStore) GetDefault(ctx context.Context) (*Client, error) {
 	err := s.db.GetContext(ctx, &c,
 		`SELECT client_id, organization_id, company_name, clickhouse_db, rill_project_id, created_at
 		 FROM bratrax_clients ORDER BY created_at, client_id LIMIT 1`,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("bratrax clientstore: query failed: %w", err)
+	}
+	return &c, nil
+}
+
+// GetByOrganizationID returns the client whose organization_id matches the given ID.
+// In Bratrax's data model each user (bratrax_users.id) maps 1:1 to a client row via
+// bratrax_clients.organization_id. Returns (nil, nil) if no row matches.
+func (s *ClientStore) GetByOrganizationID(ctx context.Context, orgID int) (*Client, error) {
+	var c Client
+	err := s.db.GetContext(ctx, &c,
+		`SELECT client_id, organization_id, company_name, clickhouse_db, rill_project_id, created_at
+		 FROM bratrax_clients WHERE organization_id = $1`,
+		orgID,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

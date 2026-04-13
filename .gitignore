@@ -103,3 +103,5 @@ vite.config.ts.timestamp-*
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+rill.exe
+rill.exe~

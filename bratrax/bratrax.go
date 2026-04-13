@@ -10,6 +10,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// Handlers carries the constructed bratrax components so that callers (e.g. the
+// CLI's local app) can register additional middleware (such as the instance router)
+// against the same AuthMapper used by the /bratrax/* proxy.
+type Handlers struct {
+	AuthMapper *AuthMapper
+}
+
 // RegisterHandlers registers Bratrax proxy routes on the given ServeMux.
 // It wires up: observability → auth → reverse proxy, plus auth endpoints.
 //
@@ -22,23 +29,25 @@ import (
 //   - GET  /bratrax/.well-known/jwks.json — public JWKS
 //   - GET  /bratrax/health        — local health check
 //   - /bratrax/                    — catch-all proxy to Flask API
-func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) error {
+//
+// Returns the constructed Handlers so the caller can install additional middleware.
+func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error) {
 	cfg, err := ConfigFromEnv()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// User store
 	store, err := NewUserStore(cfg.UsersDSN)
 	if err != nil {
-		return fmt.Errorf("bratrax: failed to create user store: %w", err)
+		return nil, fmt.Errorf("bratrax: failed to create user store: %w", err)
 	}
 
 	// Auth service (ephemeral JWT issuer)
 	authSvc, err := NewAuthService(store, logger)
 	if err != nil {
 		store.Close()
-		return fmt.Errorf("bratrax: failed to create auth service: %w", err)
+		return nil, fmt.Errorf("bratrax: failed to create auth service: %w", err)
 	}
 
 	clientStore := NewClientStore(store.DB())
@@ -91,5 +100,5 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) error {
 		zap.String("users_dsn", redactedDSN),
 	)
 
-	return nil
+	return &Handlers{AuthMapper: authMapper}, nil
 }
