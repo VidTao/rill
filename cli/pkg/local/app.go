@@ -196,7 +196,7 @@ func NewApp(ctx context.Context, opts *AppOptions) (*App, error) {
 		ConnectionCacheSize:          100,
 		MetastoreConnector:           "metastore",
 		QueryCacheSizeBytes:          int64(datasize.MB * 100),
-		AllowHostAccess:              true,
+		AllowHostAccess:              allowHostAccess(), // see allow_host_access_*.go
 		SystemConnectors:             systemConnectors,
 		SecurityEngineCacheSize:      1000,
 		ControllerLogBufferCapacity:  10000,

@@ -1,0 +1,40 @@
+FROM golang:1.25-bookworm AS builder
+
+RUN apt-get update && apt-get install -y git gcc g++ make nodejs npm
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Build web-local
+RUN npm install && npm run build
+
+# Embed web-local into CLI
+RUN mkdir -p cli/pkg/web/embed/dist && \
+    cp -r web-local/build/* cli/pkg/web/embed/dist/
+
+# Embed DuckDB extensions
+RUN go run scripts/embed_duckdb_ext/main.go
+
+# Build CLI binary
+RUN CGO_ENABLED=1 go build -o /rill cli/main.go
+
+# Runtime
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y ca-certificates git && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /rill /usr/local/bin/rill
+RUN chmod +x /usr/local/bin/rill
+
+RUN groupadd -g 1001 rill && useradd -m -u 1001 -s /bin/sh -g rill rill
+USER rill
+
+RUN rill runtime install-duckdb-extensions
+
+EXPOSE 9009 49009
+
+ENTRYPOINT ["rill"]
+CMD ["start", "--port", "9009", "--port-grpc", "49009"]

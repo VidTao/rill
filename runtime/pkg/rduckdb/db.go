@@ -881,9 +881,17 @@ func (d *db) openDBAndAttach(ctx context.Context, uri, ignoreTable string, initQ
 	d.logger.Debug("open db", zap.Bool("read", read), zap.String("uri", uri), observability.ZapCtx(ctx))
 	// open the db
 	var settings map[string]string
-	dsn, err := url.Parse(uri)
-	if err != nil {
-		return nil, err
+	// On Windows, file paths like "c:\..." get parsed as URI with scheme "c", mangling the path.
+	// Detect Windows drive-letter paths and bypass url.Parse — treat the whole thing as a file path.
+	dsn := &url.URL{}
+	var err error
+	if isWindowsPath(uri) {
+		dsn.Path = filepath.ToSlash(uri)
+	} else {
+		dsn, err = url.Parse(uri)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if read {
 		settings = d.opts.ReadSettings
@@ -1150,7 +1158,9 @@ func (d *db) localMetaPath(table string) string {
 }
 
 func (d *db) localDBPath(table, version string) string {
-	return filepath.Join(d.localPath, table, version, "data.db")
+	// Use forward slashes — paths get embedded in DuckDB SQL (ATTACH) and parsed by url.Parse,
+	// both of which choke on Windows backslashes.
+	return filepath.ToSlash(filepath.Join(d.localPath, table, version, "data.db"))
 }
 
 // initLocalTable creates a directory for the table in the local path.
@@ -1500,4 +1510,17 @@ func generateDSN(path, encodedQuery string) string {
 		return path
 	}
 	return path + "?" + encodedQuery
+}
+
+// isWindowsPath returns true if uri looks like a Windows drive-letter path (e.g. "c:\foo" or "c:/foo").
+// Such paths must NOT be passed through url.Parse, which would treat the drive letter as a URL scheme.
+func isWindowsPath(uri string) bool {
+	if len(uri) < 3 {
+		return false
+	}
+	c := uri[0]
+	if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+		return false
+	}
+	return uri[1] == ':' && (uri[2] == '\\' || uri[2] == '/')
 }
