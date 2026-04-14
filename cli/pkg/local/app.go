@@ -375,6 +375,33 @@ func NewApp(ctx context.Context, opts *AppOptions) (*App, error) {
 	}
 	if opts.MultiTenant {
 		sugarLogger.Infof("Multi-tenant mode: per-client projects loaded from %s", projectsDir)
+
+		// Create a real empty "default" instance so the frontend has a valid runtime
+		// target before the user logs in. Without this, requests to /v1/instances/default/...
+		// return 404 which TanStack Query retries infinitely, crashing the browser.
+		// Once the user logs in, the InstanceRouterMiddleware rewrites "default" to their
+		// real per-client instance ID.
+		defaultOlapConfig, _ := structpb.NewStruct(map[string]any{"pool_size": "1"})
+		defaultRepoConfig, _ := structpb.NewStruct(map[string]any{"dsn": projectPath})
+		defaultCatalogConfig, _ := structpb.NewStruct(map[string]any{"dsn": fmt.Sprintf("file:%s?cache=shared", filepath.Join(dbDirPath, "default_catalog.db"))})
+		defaultInst := &drivers.Instance{
+			ID:               DefaultInstanceID,
+			Environment:      opts.Environment,
+			OLAPConnector:    "duckdb",
+			RepoConnector:    "repo",
+			CatalogConnector: "catalog",
+			Connectors: []*runtimev1.Connector{
+				{Type: "duckdb", Name: "duckdb", Config: defaultOlapConfig},
+				{Type: "file", Name: "repo", Config: defaultRepoConfig},
+				{Type: "sqlite", Name: "catalog", Config: defaultCatalogConfig},
+			},
+			Variables:                        vars,
+			Annotations:                      map[string]string{},
+			IgnoreInitialInvalidProjectError: true,
+		}
+		if err := rt.CreateInstance(ctx, defaultInst); err != nil {
+			sugarLogger.Warnf("Failed to create default placeholder instance: %v", err)
+		}
 	}
 
 	// Create app

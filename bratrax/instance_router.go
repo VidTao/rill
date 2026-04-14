@@ -59,9 +59,11 @@ func InstanceRouterMiddleware(next http.Handler, authMapper *AuthMapper, ensure 
 			writeJSONError(w, http.StatusInternalServerError, "client lookup failed")
 			return
 		}
-		// No valid cookie / no client — pass through unchanged. The runtime will
-		// return its own error (typically 404 / "driver: not found") which the
-		// frontend handles gracefully (redirects to login).
+		// No valid cookie / no client — pass through unchanged to the runtime.
+		// In multi-tenant mode a real empty "default" instance exists (created at
+		// startup), so the runtime returns valid responses for an uninitialized
+		// project. The frontend shows the welcome/login screen. The bratrax auth
+		// layer (/bratrax/auth/me) handles the actual login redirect.
 		if client == nil {
 			next.ServeHTTP(w, r)
 			return
@@ -71,7 +73,14 @@ func InstanceRouterMiddleware(next http.Handler, authMapper *AuthMapper, ensure 
 		instanceID, err := ensure(client.ClickhouseDB)
 		if err != nil {
 			if errors.Is(err, ErrProjectNotProvisioned) {
-				writeJSONError(w, http.StatusServiceUnavailable, "Project not provisioned for client '"+client.ClientID+"' — run bratrax compile + deploy")
+				// Project directory doesn't exist yet — likely mid-onboarding (before
+				// /onboard/activate compiles the project). Fall through to the empty
+				// "default" instance so the frontend doesn't crash. Once the project
+				// is compiled, the next request will find the directory and create
+				// the real instance.
+				logger.Debug("instance router: project not provisioned, falling back to default",
+					zap.String("client", client.ClientID), zap.String("clickhouse_db", client.ClickhouseDB))
+				next.ServeHTTP(w, r)
 				return
 			}
 			logger.Error("instance router: ensure failed", zap.String("client", client.ClientID), zap.Error(err))
