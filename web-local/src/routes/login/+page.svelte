@@ -3,6 +3,7 @@
   import { page } from "$app/stores";
   import { bratraxLogin } from "$lib/bratrax/auth";
   import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 
   let email = "";
   let password = "";
@@ -15,6 +16,9 @@
     try {
       const { user } = await bratraxLogin(email, password);
       bratraxUser.set(user);
+      // Clear stale query cache from previous session/instance.
+      // Without this, dashboards can show infinite spinner instead of rendering.
+      queryClient.clear();
       const redirect = $page.url.searchParams.get("redirect") || "/";
       await goto(redirect);
     } catch (e) {

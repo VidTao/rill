@@ -3,6 +3,7 @@
   import { bratraxSignup } from "$lib/bratrax/auth";
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import { onboardStart } from "$lib/bratrax/onboarding/api";
+  import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 
   let email = "";
   let password = "";
@@ -17,6 +18,7 @@
       // Step 1: Create user + get JWT cookie
       const { user } = await bratraxSignup(email, password, companyName);
       bratraxUser.set(user);
+      queryClient.clear();
 
       // Step 2: Create client + CH database + template
       const result = await onboardStart(companyName);
