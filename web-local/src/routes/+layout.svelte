@@ -28,6 +28,7 @@
   import { onMount } from "svelte";
   import type { LayoutData } from "./$types";
   import "@rilldata/web-common/app.css";
+  import "../bratrax-theme.css";
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
 
@@ -104,28 +105,25 @@
       {/if}
 
       {#if $bratraxUser}
-        <nav class="flex gap-4 border-b border-border px-4 py-1.5 text-sm">
+        <nav class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0">
           <a
             href="/"
-            class="text-fg-secondary hover:text-fg-primary"
-            class:font-medium={!onConnectorsPage && !onWorkshopPage}
-            class:text-fg-primary={!onConnectorsPage && !onWorkshopPage}
+            class="bratrax-nav-link"
+            class:active={!onConnectorsPage && !onWorkshopPage}
           >
             Developer
           </a>
           <a
             href="/connectors"
-            class="text-fg-secondary hover:text-fg-primary"
-            class:font-medium={onConnectorsPage}
-            class:text-fg-primary={onConnectorsPage}
+            class="bratrax-nav-link"
+            class:active={onConnectorsPage}
           >
             Connectors
           </a>
           <a
             href="/workshop"
-            class="text-fg-secondary hover:text-fg-primary"
-            class:font-medium={onWorkshopPage}
-            class:text-fg-primary={onWorkshopPage}
+            class="bratrax-nav-link"
+            class:active={onWorkshopPage}
           >
             Workshop
           </a>
@@ -161,5 +159,28 @@
   /* Prevent trackpad navigation (like other code editors, like vscode.dev). */
   :global(body) {
     overscroll-behavior: none;
+  }
+
+  /* Bratrax navigation tabs — Space Mono, uppercase, acid green active */
+  .bratrax-nav-link {
+    font-family: "Space Mono", "JetBrains Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #858585 !important;
+    text-decoration: none;
+    padding: 10px 0;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .bratrax-nav-link:hover {
+    color: #E8E4DC !important;
+  }
+
+  .bratrax-nav-link.active {
+    color: #D4FF00 !important;
+    border-bottom-color: #D4FF00;
   }
 </style>

@@ -399,17 +399,24 @@
   });
 </script>
 
-<div class="flex min-h-screen w-screen items-start justify-center bg-surface py-12">
-  <div class="w-full max-w-2xl rounded-lg border border-border bg-white p-8 shadow-sm">
+<div class="flex min-h-screen w-screen items-start justify-center bg-bratrax-bg py-12">
+  <div class="relative w-full max-w-2xl border border-bratrax-border bg-bratrax-surface p-8">
+    <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
     <div class="mb-6">
-      <h1 class="text-xl font-semibold text-fg-primary">Build your stack</h1>
-      <p class="mt-1 text-sm text-fg-secondary">
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        ONBOARDING
+      </div>
+      <h1 class="text-2xl font-black text-bratrax-text-headline">
+        Build your <span class="font-serif italic text-bratrax-acid">stack</span>
+      </h1>
+      <p class="mt-2 text-sm font-light text-bratrax-text-body">
         Connect the tools you use. We'll set up your analytics automatically.
       </p>
     </div>
 
     {#if error}
-      <div class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
         {error}
       </div>
     {/if}
@@ -418,11 +425,11 @@
       {#each categories as category}
         <div>
           <div class="mb-2 flex items-baseline gap-2">
-            <span class="text-xs font-semibold uppercase tracking-wide text-fg-secondary">
+            <span class="font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
               {category.title}
             </span>
             {#if category.subtitle}
-              <span class="text-xs text-fg-secondary">({category.subtitle})</span>
+              <span class="font-mono text-[10px] text-bratrax-text-muted">({category.subtitle})</span>
             {/if}
           </div>
           <div class="flex flex-wrap gap-2">
@@ -430,31 +437,31 @@
               <button
                 on:click={() => handleCardClick(platform)}
                 disabled={loading === platform.id || platform.id === "shopify" || platform.type === "coming_soon"}
-                class="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all
+                class="flex items-center gap-2 border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-all
                   {isConnected(platform.id)
-                    ? 'border-green-300 bg-green-50 text-green-800'
+                    ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
                     : isSelected(platform.id)
-                      ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
+                      ? 'border-bratrax-cyan/50 bg-bratrax-cyan/10 text-bratrax-cyan'
                       : platform.type === 'coming_soon'
-                        ? 'border-border bg-gray-50 text-fg-secondary cursor-not-allowed'
-                        : 'border-border bg-white text-fg-primary hover:border-gray-400 hover:bg-gray-50'}
+                        ? 'border-bratrax-border bg-bratrax-bg text-bratrax-text-muted cursor-not-allowed'
+                        : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}
                   {loading === platform.id ? 'opacity-50' : ''}
                   {platform.id === 'shopify' ? 'cursor-default' : ''}"
               >
                 <span
-                  class="h-3 w-3 rounded-full"
+                  class="h-3 w-3"
                   style="background-color: {platform.color}"
                 ></span>
                 {#if isConnected(platform.id)}
-                  <svg class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <svg class="h-4 w-4 text-bratrax-acid" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 {/if}
                 {platform.name}
                 {#if platform.type === "coming_soon"}
-                  <span class="text-xs text-fg-secondary">coming soon</span>
+                  <span class="text-bratrax-text-muted normal-case tracking-normal">coming soon</span>
                 {:else if loading === platform.id}
-                  <span class="text-xs text-fg-secondary">connecting...</span>
+                  <span class="text-bratrax-text-muted normal-case tracking-normal">connecting...</span>
                 {/if}
               </button>
             {/each}
@@ -463,8 +470,8 @@
       {/each}
     </div>
 
-    <div class="mt-8 flex items-center justify-between">
-      <p class="text-xs text-fg-secondary">
+    <div class="mt-8 flex items-center justify-between border-t border-bratrax-border pt-6">
+      <p class="font-mono text-[10px] text-bratrax-text-muted">
         {#if !hasAdPlatform}
           Connect at least 1 ad platform to continue
         {:else}
@@ -474,9 +481,9 @@
       <button
         on:click={handleActivate}
         disabled={!hasAdPlatform || activating}
-        class="rounded bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+        class="bg-bratrax-acid px-6 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
       >
-        {activating ? "Setting up..." : "Set up my analytics →"}
+        {activating ? "SETTING UP..." : "SET UP MY ANALYTICS →"}
       </button>
     </div>
   </div>

@@ -78,11 +78,17 @@
 
 <style lang="postcss">
   .viewer-nav {
-    @apply flex flex-col h-full w-56 border-r bg-surface py-3 px-2 overflow-y-auto flex-none;
+    @apply flex flex-col h-full w-56 border-r border-bratrax-border bg-bratrax-surface py-3 px-2 overflow-y-auto flex-none;
   }
 
   .nav-header {
-    @apply text-[10px] font-semibold uppercase text-fg-muted px-2 pb-1;
+    font-family: "Space Mono", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(212, 255, 0, 0.7);
+    padding: 0 8px 4px;
   }
 
   .nav-list {
@@ -93,15 +99,21 @@
   }
 
   .nav-link {
-    @apply block px-2 py-1.5 text-sm text-fg-primary rounded;
+    @apply block px-2 py-1.5 text-sm;
+    color: #B0B0B0;
     text-decoration: none;
+    transition: all 0.15s;
   }
 
   .nav-link:hover {
-    @apply bg-gray-100;
+    background-color: #1E1E1E;
+    color: #E8E4DC;
   }
 
   .nav-link.active {
-    @apply bg-indigo-50 text-indigo-700 font-medium;
+    background-color: rgba(212, 255, 0, 0.08);
+    color: #D4FF00;
+    border-left: 2px solid #D4FF00;
+    font-weight: 500;
   }
 </style>

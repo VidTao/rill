@@ -38,12 +38,14 @@
   }
 </script>
 
-<div class="flex h-screen w-screen items-center justify-center bg-surface">
-  <div
-    class="w-full max-w-md rounded-lg border border-border bg-white p-8 shadow-sm"
-  >
+<div class="onboard-page flex h-screen w-screen items-center justify-center">
+  <div class="halftone-bg"></div>
+
+  <div class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-8">
+    <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
     <div class="mb-6 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-green-50">
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center bg-bratrax-acid/10">
         <svg class="h-10 w-10" viewBox="0 0 24 24" fill="none">
           <path
             d="M15.34 3.8c-.13-.06-.28-.02-.36.09-.07.11-1.67 2.57-1.79 2.75-.12.18-.38.3-.63.3h-.01c-.05 0-.1-.01-.15-.02-.45-.12-1.02-.18-1.6-.18-.58 0-1.15.06-1.6.18-.05.01-.1.02-.15.02-.26 0-.51-.12-.63-.3-.12-.18-1.72-2.64-1.79-2.75a.28.28 0 00-.36-.09c-.13.06-.19.21-.14.35l1.07 3.06c.04.12.01.25-.08.34-.18.18-.33.39-.44.62-.11.23-.18.48-.2.74-.02.26 0 .53.07.79.07.26.18.51.33.73.3.44.74.78 1.27.98.53.2 1.12.3 1.72.3s1.19-.1 1.72-.3c.53-.2.97-.54 1.27-.98.15-.22.26-.47.33-.73.07-.26.09-.53.07-.79a2.1 2.1 0 00-.2-.74c-.11-.23-.26-.44-.44-.62a.33.33 0 01-.08-.34l1.07-3.06c.05-.14-.01-.29-.14-.35z"
@@ -55,8 +57,10 @@
           />
         </svg>
       </div>
-      <h1 class="text-xl font-semibold text-fg-primary">Connect Shopify</h1>
-      <p class="mt-2 text-sm text-fg-secondary">
+      <h1 class="text-2xl font-black text-bratrax-text-headline">
+        Connect <span class="font-serif italic text-bratrax-acid">Shopify</span>
+      </h1>
+      <p class="mt-2 text-sm font-light text-bratrax-text-body">
         Connect your store to start pulling orders, products, and customers.
         We never modify your store.
       </p>
@@ -64,23 +68,21 @@
 
     <div class="flex flex-col gap-4">
       {#if error}
-        <div
-          class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-        >
+        <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
           {error}
         </div>
       {/if}
 
       <div class="flex flex-col gap-1">
-        <label for="shop" class="text-sm font-medium text-fg-primary"
-          >Store URL</label
-        >
+        <label for="shop" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+          Store URL
+        </label>
         <input
           id="shop"
           type="text"
           bind:value={shop}
           required
-          class="rounded border border-border bg-white px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+          class="border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
           placeholder="mystore.myshopify.com"
         />
       </div>
@@ -88,14 +90,33 @@
       <button
         on:click={handleConnect}
         disabled={loading}
-        class="w-full rounded bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50"
+        class="w-full bg-bratrax-acid px-4 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
       >
-        {loading ? "Connecting..." : "Connect Shopify"}
+        {loading ? "CONNECTING..." : "CONNECT SHOPIFY →"}
       </button>
 
-      <p class="text-center text-xs text-fg-secondary">
+      <p class="text-center font-mono text-[10px] text-bratrax-text-muted">
         We'll request read access to orders, products, and customers.
       </p>
     </div>
   </div>
 </div>
+
+<style>
+  .onboard-page {
+    background-color: #0A0A0A;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .halftone-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(
+      rgba(212, 255, 0, 0.06) 1.5px,
+      transparent 1.5px
+    );
+    background-size: 8px 8px;
+  }
+</style>

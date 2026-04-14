@@ -1,0 +1,441 @@
+/*
+ * Bratrax Design System — CSS Variable Overrides
+ * Imported AFTER @rilldata/web-common/app.css in the root layout.
+ * Overrides the light-mode :root block from web-common.
+ *
+ * Aesthetic: Contrarian, editorial, anti-BI-tool.
+ * Halftone print meets graph paper meets screen-print energy.
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   1. SEMANTIC TOKEN OVERRIDES
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: dark;
+
+  /* -- Radius: zero everywhere -- */
+  --radius: 0px;
+
+  /* -- Surface tokens -- */
+  --surface-base: #0A0A0A;
+  --surface-subtle: #141414;
+  --surface-background: #0A0A0A;
+  --surface-hover: #1E1E1E;
+  --surface-active: #2A2A2A;
+  --surface-overlay: #141414;
+  --surface-muted: #1E1E1E;
+  --surface-card: #141414;
+
+  /* -- Foreground tokens -- */
+  --fg-primary: #E8E4DC;
+  --fg-secondary: #B0B0B0;
+  --fg-tertiary: #858585;
+  --fg-inverse: #0A0A0A;
+  --fg-muted: #858585;
+  --fg-disabled: #555555;
+  --fg-accent: #D4FF00;
+
+  /* -- Accent tokens (acid green) -- */
+  --accent-primary: #D4FF00;
+  --accent-primary-action: #D4FF00;
+  --accent-secondary: #00D4FF;
+  --accent-secondary-action: #00D4FF;
+
+  /* -- Icon tokens -- */
+  --icon-default: #B0B0B0;
+  --icon-muted: #858585;
+  --icon-disabled: #555555;
+  --icon-accent: #D4FF00;
+
+  /* -- Border -- */
+  --border: #3A3A3A;
+
+  /* -- Ring / focus -- */
+  --ring-focus: #D4FF00;
+  --ring-offset: #0A0A0A;
+
+  /* -- Input -- */
+  --input: #1E1E1E;
+
+  /* -- Destructive (tomato red) -- */
+  --destructive: #FF3B30;
+  --destructive-foreground: #FAFAF5;
+
+  /* -- Popover -- */
+  --popover: #141414;
+  --popover-accent: #1E1E1E;
+  --popover-foreground: #E8E4DC;
+  --popover-footer: #141414;
+
+  /* -- Tooltip -- */
+  --tooltip: #1E1E1E;
+
+  /* -- White override -- */
+  --white: #E8E4DC;
+
+  /* -- Editor -- */
+  --editor-selection: #D4FF0033;
+  --line-highlight: #1E1E1E;
+
+  /* -- Feature colors (acid-tinted for dark bg) -- */
+  --canvas: #00D4FF;
+  --explore: #D4FF00;
+  --metrics: #B4A0FF;
+  --model: #00D4FF;
+  --source: var(--model);
+  --api: #FF9F43;
+  --data: #FF6B9D;
+  --theme: #FF6B9D;
+  --connector: #858585;
+
+  /* -- Dimension / Measure -- */
+  --dimension: #1a2a1a;
+  --dimension-foreground: #D4FF00;
+  --dimension-border: #D4FF00;
+  --measure: #1a2a2a;
+  --measure-foreground: #00D4FF;
+  --measure-border: #00D4FF;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. GLOBAL RESETS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Kill all border-radius — sharp edges are the Bratrax identity */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. TYPOGRAPHY OVERRIDES
+   ═══════════════════════════════════════════════════════════ */
+
+body {
+  font-family: "Outfit", "Helvetica Neue", sans-serif !important;
+  background-color: #0A0A0A !important;
+  color: #E8E4DC !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root {
+  --monospace: "Space Mono", "JetBrains Mono", monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Outfit", "Helvetica Neue", sans-serif;
+  color: #FAFAF5;
+}
+
+/* Anchor styling — acid green, no underline by default */
+a {
+  color: #D4FF00 !important;
+  text-decoration: none;
+}
+
+a:hover {
+  opacity: 0.88;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   4. GRAPH PAPER GRID OVERLAY
+   ═══════════════════════════════════════════════════════════ */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background-image:
+    linear-gradient(rgba(212, 255, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 255, 0, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   5. HARDCODED COLOR OVERRIDES
+   Override Tailwind utility classes that use hardcoded white/gray
+   values in web-common components.
+   ═══════════════════════════════════════════════════════════ */
+
+/* White backgrounds → dark surface */
+.bg-white {
+  background-color: #141414 !important;
+}
+
+/* Gray scale overrides for dark mode */
+.bg-gray-50 {
+  background-color: #0A0A0A !important;
+}
+
+.bg-gray-100 {
+  background-color: #1E1E1E !important;
+}
+
+.bg-gray-200 {
+  background-color: #2A2A2A !important;
+}
+
+/* Text gray overrides */
+.text-gray-400 {
+  color: #858585 !important;
+}
+
+.text-gray-500 {
+  color: #858585 !important;
+}
+
+.text-gray-600 {
+  color: #B0B0B0 !important;
+}
+
+.text-gray-700 {
+  color: #B0B0B0 !important;
+}
+
+.text-gray-800 {
+  color: #E8E4DC !important;
+}
+
+.text-gray-900 {
+  color: #FAFAF5 !important;
+}
+
+/* Border gray overrides */
+.border-gray-100 {
+  border-color: #2A2A2A !important;
+}
+
+.border-gray-200 {
+  border-color: #3A3A3A !important;
+}
+
+.border-gray-300 {
+  border-color: #3A3A3A !important;
+}
+
+/* Indigo → acid green */
+.bg-indigo-600 {
+  background-color: #D4FF00 !important;
+  color: #0A0A0A !important;
+}
+
+.bg-indigo-500 {
+  background-color: #D4FF00 !important;
+  color: #0A0A0A !important;
+}
+
+.bg-indigo-50 {
+  background-color: rgba(212, 255, 0, 0.08) !important;
+}
+
+.text-indigo-600 {
+  color: #D4FF00 !important;
+}
+
+.text-indigo-700 {
+  color: #D4FF00 !important;
+}
+
+.text-indigo-900 {
+  color: #FAFAF5 !important;
+}
+
+.border-indigo-200 {
+  border-color: rgba(212, 255, 0, 0.25) !important;
+}
+
+.border-indigo-300 {
+  border-color: rgba(212, 255, 0, 0.25) !important;
+}
+
+/* Blue → acid or cyan */
+.bg-blue-600 {
+  background-color: #D4FF00 !important;
+  color: #0A0A0A !important;
+}
+
+.bg-blue-700 {
+  background-color: #D4FF00 !important;
+  color: #0A0A0A !important;
+}
+
+.bg-blue-50 {
+  background-color: rgba(212, 255, 0, 0.05) !important;
+}
+
+.text-blue-600 {
+  color: #D4FF00 !important;
+}
+
+.text-blue-700 {
+  color: #D4FF00 !important;
+}
+
+.hover\:bg-blue-50\/50:hover {
+  background-color: rgba(212, 255, 0, 0.05) !important;
+}
+
+/* Green connected states → acid green */
+.bg-green-50 {
+  background-color: rgba(212, 255, 0, 0.05) !important;
+}
+
+.bg-green-100 {
+  background-color: rgba(212, 255, 0, 0.12) !important;
+}
+
+.bg-green-600 {
+  background-color: #D4FF00 !important;
+  color: #0A0A0A !important;
+}
+
+.text-green-600 {
+  color: #D4FF00 !important;
+}
+
+.text-green-700 {
+  color: #D4FF00 !important;
+}
+
+.text-green-800 {
+  color: #D4FF00 !important;
+}
+
+.border-green-200 {
+  border-color: rgba(212, 255, 0, 0.25) !important;
+}
+
+.border-green-300 {
+  border-color: rgba(212, 255, 0, 0.3) !important;
+}
+
+.hover\:bg-green-50\/50:hover {
+  background-color: rgba(212, 255, 0, 0.05) !important;
+}
+
+/* Red states → tomato red */
+.bg-red-50 {
+  background-color: rgba(255, 59, 48, 0.08) !important;
+}
+
+.border-red-200 {
+  border-color: rgba(255, 59, 48, 0.25) !important;
+}
+
+.text-red-600 {
+  color: #FF3B30 !important;
+}
+
+.text-red-700 {
+  color: #FF3B30 !important;
+}
+
+/* Yellow states → acid green dim */
+.bg-yellow-100 {
+  background-color: rgba(212, 255, 0, 0.15) !important;
+}
+
+.text-yellow-700 {
+  color: #D4FF00 !important;
+}
+
+.bg-yellow-500 {
+  background-color: #D4FF00 !important;
+}
+
+/* Purple category → lavender */
+.bg-purple-100 {
+  background-color: rgba(180, 160, 255, 0.15) !important;
+}
+
+.text-purple-700 {
+  color: #B4A0FF !important;
+}
+
+/* Orange category → acid/warm */
+.bg-orange-100 {
+  background-color: rgba(255, 159, 67, 0.15) !important;
+}
+
+.text-orange-700 {
+  color: #FF9F43 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   6. SHADOW OVERRIDES
+   ═══════════════════════════════════════════════════════════ */
+
+.shadow-sm,
+.shadow,
+.shadow-md,
+.shadow-lg,
+.shadow-xl,
+.shadow-2xl {
+  box-shadow: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   7. SCROLLBAR STYLING (dark)
+   ═══════════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3A3A3A;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. INPUT FIELD OVERRIDES
+   ═══════════════════════════════════════════════════════════ */
+
+input, textarea, select {
+  background-color: #0A0A0A !important;
+  border-color: #3A3A3A !important;
+  color: #E8E4DC !important;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: #D4FF00 !important;
+  box-shadow: 0 0 0 1px #D4FF00 !important;
+  outline: none !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #858585 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   9. DIALOG / POPOVER OVERRIDES
+   ═══════════════════════════════════════════════════════════ */
+
+[data-radix-popper-content-wrapper],
+[role="dialog"],
+[role="alertdialog"],
+[data-floating-ui-portal] {
+  border-radius: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   10. SELECTION COLOR
+   ═══════════════════════════════════════════════════════════ */
+
+::selection {
+  background: rgba(212, 255, 0, 0.3);
+  color: #FAFAF5;
+}
