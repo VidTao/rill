@@ -184,7 +184,7 @@
 /* Body — use Bratrax fonts and theme-aware colors */
 body {
   font-family: "Outfit", "Helvetica Neue", sans-serif !important;
-  font-size: 14px !important;
+  font-size: 0.875rem !important; /* 14px — readability floor */
   background-color: var(--bratrax-bg) !important;
   color: var(--bratrax-text-primary) !important;
   -webkit-font-smoothing: antialiased;
@@ -432,12 +432,12 @@ input::placeholder, textarea::placeholder {
 .text-\[12\.5px\],
 .text-\[13px\],
 .text-\[13\.5px\] {
-  font-size: 14px !important;
+  font-size: 0.875rem !important; /* 14px */
   line-height: 1.5 !important;
 }
 
 /* text-2xs (sometimes defined by apps) — also floor at 14px */
 .text-2xs {
-  font-size: 14px !important;
+  font-size: 0.875rem !important; /* 14px */
   line-height: 1.5 !important;
 }
