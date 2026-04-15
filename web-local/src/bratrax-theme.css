@@ -1,23 +1,129 @@
 /*
  * Bratrax Design System — CSS Variable Overrides
  * Imported AFTER @rilldata/web-common/app.css in the root layout.
- * Overrides the light-mode :root block from web-common.
  *
- * Aesthetic: Contrarian, editorial, anti-BI-tool.
- * Halftone print meets graph paper meets screen-print energy.
+ * Two themes:
+ *   :root            → Light mode (default). Editorial, print-inspired.
+ *   :root.dark       → Dark mode. Contrarian, screen-print energy.
+ *
+ * Both modes share: acid green accent, Outfit/DM Serif/Space Mono fonts,
+ * zero border-radius, graph paper grid, sharp editorial typography.
  */
 
 /* ═══════════════════════════════════════════════════════════
-   1. SEMANTIC TOKEN OVERRIDES
+   1. THEME-AGNOSTIC TOKENS (apply to both modes)
    ═══════════════════════════════════════════════════════════ */
 
 :root {
+  --radius: 0px;
+  --monospace: "Space Mono", "JetBrains Mono", monospace;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. LIGHT THEME (default :root)
+   Off-white cream backgrounds, near-black text, acid accents.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: light;
+
+  /* -- Bratrax tokens (theme-aware) -- */
+  --bratrax-bg: #FAFAF5;
+  --bratrax-surface: #FFFFFF;
+  --bratrax-hover: #F0EEE7;
+  --bratrax-border: #C8C4BC;
+  --bratrax-acid: #D4FF00;
+  --bratrax-acid-dim: rgba(212, 255, 0, 0.7);
+  --bratrax-acid-muted: rgba(212, 255, 0, 0.1);
+  --bratrax-tomato: #E63226;
+  --bratrax-cyan: #0099CC;
+  --bratrax-lavender: #8B7AE8;
+  --bratrax-text-headline: #0A0A0A;
+  --bratrax-text-primary: #1A1A1A;
+  --bratrax-text-body: #3A3A3A;
+  --bratrax-text-muted: #858585;
+
+  /* -- Graph paper (subtle dark lines on light bg) -- */
+  --bratrax-grid-line: rgba(10, 10, 10, 0.04);
+
+  /* -- Halftone texture (subtle dark dots on light bg) -- */
+  --bratrax-halftone: rgba(10, 10, 10, 0.05);
+
+  /* -- Semantic token overrides (Rill web-common) -- */
+  --surface-base: #FAFAF5;
+  --surface-subtle: #F5F3EC;
+  --surface-background: #FAFAF5;
+  --surface-hover: #F0EEE7;
+  --surface-active: #E8E4DC;
+  --surface-overlay: #FFFFFF;
+  --surface-muted: #F0EEE7;
+  --surface-card: #FFFFFF;
+
+  --fg-primary: #1A1A1A;
+  --fg-secondary: #3A3A3A;
+  --fg-tertiary: #555555;
+  --fg-inverse: #FAFAF5;
+  --fg-muted: #858585;
+  --fg-disabled: #B0B0B0;
+  --fg-accent: #0A0A0A;
+
+  --accent-primary: #0A0A0A;
+  --accent-primary-action: #0A0A0A;
+  --accent-secondary: #0099CC;
+  --accent-secondary-action: #0099CC;
+
+  --icon-default: #3A3A3A;
+  --icon-muted: #858585;
+  --icon-disabled: #B0B0B0;
+  --icon-accent: #0A0A0A;
+
+  --border: #C8C4BC;
+  --ring-focus: #D4FF00;
+  --ring-offset: #FAFAF5;
+  --input: #FFFFFF;
+
+  --destructive: #E63226;
+  --destructive-foreground: #FAFAF5;
+
+  --popover: #FFFFFF;
+  --popover-accent: #F0EEE7;
+  --popover-foreground: #0A0A0A;
+  --popover-footer: #F5F3EC;
+
+  --tooltip: #0A0A0A;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. DARK THEME (:root.dark)
+   Near-black backgrounds, off-white text, acid accents.
+   ═══════════════════════════════════════════════════════════ */
+
+:root.dark {
   color-scheme: dark;
 
-  /* -- Radius: zero everywhere -- */
-  --radius: 0px;
+  /* -- Bratrax tokens -- */
+  --bratrax-bg: #0A0A0A;
+  --bratrax-surface: #141414;
+  --bratrax-hover: #1E1E1E;
+  --bratrax-border: #3A3A3A;
+  --bratrax-acid: #D4FF00;
+  --bratrax-acid-dim: rgba(212, 255, 0, 0.7);
+  --bratrax-acid-muted: rgba(212, 255, 0, 0.08);
+  --bratrax-tomato: #FF3B30;
+  --bratrax-cyan: #00D4FF;
+  --bratrax-lavender: #B4A0FF;
+  --bratrax-text-headline: #FAFAF5;
+  --bratrax-text-primary: #E8E4DC;
+  --bratrax-text-body: #B0B0B0;
+  --bratrax-text-muted: #858585;
 
-  /* -- Surface tokens -- */
+  /* -- Graph paper (subtle acid lines on dark bg) -- */
+  --bratrax-grid-line: rgba(212, 255, 0, 0.04);
+
+  /* -- Halftone texture -- */
+  --bratrax-halftone: rgba(212, 255, 0, 0.06);
+
+  /* -- Semantic tokens -- */
   --surface-base: #0A0A0A;
   --surface-subtle: #141414;
   --surface-background: #0A0A0A;
@@ -27,7 +133,6 @@
   --surface-muted: #1E1E1E;
   --surface-card: #141414;
 
-  /* -- Foreground tokens -- */
   --fg-primary: #E8E4DC;
   --fg-secondary: #B0B0B0;
   --fg-tertiary: #858585;
@@ -36,70 +141,37 @@
   --fg-disabled: #555555;
   --fg-accent: #D4FF00;
 
-  /* -- Accent tokens (acid green) -- */
   --accent-primary: #D4FF00;
   --accent-primary-action: #D4FF00;
   --accent-secondary: #00D4FF;
   --accent-secondary-action: #00D4FF;
 
-  /* -- Icon tokens -- */
   --icon-default: #B0B0B0;
   --icon-muted: #858585;
   --icon-disabled: #555555;
   --icon-accent: #D4FF00;
 
-  /* -- Border -- */
   --border: #3A3A3A;
-
-  /* -- Ring / focus -- */
   --ring-focus: #D4FF00;
   --ring-offset: #0A0A0A;
-
-  /* -- Input -- */
   --input: #1E1E1E;
 
-  /* -- Destructive (tomato red) -- */
   --destructive: #FF3B30;
   --destructive-foreground: #FAFAF5;
 
-  /* -- Popover -- */
   --popover: #141414;
   --popover-accent: #1E1E1E;
   --popover-foreground: #E8E4DC;
   --popover-footer: #141414;
 
-  /* -- Tooltip -- */
   --tooltip: #1E1E1E;
 
-  /* -- White override -- */
-  --white: #E8E4DC;
-
-  /* -- Editor -- */
   --editor-selection: #D4FF0033;
   --line-highlight: #1E1E1E;
-
-  /* -- Feature colors (acid-tinted for dark bg) -- */
-  --canvas: #00D4FF;
-  --explore: #D4FF00;
-  --metrics: #B4A0FF;
-  --model: #00D4FF;
-  --source: var(--model);
-  --api: #FF9F43;
-  --data: #FF6B9D;
-  --theme: #FF6B9D;
-  --connector: #858585;
-
-  /* -- Dimension / Measure -- */
-  --dimension: #1a2a1a;
-  --dimension-foreground: #D4FF00;
-  --dimension-border: #D4FF00;
-  --measure: #1a2a2a;
-  --measure-foreground: #00D4FF;
-  --measure-border: #00D4FF;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   2. GLOBAL RESETS
+   4. GLOBAL STYLES (both themes)
    ═══════════════════════════════════════════════════════════ */
 
 /* Kill all border-radius — sharp edges are the Bratrax identity */
@@ -109,30 +181,23 @@
   border-radius: 0 !important;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   3. TYPOGRAPHY OVERRIDES
-   ═══════════════════════════════════════════════════════════ */
-
+/* Body — use Bratrax fonts and theme-aware colors */
 body {
   font-family: "Outfit", "Helvetica Neue", sans-serif !important;
-  background-color: #0A0A0A !important;
-  color: #E8E4DC !important;
+  background-color: var(--bratrax-bg) !important;
+  color: var(--bratrax-text-primary) !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-:root {
-  --monospace: "Space Mono", "JetBrains Mono", monospace;
-}
-
 h1, h2, h3, h4, h5, h6 {
   font-family: "Outfit", "Helvetica Neue", sans-serif;
-  color: #FAFAF5;
+  color: var(--bratrax-text-headline);
 }
 
-/* Anchor styling — acid green, no underline by default */
+/* Anchor styling — theme-aware */
 a {
-  color: #D4FF00 !important;
+  color: var(--accent-primary) !important;
   text-decoration: none;
 }
 
@@ -141,7 +206,8 @@ a:hover {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   4. GRAPH PAPER GRID OVERLAY
+   5. GRAPH PAPER GRID OVERLAY
+   Theme-aware — dark lines on light, acid lines on dark.
    ═══════════════════════════════════════════════════════════ */
 
 body::before {
@@ -151,223 +217,14 @@ body::before {
   pointer-events: none;
   z-index: 9998;
   background-image:
-    linear-gradient(rgba(212, 255, 0, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(212, 255, 0, 0.04) 1px, transparent 1px);
+    linear-gradient(var(--bratrax-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bratrax-grid-line) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   5. HARDCODED COLOR OVERRIDES
-   Override Tailwind utility classes that use hardcoded white/gray
-   values in web-common components.
-   ═══════════════════════════════════════════════════════════ */
-
-/* White backgrounds → dark surface */
-.bg-white {
-  background-color: #141414 !important;
-}
-
-/* Gray scale overrides for dark mode */
-.bg-gray-50 {
-  background-color: #0A0A0A !important;
-}
-
-.bg-gray-100 {
-  background-color: #1E1E1E !important;
-}
-
-.bg-gray-200 {
-  background-color: #2A2A2A !important;
-}
-
-/* Text gray overrides */
-.text-gray-400 {
-  color: #858585 !important;
-}
-
-.text-gray-500 {
-  color: #858585 !important;
-}
-
-.text-gray-600 {
-  color: #B0B0B0 !important;
-}
-
-.text-gray-700 {
-  color: #B0B0B0 !important;
-}
-
-.text-gray-800 {
-  color: #E8E4DC !important;
-}
-
-.text-gray-900 {
-  color: #FAFAF5 !important;
-}
-
-/* Border gray overrides */
-.border-gray-100 {
-  border-color: #2A2A2A !important;
-}
-
-.border-gray-200 {
-  border-color: #3A3A3A !important;
-}
-
-.border-gray-300 {
-  border-color: #3A3A3A !important;
-}
-
-/* Indigo → acid green */
-.bg-indigo-600 {
-  background-color: #D4FF00 !important;
-  color: #0A0A0A !important;
-}
-
-.bg-indigo-500 {
-  background-color: #D4FF00 !important;
-  color: #0A0A0A !important;
-}
-
-.bg-indigo-50 {
-  background-color: rgba(212, 255, 0, 0.08) !important;
-}
-
-.text-indigo-600 {
-  color: #D4FF00 !important;
-}
-
-.text-indigo-700 {
-  color: #D4FF00 !important;
-}
-
-.text-indigo-900 {
-  color: #FAFAF5 !important;
-}
-
-.border-indigo-200 {
-  border-color: rgba(212, 255, 0, 0.25) !important;
-}
-
-.border-indigo-300 {
-  border-color: rgba(212, 255, 0, 0.25) !important;
-}
-
-/* Blue → acid or cyan */
-.bg-blue-600 {
-  background-color: #D4FF00 !important;
-  color: #0A0A0A !important;
-}
-
-.bg-blue-700 {
-  background-color: #D4FF00 !important;
-  color: #0A0A0A !important;
-}
-
-.bg-blue-50 {
-  background-color: rgba(212, 255, 0, 0.05) !important;
-}
-
-.text-blue-600 {
-  color: #D4FF00 !important;
-}
-
-.text-blue-700 {
-  color: #D4FF00 !important;
-}
-
-.hover\:bg-blue-50\/50:hover {
-  background-color: rgba(212, 255, 0, 0.05) !important;
-}
-
-/* Green connected states → acid green */
-.bg-green-50 {
-  background-color: rgba(212, 255, 0, 0.05) !important;
-}
-
-.bg-green-100 {
-  background-color: rgba(212, 255, 0, 0.12) !important;
-}
-
-.bg-green-600 {
-  background-color: #D4FF00 !important;
-  color: #0A0A0A !important;
-}
-
-.text-green-600 {
-  color: #D4FF00 !important;
-}
-
-.text-green-700 {
-  color: #D4FF00 !important;
-}
-
-.text-green-800 {
-  color: #D4FF00 !important;
-}
-
-.border-green-200 {
-  border-color: rgba(212, 255, 0, 0.25) !important;
-}
-
-.border-green-300 {
-  border-color: rgba(212, 255, 0, 0.3) !important;
-}
-
-.hover\:bg-green-50\/50:hover {
-  background-color: rgba(212, 255, 0, 0.05) !important;
-}
-
-/* Red states → tomato red */
-.bg-red-50 {
-  background-color: rgba(255, 59, 48, 0.08) !important;
-}
-
-.border-red-200 {
-  border-color: rgba(255, 59, 48, 0.25) !important;
-}
-
-.text-red-600 {
-  color: #FF3B30 !important;
-}
-
-.text-red-700 {
-  color: #FF3B30 !important;
-}
-
-/* Yellow states → acid green dim */
-.bg-yellow-100 {
-  background-color: rgba(212, 255, 0, 0.15) !important;
-}
-
-.text-yellow-700 {
-  color: #D4FF00 !important;
-}
-
-.bg-yellow-500 {
-  background-color: #D4FF00 !important;
-}
-
-/* Purple category → lavender */
-.bg-purple-100 {
-  background-color: rgba(180, 160, 255, 0.15) !important;
-}
-
-.text-purple-700 {
-  color: #B4A0FF !important;
-}
-
-/* Orange category → acid/warm */
-.bg-orange-100 {
-  background-color: rgba(255, 159, 67, 0.15) !important;
-}
-
-.text-orange-700 {
-  color: #FF9F43 !important;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   6. SHADOW OVERRIDES
+   6. SHADOW REMOVAL (both themes)
+   Editorial aesthetic — no drop shadows.
    ═══════════════════════════════════════════════════════════ */
 
 .shadow-sm,
@@ -380,7 +237,132 @@ body::before {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   7. SCROLLBAR STYLING (dark)
+   7. SELECTION COLOR (both themes)
+   ═══════════════════════════════════════════════════════════ */
+
+::selection {
+  background: rgba(212, 255, 0, 0.35);
+  color: var(--bratrax-text-headline);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. DARK-MODE-ONLY TAILWIND CLASS OVERRIDES
+   These force hardcoded light-mode Tailwind utilities
+   (bg-white, text-gray-*, bg-indigo-*, etc.) into the
+   Bratrax dark palette. Scoped under .dark so they don't
+   affect the light theme.
+   ═══════════════════════════════════════════════════════════ */
+
+.dark .bg-white {
+  background-color: #141414 !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #0A0A0A !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: #1E1E1E !important;
+}
+
+.dark .bg-gray-200 {
+  background-color: #2A2A2A !important;
+}
+
+.dark .text-gray-400 { color: #858585 !important; }
+.dark .text-gray-500 { color: #858585 !important; }
+.dark .text-gray-600 { color: #B0B0B0 !important; }
+.dark .text-gray-700 { color: #B0B0B0 !important; }
+.dark .text-gray-800 { color: #E8E4DC !important; }
+.dark .text-gray-900 { color: #FAFAF5 !important; }
+
+.dark .border-gray-100 { border-color: #2A2A2A !important; }
+.dark .border-gray-200 { border-color: #3A3A3A !important; }
+.dark .border-gray-300 { border-color: #3A3A3A !important; }
+
+/* Indigo → acid green (dark mode) */
+.dark .bg-indigo-600,
+.dark .bg-indigo-500 {
+  background-color: #D4FF00 !important;
+  color: #0A0A0A !important;
+}
+.dark .bg-indigo-50 { background-color: rgba(212, 255, 0, 0.08) !important; }
+.dark .text-indigo-600,
+.dark .text-indigo-700 { color: #D4FF00 !important; }
+.dark .text-indigo-900 { color: #FAFAF5 !important; }
+.dark .border-indigo-200,
+.dark .border-indigo-300 { border-color: rgba(212, 255, 0, 0.25) !important; }
+
+/* Blue → acid green (dark mode) */
+.dark .bg-blue-600,
+.dark .bg-blue-700 {
+  background-color: #D4FF00 !important;
+  color: #0A0A0A !important;
+}
+.dark .bg-blue-50 { background-color: rgba(212, 255, 0, 0.05) !important; }
+.dark .text-blue-600,
+.dark .text-blue-700 { color: #D4FF00 !important; }
+.dark .hover\:bg-blue-50\/50:hover { background-color: rgba(212, 255, 0, 0.05) !important; }
+
+/* Green connected → acid green (dark mode) */
+.dark .bg-green-50 { background-color: rgba(212, 255, 0, 0.05) !important; }
+.dark .bg-green-100 { background-color: rgba(212, 255, 0, 0.12) !important; }
+.dark .bg-green-600 {
+  background-color: #D4FF00 !important;
+  color: #0A0A0A !important;
+}
+.dark .text-green-600,
+.dark .text-green-700,
+.dark .text-green-800 { color: #D4FF00 !important; }
+.dark .border-green-200 { border-color: rgba(212, 255, 0, 0.25) !important; }
+.dark .border-green-300 { border-color: rgba(212, 255, 0, 0.3) !important; }
+.dark .hover\:bg-green-50\/50:hover { background-color: rgba(212, 255, 0, 0.05) !important; }
+
+/* Red errors → tomato (dark mode) */
+.dark .bg-red-50 { background-color: rgba(255, 59, 48, 0.08) !important; }
+.dark .border-red-200 { border-color: rgba(255, 59, 48, 0.25) !important; }
+.dark .text-red-600,
+.dark .text-red-700 { color: #FF3B30 !important; }
+
+/* Yellow → acid (dark mode) */
+.dark .bg-yellow-100 { background-color: rgba(212, 255, 0, 0.15) !important; }
+.dark .text-yellow-700 { color: #D4FF00 !important; }
+.dark .bg-yellow-500 { background-color: #D4FF00 !important; }
+
+/* Purple → lavender (dark mode) */
+.dark .bg-purple-100 { background-color: rgba(180, 160, 255, 0.15) !important; }
+.dark .text-purple-700 { color: #B4A0FF !important; }
+
+/* Orange (dark mode) */
+.dark .bg-orange-100 { background-color: rgba(255, 159, 67, 0.15) !important; }
+.dark .text-orange-700 { color: #FF9F43 !important; }
+
+/* ═══════════════════════════════════════════════════════════
+   9. LIGHT-MODE TAILWIND CLASS OVERRIDES
+   Keep most Tailwind defaults — just swap indigo/blue accents
+   to the Bratrax near-black "editorial" style.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Indigo → near-black (light mode buttons) */
+:root:not(.dark) .bg-indigo-600,
+:root:not(.dark) .bg-indigo-500 {
+  background-color: #0A0A0A !important;
+  color: #FAFAF5 !important;
+}
+:root:not(.dark) .text-indigo-600,
+:root:not(.dark) .text-indigo-700 { color: #0A0A0A !important; }
+
+/* Blue accents → near-black (light mode) */
+:root:not(.dark) .bg-blue-600,
+:root:not(.dark) .bg-blue-700 {
+  background-color: #0A0A0A !important;
+  color: #FAFAF5 !important;
+}
+:root:not(.dark) .text-blue-600,
+:root:not(.dark) .text-blue-700 { color: #0A0A0A !important; }
+
+/* ═══════════════════════════════════════════════════════════
+   10. SCROLLBAR STYLING (theme-aware)
    ═══════════════════════════════════════════════════════════ */
 
 ::-webkit-scrollbar {
@@ -389,39 +371,39 @@ body::before {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0A0A0A;
+  background: var(--bratrax-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3A3A3A;
+  background: var(--bratrax-border);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555555;
+  background: var(--bratrax-text-muted);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   8. INPUT FIELD OVERRIDES
+   11. INPUT FIELD OVERRIDES (theme-aware)
    ═══════════════════════════════════════════════════════════ */
 
 input, textarea, select {
-  background-color: #0A0A0A !important;
-  border-color: #3A3A3A !important;
-  color: #E8E4DC !important;
+  background-color: var(--bratrax-surface) !important;
+  border-color: var(--bratrax-border) !important;
+  color: var(--bratrax-text-primary) !important;
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: #D4FF00 !important;
-  box-shadow: 0 0 0 1px #D4FF00 !important;
+  border-color: var(--bratrax-acid) !important;
+  box-shadow: 0 0 0 1px var(--bratrax-acid) !important;
   outline: none !important;
 }
 
 input::placeholder, textarea::placeholder {
-  color: #858585 !important;
+  color: var(--bratrax-text-muted) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   9. DIALOG / POPOVER OVERRIDES
+   12. DIALOG / POPOVER RADIUS (both themes)
    ═══════════════════════════════════════════════════════════ */
 
 [data-radix-popper-content-wrapper],
@@ -429,13 +411,4 @@ input::placeholder, textarea::placeholder {
 [role="alertdialog"],
 [data-floating-ui-portal] {
   border-radius: 0 !important;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   10. SELECTION COLOR
-   ═══════════════════════════════════════════════════════════ */
-
-::selection {
-  background: rgba(212, 255, 0, 0.3);
-  color: #FAFAF5;
 }
