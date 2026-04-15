@@ -164,7 +164,7 @@
   /* Bratrax navigation tabs — Space Mono, uppercase, acid green active */
   .bratrax-nav-link {
     font-family: "Space Mono", "JetBrains Mono", monospace;
-    font-size: 11px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 2px;
     text-transform: uppercase;

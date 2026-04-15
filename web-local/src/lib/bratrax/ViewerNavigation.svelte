@@ -83,7 +83,7 @@
 
   .nav-header {
     font-family: "Space Mono", monospace;
-    font-size: 10px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 2px;
     text-transform: uppercase;
