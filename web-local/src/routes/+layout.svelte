@@ -91,7 +91,7 @@
 <QueryClientProvider client={queryClient}>
   <FileAndResourceWatcher {host} {instanceId}>
     <div class="body h-screen w-screen overflow-hidden absolute flex flex-col">
-      {#if data.initialized}
+      {#if $bratraxUser}
         <BannerCenter />
         <RepresentingUserBanner />
         <ApplicationHeader
@@ -99,12 +99,10 @@
           externalUser={$bratraxUser}
           onLogout={handleBratraxLogout}
         />
-        {#if $deploy}
+        {#if $deploy && data.initialized}
           <RemoteProjectManager />
         {/if}
-      {/if}
 
-      {#if $bratraxUser}
         <nav class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0">
           <a
             href="/"
