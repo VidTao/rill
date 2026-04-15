@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import Rill from "@rilldata/web-common/components/icons/Rill.svelte";
   import Breadcrumbs from "@rilldata/web-common/components/navigation/breadcrumbs/Breadcrumbs.svelte";
   import type {
     PathOption,
@@ -29,8 +28,16 @@
   const { deploy, developerChat, stickyDashboardState } = featureFlags;
 
   export let mode: string;
-  export let externalUser: { email: string; name: string } | null = null;
+  export let externalUser: { email: string; name: string; role?: string } | null = null;
   export let onLogout: (() => void) | null = null;
+
+  // If externalUser has a role, show a friendly role label instead of the dev/preview mode.
+  $: roleLabel =
+    externalUser?.role === "admin"
+      ? "Administrator"
+      : externalUser?.role === "viewer"
+        ? "Viewer"
+        : null;
 
   $: ({ instanceId } = $runtime);
 
@@ -100,11 +107,20 @@
 
 <header class:border-b={!onDeployPage} class="bg-surface-base">
   {#if !onDeployPage}
-    <a href="/">
-      <Rill />
+    <a href="/" class="bratrax-logo-link">
+      <img
+        src="/img/bratrax/bratrax-logo-dark.svg"
+        alt="Bratrax"
+        class="bratrax-logo bratrax-logo-light-mode"
+      />
+      <img
+        src="/img/bratrax/bratrax-logo-light.svg"
+        alt="Bratrax"
+        class="bratrax-logo bratrax-logo-dark-mode"
+      />
     </a>
 
-    <Tag text={mode} color="gray"></Tag>
+    <Tag text={roleLabel ?? mode} color="gray"></Tag>
 
     {#if mode === "Preview"}
       {#if $exploresQuery?.data}
@@ -144,6 +160,30 @@
   header {
     @apply w-full box-border;
     @apply flex gap-x-2 items-center px-4 flex-none;
-    @apply h-11;
+    @apply h-[3.75rem];
+  }
+
+  .bratrax-logo-link {
+    @apply flex items-center;
+  }
+
+  .bratrax-logo {
+    height: 1.5rem; /* 24px */
+    width: auto;
+    display: block;
+  }
+
+  /* Light mode (default): show the dark-text logo, hide the light-text one */
+  .bratrax-logo-dark-mode {
+    display: none;
+  }
+
+  /* Dark mode: show the light-text logo, hide the dark-text one */
+  :global(.dark) .bratrax-logo-light-mode {
+    display: none;
+  }
+
+  :global(.dark) .bratrax-logo-dark-mode {
+    display: block;
   }
 </style>
