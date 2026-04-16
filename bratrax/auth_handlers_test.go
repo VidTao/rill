@@ -79,6 +79,17 @@ func (m *mockUserStore) ListUsers(_ context.Context) ([]User, error) {
 	return m.users, nil
 }
 
+func (m *mockUserStore) LinkUserToClient(_ context.Context, userID int, clientID string) error {
+	for i := range m.users {
+		if m.users[i].ID == userID {
+			cid := clientID
+			m.users[i].ClientID = &cid
+			return nil
+		}
+	}
+	return nil
+}
+
 func setupAuthService(t *testing.T) (*AuthService, *mockUserStore) {
 	t.Helper()
 	store := newMockStore()

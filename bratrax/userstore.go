@@ -13,7 +13,7 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib" // pgx driver for database/sql
 )
 
-// User represents a row in the bratrax_users table.
+// User represents a row in the rill_users table.
 type User struct {
 	ID           int       `db:"id"            json:"id"`
 	Email        string    `db:"email"         json:"email"`
@@ -21,6 +21,7 @@ type User struct {
 	Name         string    `db:"name"          json:"name"`
 	Role         string    `db:"role"          json:"role"`
 	ProjectID    *string   `db:"project_id"    json:"project_id"`
+	ClientID     *string   `db:"client_id"     json:"client_id,omitempty"`
 	CreatedAt    time.Time `db:"created_at"    json:"created_at"`
 	UpdatedAt    time.Time `db:"updated_at"    json:"updated_at"`
 }
@@ -31,9 +32,10 @@ type UserStoreInterface interface {
 	GetByID(ctx context.Context, id int) (*User, error)
 	CreateUser(ctx context.Context, email, password, name, role string, projectID *string) (*User, error)
 	ListUsers(ctx context.Context) ([]User, error)
+	LinkUserToClient(ctx context.Context, userID int, clientID string) error
 }
 
-// UserStore provides CRUD operations on bratrax_users.
+// UserStore provides CRUD operations on rill_users.
 type UserStore struct {
 	db *sqlx.DB
 }
@@ -66,7 +68,7 @@ func (s *UserStore) Close() error {
 func (s *UserStore) Authenticate(ctx context.Context, email, password string) (*User, error) {
 	var u User
 	err := s.db.GetContext(ctx, &u,
-		"SELECT id, email, password_hash, name, role, project_id, created_at, updated_at FROM bratrax_users WHERE email = $1",
+		"SELECT id, email, password_hash, name, role, project_id, client_id, created_at, updated_at FROM rill_users WHERE email = $1",
 		email,
 	)
 	if err != nil {
@@ -87,7 +89,7 @@ func (s *UserStore) Authenticate(ctx context.Context, email, password string) (*
 func (s *UserStore) GetByID(ctx context.Context, id int) (*User, error) {
 	var u User
 	err := s.db.GetContext(ctx, &u,
-		"SELECT id, email, '' AS password_hash, name, role, project_id, created_at, updated_at FROM bratrax_users WHERE id = $1",
+		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, created_at, updated_at FROM rill_users WHERE id = $1",
 		id,
 	)
 	if err != nil {
@@ -101,6 +103,8 @@ func (s *UserStore) GetByID(ctx context.Context, id int) (*User, error) {
 
 // CreateUser inserts a new user with a bcrypt-hashed password.
 // Passwords longer than 72 bytes are rejected (bcrypt truncation limit).
+// The client_id column is left NULL at creation; the onboarding flow links
+// the user to a client later via LinkUserToClient.
 func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role string, projectID *string) (*User, error) {
 	if len(password) > 72 {
 		return nil, fmt.Errorf("bratrax userstore: password exceeds 72 bytes (bcrypt limit)")
@@ -112,9 +116,9 @@ func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role 
 
 	var u User
 	err = s.db.QueryRowxContext(ctx,
-		`INSERT INTO bratrax_users (email, password_hash, name, role, project_id)
+		`INSERT INTO rill_users (email, password_hash, name, role, project_id)
 		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, email, '' AS password_hash, name, role, project_id, created_at, updated_at`,
+		 RETURNING id, email, '' AS password_hash, name, role, project_id, client_id, created_at, updated_at`,
 		email, string(hash), name, role, projectID,
 	).StructScan(&u)
 	if err != nil {
@@ -128,10 +132,23 @@ func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role 
 func (s *UserStore) ListUsers(ctx context.Context) ([]User, error) {
 	var users []User
 	err := s.db.SelectContext(ctx, &users,
-		"SELECT id, email, '' AS password_hash, name, role, project_id, created_at, updated_at FROM bratrax_users ORDER BY id",
+		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, created_at, updated_at FROM rill_users ORDER BY id",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bratrax userstore: query failed: %w", err)
 	}
 	return users, nil
+}
+
+// LinkUserToClient sets the client_id FK on a user row. Used by onboarding
+// when a new client is created and needs to be associated with its user.
+func (s *UserStore) LinkUserToClient(ctx context.Context, userID int, clientID string) error {
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE rill_users SET client_id = $1, updated_at = NOW() WHERE id = $2",
+		clientID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("bratrax userstore: link user to client failed: %w", err)
+	}
+	return nil
 }

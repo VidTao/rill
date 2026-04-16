@@ -10,7 +10,7 @@ import (
 type Config struct {
 	// TargetURL is the parsed URL of the Flask API backend.
 	TargetURL *url.URL
-	// UsersDSN is the PostgreSQL connection string for the bratrax_users table.
+	// UsersDSN is the PostgreSQL connection string for the rill_users table.
 	UsersDSN string
 }
 

@@ -101,8 +101,8 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 4. Resolve client by strict 1:1 user.id == organization_id mapping (admin & viewer alike).
-		//    Users without a matching client are allowed through for onboarding routes
+		// 4. Resolve client via rill_users.client_id FK (admin & viewer alike).
+		//    Users without a linked client are allowed through for onboarding routes
 		//    (their client is created by /onboard/start).
 		isOnboardRoute := strings.HasPrefix(r.URL.Path, "/bratrax/onboard/") ||
 			strings.HasPrefix(r.URL.Path, "/onboard/") ||
@@ -111,7 +111,7 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			writeJSONError(w, http.StatusForbidden, fmt.Sprintf("unsupported role: %s", user.Role))
 			return
 		}
-		client, err := a.clientStore.GetByOrganizationID(r.Context(), user.ID)
+		client, err := a.clientStore.GetByUserID(r.Context(), user.ID)
 		if err != nil {
 			a.logger.Error("client lookup failed", zap.Error(err))
 			writeJSONError(w, http.StatusInternalServerError, "internal error")
@@ -126,14 +126,15 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		// Uses case-insensitive matching to block all variations.
 		stripBratraxHeaders(r.Header)
 
-		// 6. Set identity headers for Flask
+		// 6. Set identity headers for Flask.
+		// X-Bratrax-Org-Id is retained for backwards compatibility with legacy Flask
+		// code (credentials.py, connectors/*.py) that reads it via helpers/auth.get_user_organization_id().
+		// It now always mirrors user.id — which is what it semantically was in the old schema.
 		r.Header.Set("user-id", strconv.Itoa(user.ID))
 		r.Header.Set("X-Bratrax-User-Id", strconv.Itoa(user.ID))
+		r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(user.ID))
 		if client != nil {
 			r.Header.Set("X-Bratrax-Client-Id", client.ClientID)
-			r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(client.OrganizationID))
-		} else {
-			r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(user.ID))
 		}
 		r.Header.Set("X-Bratrax-User-Email", user.Email)
 		r.Header.Set("X-Bratrax-User-Role", user.Role)
@@ -179,7 +180,7 @@ func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, e
 	if user == nil {
 		return nil, nil, nil
 	}
-	client, err := a.clientStore.GetByOrganizationID(r.Context(), user.ID)
+	client, err := a.clientStore.GetByUserID(r.Context(), user.ID)
 	if err != nil {
 		return user, nil, fmt.Errorf("client lookup: %w", err)
 	}
