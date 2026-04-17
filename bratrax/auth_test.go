@@ -68,10 +68,10 @@ func setupAuthMapper(t *testing.T) (*AuthMapper, *AuthService, *mockUserStore, *
 	t.Helper()
 	userStore := newMockStore()
 	clientStore := newMockClientStore()
-	authSvc, err := NewAuthService(userStore, zap.NewNop())
+	authSvc, err := NewAuthService(userStore, zap.NewNop(), testIssuerURL, testAudienceURL, testSecureCookie)
 	require.NoError(t, err)
 
-	mapper := NewAuthMapper(userStore, clientStore, authSvc.JWKS(), zap.NewNop())
+	mapper := NewAuthMapper(userStore, clientStore, authSvc.JWKS(), zap.NewNop(), testIssuerURL, testAudienceURL)
 	return mapper, authSvc, userStore, clientStore
 }
 

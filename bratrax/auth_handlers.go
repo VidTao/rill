@@ -23,22 +23,22 @@ import (
 )
 
 const (
-	bratraxCookieName   = "bratrax_auth"
-	bratraxTokenTTL     = 24 * time.Hour
-	bratraxIssuerURL    = "http://localhost:9009/bratrax"
-	bratraxAudienceURL  = "http://localhost:9009"
-	bratraxSecureCookie = false // Set true in production (HTTPS)
-	maxRequestBodySize  = 1 << 20 // 1 MB
-	minPasswordLength   = 8
-	maxPasswordLength   = 72 // bcrypt truncates beyond 72 bytes
+	bratraxCookieName  = "bratrax_auth"
+	bratraxTokenTTL    = 24 * time.Hour
+	maxRequestBodySize = 1 << 20 // 1 MB
+	minPasswordLength  = 8
+	maxPasswordLength  = 72 // bcrypt truncates beyond 72 bytes
 )
 
 // AuthService handles authentication endpoints for Bratrax.
 type AuthService struct {
-	store  UserStoreInterface
-	issuer *auth.Issuer
-	jwks   *keyfunc.JWKS
-	logger *zap.Logger
+	store        UserStoreInterface
+	issuer       *auth.Issuer
+	jwks         *keyfunc.JWKS
+	logger       *zap.Logger
+	issuerURL    string
+	audienceURL  string
+	secureCookie bool
 }
 
 // jwksKeyFile is the path where the dev JWT signing key is persisted.
@@ -54,8 +54,8 @@ type persistedJWKS struct {
 // NewAuthService creates an AuthService with a persistent JWT issuer.
 // The signing key is saved to ~/.bratrax/jwt_dev_key.json on first run
 // and reused on subsequent runs so tokens survive restarts.
-func NewAuthService(store UserStoreInterface, logger *zap.Logger) (*AuthService, error) {
-	issuer, err := loadOrCreateIssuer(logger)
+func NewAuthService(store UserStoreInterface, logger *zap.Logger, issuerURL, audienceURL string, secureCookie bool) (*AuthService, error) {
+	issuer, err := loadOrCreateIssuer(logger, issuerURL)
 	if err != nil {
 		return nil, err
 	}
@@ -67,21 +67,24 @@ func NewAuthService(store UserStoreInterface, logger *zap.Logger) (*AuthService,
 	jwks := keyfunc.NewGiven(givenKeys)
 
 	return &AuthService{
-		store:  store,
-		issuer: issuer,
-		jwks:   jwks,
-		logger: logger,
+		store:        store,
+		issuer:       issuer,
+		jwks:         jwks,
+		logger:       logger,
+		issuerURL:    issuerURL,
+		audienceURL:  audienceURL,
+		secureCookie: secureCookie,
 	}, nil
 }
 
 // loadOrCreateIssuer loads a persisted JWKS from disk, or generates and saves a new one.
-func loadOrCreateIssuer(logger *zap.Logger) (*auth.Issuer, error) {
+func loadOrCreateIssuer(logger *zap.Logger, issuerURL string) (*auth.Issuer, error) {
 	// Try to load existing key
 	data, err := os.ReadFile(jwksKeyFile)
 	if err == nil {
 		var saved persistedJWKS
 		if jsonErr := json.Unmarshal(data, &saved); jsonErr == nil {
-			issuer, issErr := auth.NewIssuer(bratraxIssuerURL, saved.KeyID, saved.JwksJSON)
+			issuer, issErr := auth.NewIssuer(issuerURL, saved.KeyID, saved.JwksJSON)
 			if issErr == nil {
 				logger.Info("loaded persistent JWT key", zap.String("file", jwksKeyFile))
 				return issuer, nil
@@ -123,7 +126,7 @@ func loadOrCreateIssuer(logger *zap.Logger) (*auth.Issuer, error) {
 		}
 	}
 
-	return auth.NewIssuer(bratraxIssuerURL, jwk.KeyID, jwksJSON)
+	return auth.NewIssuer(issuerURL, jwk.KeyID, jwksJSON)
 }
 
 // Issuer returns the underlying JWT issuer (used for JWKS endpoint).
@@ -181,7 +184,7 @@ func (s *AuthService) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   int(bratraxTokenTTL.Seconds()),
 		HttpOnly: true,
-		Secure:   bratraxSecureCookie,
+		Secure:   s.secureCookie,
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -204,7 +207,7 @@ func (s *AuthService) HandleLogout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   bratraxSecureCookie,
+		Secure:   s.secureCookie,
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -353,7 +356,7 @@ func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   int(bratraxTokenTTL.Seconds()),
 		HttpOnly: true,
-		Secure:   bratraxSecureCookie,
+		Secure:   s.secureCookie,
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -380,10 +383,10 @@ func (s *AuthService) authenticateRequest(r *http.Request) (*User, error) {
 		return nil, err
 	}
 
-	if !claims.VerifyIssuer(bratraxIssuerURL, true) {
+	if !claims.VerifyIssuer(s.issuerURL, true) {
 		return nil, jwt.ErrTokenInvalidIssuer
 	}
-	if !claims.VerifyAudience(bratraxAudienceURL, true) {
+	if !claims.VerifyAudience(s.audienceURL, true) {
 		return nil, jwt.ErrTokenInvalidAudience
 	}
 
@@ -415,7 +418,7 @@ func (s *AuthService) issueToken(user *User) (string, error) {
 	}
 
 	return s.issuer.NewToken(auth.TokenOptions{
-		AudienceURL:       bratraxAudienceURL,
+		AudienceURL:       s.audienceURL,
 		Subject:           strconv.Itoa(user.ID),
 		TTL:               bratraxTokenTTL,
 		SystemPermissions: permissionsForRole(user.Role),

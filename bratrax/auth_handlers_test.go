@@ -90,10 +90,16 @@ func (m *mockUserStore) LinkUserToClient(_ context.Context, userID int, clientID
 	return nil
 }
 
+const (
+	testIssuerURL    = "http://localhost:9009/bratrax"
+	testAudienceURL  = "http://localhost:9009"
+	testSecureCookie = false
+)
+
 func setupAuthService(t *testing.T) (*AuthService, *mockUserStore) {
 	t.Helper()
 	store := newMockStore()
-	svc, err := NewAuthService(store, zap.NewNop())
+	svc, err := NewAuthService(store, zap.NewNop(), testIssuerURL, testAudienceURL, testSecureCookie)
 	require.NoError(t, err)
 	return svc, store
 }
