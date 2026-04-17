@@ -215,6 +215,7 @@
   let fbAccessToken = "";
   let fbEmail = "";
   let fbSdkReady = false;
+  let googleManagerMap: Record<string, string> = {};
 
   // Load Google Identity Services SDK + fetch client_id from backend
   onMount(async () => {
@@ -319,14 +320,20 @@
     customer_id: string;
     name?: string;
     descriptive_name?: string;
+    manager_account_id?: string;
     children?: GoogleAdAccountNode[];
   }
 
   function flattenAccounts(accounts: GoogleAdAccountNode[]): Array<{ id: string; name: string }> {
     const flat: Array<{ id: string; name: string }> = [];
+    googleManagerMap = {};
     function walk(list: GoogleAdAccountNode[]) {
       for (const acc of list) {
-        flat.push({ id: String(acc.customer_id), name: acc.name || acc.descriptive_name || String(acc.customer_id) });
+        const id = String(acc.customer_id);
+        flat.push({ id, name: acc.name || acc.descriptive_name || id });
+        if (acc.manager_account_id) {
+          googleManagerMap[id] = String(acc.manager_account_id);
+        }
         if (acc.children) walk(acc.children);
       }
     }
@@ -407,7 +414,10 @@
         : {
             code: googleAuthCode,
             client_id: clientId,
-            selectedAccounts: selected,
+            selectedAccounts: selected.map((a) => ({
+              ...a,
+              managerAccountId: googleManagerMap[a.accountId] || "",
+            })),
           };
 
       const res = await fetch(endpoint, {
