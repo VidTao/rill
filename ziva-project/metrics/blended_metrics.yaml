@@ -1,0 +1,44 @@
+# Metrics: Blended (Scorecard)
+# Timezone-aware — no pre-aggregation, Rill groups by date in user's timezone
+
+type: metrics_view
+display_name: Blended Analytics
+description: 'Scorecard: Total Sales (Shopify-aligned), ROAS, ad spend'
+model: blended_metrics
+timeseries: ts
+dimensions:
+- name: ts
+  display_name: Date
+  column: ts
+measures:
+- name: metric_total_sales
+  display_name: Total Sales
+  expression: SUM(net_sales) - SUM(returns)
+  description: Shopify Total Sales — subtotal minus refunds
+  format_preset: currency_usd
+- name: metric_blended_spend
+  display_name: Ads
+  expression: SUM(spend)
+  format_preset: currency_usd
+- name: metric_blended_roas
+  display_name: Blended Roas
+  expression: (SUM(net_sales) - SUM(returns)) / NULLIF(SUM(spend), 0)
+  description: Blended ROAS — Total Sales / ad spend
+  format_preset: humanize
+- name: metric_blended_cpa
+  display_name: Blended Cpa
+  expression: SUM(spend) / NULLIF(SUM(CASE WHEN revenue > 0 THEN 1 ELSE 0 END), 0)
+  description: Blended CPA — ad spend / orders
+  format_preset: currency_usd
+- name: metric_gross_sales
+  display_name: Gross Sales
+  expression: SUM(gross_sales)
+  format_preset: currency_usd
+- name: metric_returns
+  display_name: Returns
+  expression: SUM(returns)
+  format_preset: currency_usd
+- name: metric_discounts
+  display_name: Discounts
+  expression: SUM(discounts)
+  format_preset: currency_usd

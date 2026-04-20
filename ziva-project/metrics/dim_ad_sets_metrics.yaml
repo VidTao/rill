@@ -1,0 +1,30 @@
+# Metrics: Ad Set
+# Generated from ontology object: AdSet
+
+type: metrics_view
+display_name: Ad Set Analytics
+description: An ad set (Facebook) or ad group (Google/TikTok)
+table: dim_ad_sets
+dimensions:
+- name: ad_set_id
+  display_name: Ad Set Id
+  column: ad_set_id
+- name: ad_set_name
+  display_name: Ad Set Name
+  column: ad_set_name
+- name: campaign_id
+  display_name: Campaign Id
+  column: campaign_id
+- name: status
+  display_name: Status
+  column: status
+- name: channel
+  display_name: Channel
+  column: channel
+  description: Ad platform
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of ad set records

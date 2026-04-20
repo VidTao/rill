@@ -1,0 +1,9 @@
+# Source: dim_transactions
+
+type: source
+connector: clickhouse
+sql: "SELECT\n    client_id,\n    transaction_id,\n    order_id,\n    kind,\n    ifNull(amount,\
+  \ 0) AS amount,\n    currency,\n    gateway,\n    status,\n    toDateTime(ifNull(created_at,\
+  \ now())) AS created_at\nFROM ziva.dim_transactions FINAL"
+refresh:
+  cron: 0 * * * *

@@ -34,6 +34,7 @@ explores:
   defaults:
     time_range: P12M
   time_zones:
+  - America/New_York
   - UTC
   time_ranges:
   - PT24H

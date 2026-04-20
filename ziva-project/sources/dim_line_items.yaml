@@ -1,0 +1,9 @@
+# Source: dim_line_items
+
+type: source
+connector: clickhouse
+sql: "SELECT\n    client_id,\n    line_item_id,\n    order_id,\n    product_id,\n\
+  \    title,\n    toInt64(ifNull(quantity, 0)) AS quantity,\n    ifNull(price, 0)\
+  \ AS price,\n    sku\nFROM ziva.dim_line_items FINAL"
+refresh:
+  cron: 0 * * * *
