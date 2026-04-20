@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/c2h5oh/datasize"
@@ -60,6 +61,14 @@ type App struct {
 	pkceAuthenticators    map[string]*pkce.Authenticator // map of state to pkce authenticators
 	localURL              string
 	allowedOrigins        []string
+	// Multi-tenant fields. When MultiTenant is true, no default instance is created at startup;
+	// instead per-client instances are created on-demand by EnsureInstanceForClient.
+	MultiTenant bool
+	ProjectsDir string                 // base directory containing per-client project dirs
+	environment string                 // saved for instance creation
+	debugFlag   bool                   // saved for instance creation
+	instMu      sync.Mutex             // guards instances
+	instances   map[string]*drivers.Instance
 }
 
 type AppOptions struct {
@@ -76,31 +85,36 @@ type AppOptions struct {
 	LocalURL       string
 	AllowedOrigins []string
 	ServeUI        bool
+	MultiTenant    bool   // Bratrax: when true, skip creating a default instance; instances created per-user
+	ProjectsDir    string // Bratrax: base dir for per-client project dirs (multi-tenant mode)
 }
 
 func NewApp(ctx context.Context, opts *AppOptions) (*App, error) {
-	// Check that projectPath doesn't have an excessive number of files.
-	// Note: Relies on ListGlob enforcing drivers.RepoListLimit.
-	if _, err := os.Stat(opts.ProjectPath); err == nil {
-		repo, _, err := cmdutil.RepoForProjectPath(opts.ProjectPath)
-		if err != nil {
-			return nil, err
-		}
-		_, err = repo.ListGlob(ctx, "**", false)
-		if err != nil {
-			if errors.Is(err, drivers.ErrRepoListLimitExceeded) {
-				opts.Ch.PrintfError("The project directory exceeds the limit of %d files. Please open Rill against a directory with fewer files or set \"ignore_paths\" in rill.yaml.\n", drivers.RepoListLimit)
-				return nil, nil
+	// Skip project-path-bound setup when in multi-tenant mode (no default project).
+	if !opts.MultiTenant {
+		// Check that projectPath doesn't have an excessive number of files.
+		// Note: Relies on ListGlob enforcing drivers.RepoListLimit.
+		if _, err := os.Stat(opts.ProjectPath); err == nil {
+			repo, _, err := cmdutil.RepoForProjectPath(opts.ProjectPath)
+			if err != nil {
+				return nil, err
 			}
-			return nil, fmt.Errorf("failed to list project files: %w", err)
+			_, err = repo.ListGlob(ctx, "**", false)
+			if err != nil {
+				if errors.Is(err, drivers.ErrRepoListLimitExceeded) {
+					opts.Ch.PrintfError("The project directory exceeds the limit of %d files. Please open Rill against a directory with fewer files or set \"ignore_paths\" in rill.yaml.\n", drivers.RepoListLimit)
+					return nil, nil
+				}
+				return nil, fmt.Errorf("failed to list project files: %w", err)
+			}
 		}
-	}
 
-	// Always attempt to pull env for any valid Rill project (after projectPath is set)
-	if opts.PullEnv && opts.Ch.IsAuthenticated() && IsProjectInit(opts.ProjectPath) {
-		err := env.PullVars(ctx, opts.Ch, opts.ProjectPath, "", opts.Environment, false)
-		if err != nil && !errors.Is(err, cmdutil.ErrNoMatchingProject) {
-			opts.Ch.PrintfWarn("Warning: failed to pull environment credentials: %v\n", err)
+		// Always attempt to pull env for any valid Rill project (after projectPath is set)
+		if opts.PullEnv && opts.Ch.IsAuthenticated() && IsProjectInit(opts.ProjectPath) {
+			err := env.PullVars(ctx, opts.Ch, opts.ProjectPath, "", opts.Environment, false)
+			if err != nil && !errors.Is(err, cmdutil.ErrNoMatchingProject) {
+				opts.Ch.PrintfWarn("Warning: failed to pull environment credentials: %v\n", err)
+			}
 		}
 	}
 
@@ -135,24 +149,40 @@ func NewApp(ctx context.Context, opts *AppOptions) (*App, error) {
 		return nil, err
 	}
 
-	// Get full path to project
-	projectPath, err := filepath.Abs(opts.ProjectPath)
-	if err != nil {
-		return nil, err
-	}
-	dbDirPath := filepath.Join(projectPath, DefaultDBDir)
-	err = os.MkdirAll(dbDirPath, os.ModePerm) // Create project dir and db dir if it doesn't exist
-	if err != nil {
-		return nil, err
-	}
+	// Get full path to project. In multi-tenant mode use a shared work dir for storage/cache,
+	// since per-client paths are resolved later by EnsureInstanceForClient.
+	var projectPath, dbDirPath string
+	if opts.MultiTenant {
+		// Use a stable per-user work dir, e.g. ~/.rill/multi-tenant
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		projectPath = filepath.Join(homeDir, ".rill", "multi-tenant")
+		dbDirPath = filepath.Join(projectPath, DefaultDBDir)
+		if err := os.MkdirAll(dbDirPath, os.ModePerm); err != nil {
+			return nil, err
+		}
+	} else {
+		var err error
+		projectPath, err = filepath.Abs(opts.ProjectPath)
+		if err != nil {
+			return nil, err
+		}
+		dbDirPath = filepath.Join(projectPath, DefaultDBDir)
+		err = os.MkdirAll(dbDirPath, os.ModePerm) // Create project dir and db dir if it doesn't exist
+		if err != nil {
+			return nil, err
+		}
 
-	// old behaviour when data was stored in a stage.db file in the project directory.
-	// drop old file, remove this code after some time
-	_, err = os.Stat(filepath.Join(projectPath, "stage.db"))
-	if err == nil { // a old stage.db file exists
-		_ = os.Remove(filepath.Join(projectPath, "stage.db"))
-		_ = os.Remove(filepath.Join(projectPath, "stage.db.wal"))
-		logger.Info("Dropping old stage.db file and rebuilding project")
+		// old behaviour when data was stored in a stage.db file in the project directory.
+		// drop old file, remove this code after some time
+		_, err = os.Stat(filepath.Join(projectPath, "stage.db"))
+		if err == nil { // a old stage.db file exists
+			_ = os.Remove(filepath.Join(projectPath, "stage.db"))
+			_ = os.Remove(filepath.Join(projectPath, "stage.db.wal"))
+			logger.Info("Dropping old stage.db file and rebuilding project")
+		}
 	}
 
 	// Create a local runtime with an in-memory metastore
@@ -196,7 +226,7 @@ func NewApp(ctx context.Context, opts *AppOptions) (*App, error) {
 		ConnectionCacheSize:          100,
 		MetastoreConnector:           "metastore",
 		QueryCacheSizeBytes:          int64(datasize.MB * 100),
-		AllowHostAccess:              true,
+		AllowHostAccess:              allowHostAccess(), // see allow_host_access_*.go
 		SystemConnectors:             systemConnectors,
 		SecurityEngineCacheSize:      1000,
 		ControllerLogBufferCapacity:  10000,
@@ -309,23 +339,69 @@ func NewApp(ctx context.Context, opts *AppOptions) (*App, error) {
 		frontendURL = "http://localhost:3001"
 	}
 
-	// Create instance with its repo set to the project directory
-	inst := &drivers.Instance{
-		ID:                               DefaultInstanceID,
-		Environment:                      opts.Environment,
-		OLAPConnector:                    olapConnector.Name,
-		RepoConnector:                    repoConnector.Name,
-		AIConnector:                      aiConnector.Name,
-		CatalogConnector:                 catalogConnector.Name,
-		Connectors:                       connectors,
-		Variables:                        vars,
-		Annotations:                      map[string]string{},
-		IgnoreInitialInvalidProjectError: !isInit, // See ProjectParser reconciler for details
-		FrontendURL:                      frontendURL,
+	// Create instance with its repo set to the project directory.
+	// In multi-tenant mode skip this — instances are created lazily per-user.
+	var inst *drivers.Instance
+	if !opts.MultiTenant {
+		inst = &drivers.Instance{
+			ID:                               DefaultInstanceID,
+			Environment:                      opts.Environment,
+			OLAPConnector:                    olapConnector.Name,
+			RepoConnector:                    repoConnector.Name,
+			AIConnector:                      aiConnector.Name,
+			CatalogConnector:                 catalogConnector.Name,
+			Connectors:                       connectors,
+			Variables:                        vars,
+			Annotations:                      map[string]string{},
+			IgnoreInitialInvalidProjectError: !isInit, // See ProjectParser reconciler for details
+			FrontendURL:                      frontendURL,
+		}
+		err = rt.CreateInstance(ctx, inst)
+		if err != nil {
+			return nil, err
+		}
 	}
-	err = rt.CreateInstance(ctx, inst)
-	if err != nil {
-		return nil, err
+
+	// Resolve the projects directory for multi-tenant mode (defaults to $BRATRAX_PROJECTS_DIR or ./generated).
+	projectsDir := opts.ProjectsDir
+	if projectsDir == "" {
+		projectsDir = os.Getenv("BRATRAX_PROJECTS_DIR")
+	}
+	if projectsDir == "" {
+		projectsDir = "./generated"
+	}
+	if abs, absErr := filepath.Abs(projectsDir); absErr == nil {
+		projectsDir = abs
+	}
+	if opts.MultiTenant {
+		sugarLogger.Infof("Multi-tenant mode: per-client projects loaded from %s", projectsDir)
+
+		// Create a real empty "default" instance so the frontend has a valid runtime
+		// target before the user logs in. Without this, requests to /v1/instances/default/...
+		// return 404 which TanStack Query retries infinitely, crashing the browser.
+		// Once the user logs in, the InstanceRouterMiddleware rewrites "default" to their
+		// real per-client instance ID.
+		defaultOlapConfig, _ := structpb.NewStruct(map[string]any{"pool_size": "1"})
+		defaultRepoConfig, _ := structpb.NewStruct(map[string]any{"dsn": projectPath})
+		defaultCatalogConfig, _ := structpb.NewStruct(map[string]any{"dsn": fmt.Sprintf("file:%s?cache=shared", filepath.Join(dbDirPath, "default_catalog.db"))})
+		defaultInst := &drivers.Instance{
+			ID:               DefaultInstanceID,
+			Environment:      opts.Environment,
+			OLAPConnector:    "duckdb",
+			RepoConnector:    "repo",
+			CatalogConnector: "catalog",
+			Connectors: []*runtimev1.Connector{
+				{Type: "duckdb", Name: "duckdb", Config: defaultOlapConfig},
+				{Type: "file", Name: "repo", Config: defaultRepoConfig},
+				{Type: "sqlite", Name: "catalog", Config: defaultCatalogConfig},
+			},
+			Variables:                        vars,
+			Annotations:                      map[string]string{},
+			IgnoreInitialInvalidProjectError: true,
+		}
+		if err := rt.CreateInstance(ctx, defaultInst); err != nil {
+			sugarLogger.Warnf("Failed to create default placeholder instance: %v", err)
+		}
 	}
 
 	// Create app
@@ -337,6 +413,11 @@ func NewApp(ctx context.Context, opts *AppOptions) (*App, error) {
 		BaseLogger:            logger,
 		Verbose:               opts.Verbose,
 		Debug:                 opts.Debug,
+		MultiTenant:           opts.MultiTenant,
+		ProjectsDir:           projectsDir,
+		environment:           opts.Environment,
+		debugFlag:             opts.Debug,
+		instances:             make(map[string]*drivers.Instance),
 		ProjectPath:           projectPath,
 		ch:                    opts.Ch,
 		observabilityShutdown: shutdown,
@@ -346,10 +427,12 @@ func NewApp(ctx context.Context, opts *AppOptions) (*App, error) {
 		allowedOrigins:        opts.AllowedOrigins,
 	}
 
-	// Collect and emit information about connectors at start time
-	err = app.emitStartEvent(ctx)
-	if err != nil {
-		logger.Debug("failed to emit start event", zap.Error(err))
+	// Collect and emit information about connectors at start time (skip in multi-tenant — no project)
+	if !opts.MultiTenant {
+		err = app.emitStartEvent(ctx)
+		if err != nil {
+			logger.Debug("failed to emit start event", zap.Error(err))
+		}
 	}
 
 	return app, nil
@@ -382,9 +465,14 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 		a.Logger.Warnf("error finding install ID: %v", err)
 	}
 
-	// Build local metadata
+	// Build local metadata. In multi-tenant mode there's no default instance — use a placeholder
+	// instance ID; the bratrax instance-router middleware rewrites per-request.
+	instanceID := DefaultInstanceID
+	if a.Instance != nil {
+		instanceID = a.Instance.ID
+	}
 	metadata := &localMetadata{
-		InstanceID:       a.Instance.ID,
+		InstanceID:       instanceID,
 		GRPCPort:         grpcPort,
 		InstallID:        installID,
 		ProjectPath:      a.ProjectPath,
@@ -432,16 +520,44 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 	// if keypath and certpath are provided
 	secure := tlsCertPath != "" && tlsKeyPath != ""
 
-	// Start the local HTTP server
+	// Start the local HTTP server. We build the runtime HTTP handler ourselves
+	// so we can wrap it with the bratrax InstanceRouterMiddleware (multi-tenant mode).
 	group.Go(func() error {
-		return runtimeServer.ServeHTTP(ctx, func(mux *http.ServeMux) {
+		var bratraxHandlers *bratrax.Handlers
+		runtimeHandler, err := runtimeServer.HTTPHandler(ctx, func(mux *http.ServeMux) {
 			// Inject local-only endpoints on the runtime server
 			localServer.RegisterHandlers(mux, httpPort, secure, enableUI)
 			// Register Bratrax proxy (non-fatal — most users won't have Flask running)
-			if err := bratrax.RegisterHandlers(mux, a.BaseLogger); err != nil {
+			h, err := bratrax.RegisterHandlers(mux, a.BaseLogger)
+			if err != nil {
 				a.Logger.Warnf("bratrax proxy not registered: %v", err)
+				return
 			}
+			bratraxHandlers = h
 		}, enableUI)
+		if err != nil {
+			return err
+		}
+
+		// In multi-tenant mode, wrap the entire runtime handler with the instance router.
+		// It rewrites /v1/instances/default/... → /v1/instances/{client.ClickhouseDB}/...
+		// based on the bratrax_auth JWT cookie.
+		serveHandler := runtimeHandler
+		if a.MultiTenant && bratraxHandlers != nil {
+			ensure := func(clientDB string) (string, error) {
+				return a.EnsureInstanceForClient(ctx, clientDB)
+			}
+			serveHandler = bratrax.InstanceRouterMiddleware(runtimeHandler, bratraxHandlers.AuthMapper, ensure, a.BaseLogger)
+			a.Logger.Info("Multi-tenant: instance router middleware installed")
+		}
+
+		return graceful.ServeHTTP(ctx, serveHandler, graceful.ServeOptions{
+			Port:     httpPort,
+			GRPCPort: grpcPort,
+			CertPath: tlsCertPath,
+			KeyPath:  tlsKeyPath,
+			Logger:   a.BaseLogger,
+		})
 	})
 
 	// Start debug server on port 6060
@@ -550,4 +666,105 @@ func IsProjectInit(projectPath string) bool {
 		return false
 	}
 	return true
+}
+
+// EnsureInstanceForClient lazily creates a Rill instance for the given clientDB.
+// The instance ID equals clientDB. The project is loaded from {ProjectsDir}/{clientDB}/rill.
+// Safe to call concurrently. Returns the instance ID once ready.
+// Returns bratrax.ErrProjectNotProvisioned if the project directory is missing.
+func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB string) (string, error) {
+	if !a.MultiTenant {
+		// In single-tenant mode every request goes to the default instance.
+		return DefaultInstanceID, nil
+	}
+	if clientDB == "" {
+		return "", fmt.Errorf("EnsureInstanceForClient: empty clientDB")
+	}
+
+	a.instMu.Lock()
+	defer a.instMu.Unlock()
+
+	if _, ok := a.instances[clientDB]; ok {
+		return clientDB, nil
+	}
+
+	// Verify the project dir exists on disk before touching the runtime.
+	projectPath := filepath.Join(a.ProjectsDir, clientDB, "rill")
+	if !IsProjectInit(projectPath) {
+		return "", fmt.Errorf("%w: %s", bratrax.ErrProjectNotProvisioned, projectPath)
+	}
+
+	// Per-client tmp dir for DuckDB cache + catalog SQLite
+	dbDirPath := filepath.Join(projectPath, DefaultDBDir)
+	if err := os.MkdirAll(dbDirPath, os.ModePerm); err != nil {
+		return "", err
+	}
+
+	// OLAP (DuckDB) connector
+	olapConfig, err := structpb.NewStruct(map[string]any{
+		"pool_size":   "4",
+		"log_queries": strconv.FormatBool(a.debugFlag),
+	})
+	if err != nil {
+		return "", err
+	}
+	olapConnector := &runtimev1.Connector{Type: "duckdb", Name: "duckdb", Config: olapConfig}
+
+	// Repo connector pointing at the per-client project dir
+	repoConfig, err := structpb.NewStruct(map[string]any{
+		"dsn":                   projectPath,
+		"admin_url_override":    a.ch.AdminURLOverride,
+		"access_token_override": a.ch.AdminTokenOverride,
+		"home_dir":              a.ch.HomeDir,
+	})
+	if err != nil {
+		return "", err
+	}
+	repoConnector := &runtimev1.Connector{Type: "file", Name: "repo", Config: repoConfig}
+
+	// Catalog SQLite per client
+	catalogConfig, err := structpb.NewStruct(map[string]any{
+		"dsn": fmt.Sprintf("file:%s?cache=shared", filepath.Join(dbDirPath, DefaultCatalogStore)),
+	})
+	if err != nil {
+		return "", err
+	}
+	catalogConnector := &runtimev1.Connector{Type: "sqlite", Name: "catalog", Config: catalogConfig}
+
+	// Admin AI connector (shared across instances)
+	aiConfig, err := structpb.NewStruct(map[string]any{
+		"admin_url":    a.ch.AdminURL(),
+		"access_token": a.ch.AdminToken(),
+	})
+	if err != nil {
+		return "", err
+	}
+	aiConnector := &runtimev1.Connector{Type: "admin", Name: "admin", Config: aiConfig}
+
+	connectors := []*runtimev1.Connector{olapConnector, repoConnector, catalogConnector, aiConnector}
+	vars := map[string]string{
+		"rill.download_limit_bytes": "0",
+		"rill.stage_changes":        "false",
+		"rill.watch_repo":           "true",
+	}
+
+	inst := &drivers.Instance{
+		ID:                               clientDB,
+		Environment:                      a.environment,
+		OLAPConnector:                    olapConnector.Name,
+		RepoConnector:                    repoConnector.Name,
+		AIConnector:                      aiConnector.Name,
+		CatalogConnector:                 catalogConnector.Name,
+		Connectors:                       connectors,
+		Variables:                        vars,
+		Annotations:                      map[string]string{},
+		IgnoreInitialInvalidProjectError: false,
+		FrontendURL:                      a.localURL,
+	}
+	if err := a.Runtime.CreateInstance(ctx, inst); err != nil {
+		return "", fmt.Errorf("create instance for client %q: %w", clientDB, err)
+	}
+	a.instances[clientDB] = inst
+	a.Logger.Infof("Multi-tenant: created Rill instance %q from %s", clientDB, projectPath)
+	return clientDB, nil
 }

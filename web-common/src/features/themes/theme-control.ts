@@ -14,11 +14,11 @@ function isEmbedEnvironment(): boolean {
 }
 
 class ThemeControl {
-  public current = writable<"light" | "dark">("light");
+  public current = writable<"light" | "dark">("dark");
   private darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
   private preferenceStore = isEmbedEnvironment()
-    ? sessionStorageStore<Theme>("rill:embed:theme-mode", "light")
-    : localStorageStore<Theme>("rill:theme", "light");
+    ? sessionStorageStore<Theme>("rill:embed:theme-mode", "dark")
+    : localStorageStore<Theme>("rill:theme", "dark");
 
   public subscribe = this.current.subscribe;
   public preference = { subscribe: this.preferenceStore.subscribe };
@@ -30,9 +30,13 @@ class ThemeControl {
   init = () => {
     const currentPreference = get(this.preferenceStore);
 
-    if (
+    // Default to dark — only go light if explicitly set to light
+    if (currentPreference === "light") {
+      this.removeDark();
+    } else if (
       currentPreference === "dark" ||
-      (currentPreference === "system" && this.darkQuery.matches)
+      (currentPreference === "system" && this.darkQuery.matches) ||
+      !currentPreference
     ) {
       this.setDark();
     }

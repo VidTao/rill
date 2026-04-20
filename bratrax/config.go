@@ -4,18 +4,25 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 )
 
 // Config holds the Bratrax proxy configuration.
 type Config struct {
 	// TargetURL is the parsed URL of the Flask API backend.
 	TargetURL *url.URL
-	// UsersDSN is the PostgreSQL connection string for the bratrax_users table.
+	// UsersDSN is the PostgreSQL connection string for the rill_users table.
 	UsersDSN string
+	// IssuerURL is baked into issued JWTs and verified on incoming tokens.
+	IssuerURL string
+	// AudienceURL is the expected `aud` claim value.
+	AudienceURL string
+	// SecureCookie controls the `Secure` attribute on the auth cookie. Must be
+	// true when Rill is served behind HTTPS (e.g. prod).
+	SecureCookie bool
 }
 
 // ConfigFromEnv reads Bratrax configuration from environment variables.
-// BRATRAX_API_URL defaults to "http://localhost:8082" if not set.
 func ConfigFromEnv() (*Config, error) {
 	raw := os.Getenv("BRATRAX_API_URL")
 	if raw == "" {
@@ -39,8 +46,30 @@ func ConfigFromEnv() (*Config, error) {
 		usersDSN = "postgres://airflow:BratMaxPass@localhost:5434/airflow?sslmode=disable"
 	}
 
+	issuerURL := os.Getenv("BRATRAX_ISSUER_URL")
+	if issuerURL == "" {
+		issuerURL = "http://localhost:9009/bratrax"
+	}
+
+	audienceURL := os.Getenv("BRATRAX_AUDIENCE_URL")
+	if audienceURL == "" {
+		audienceURL = "http://localhost:9009"
+	}
+
+	secureCookie := false
+	if rawSecure := os.Getenv("BRATRAX_SECURE_COOKIE"); rawSecure != "" {
+		v, parseErr := strconv.ParseBool(rawSecure)
+		if parseErr != nil {
+			return nil, fmt.Errorf("bratrax: invalid BRATRAX_SECURE_COOKIE %q: %w", rawSecure, parseErr)
+		}
+		secureCookie = v
+	}
+
 	return &Config{
-		TargetURL: u,
-		UsersDSN:  usersDSN,
+		TargetURL:    u,
+		UsersDSN:     usersDSN,
+		IssuerURL:    issuerURL,
+		AudienceURL:  audienceURL,
+		SecureCookie: secureCookie,
 	}, nil
 }

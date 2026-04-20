@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"path/filepath"
+	gopath "path"
 
 	"gopkg.in/yaml.v2"
 )
@@ -33,7 +33,7 @@ func List() ([]Example, error) {
 			continue
 		}
 
-		rillYamlContents, err := examplesFS.ReadFile(filepath.Join("embed", "dist", entry.Name(), "rill.yaml"))
+		rillYamlContents, err := examplesFS.ReadFile(gopath.Join("embed", "dist", entry.Name(), "rill.yaml"))
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +61,7 @@ func List() ([]Example, error) {
 }
 
 func Get(name string) (fs.FS, error) {
-	exampleFS, err := fs.Sub(examplesFS, filepath.Join("embed", "dist", name))
+	exampleFS, err := fs.Sub(examplesFS, gopath.Join("embed", "dist", name))
 	if err != nil {
 		return nil, err
 	}

@@ -122,7 +122,7 @@
 
       if (status.step === "ready") {
         if (pollInterval) clearInterval(pollInterval);
-        // Brief delay so user sees "Dashboards ready ✓" before redirect
+        // Brief delay so user sees "Dashboards ready" before redirect
         setTimeout(() => goto("/canvas/performance_overview"), 1500);
       }
 
@@ -152,24 +152,27 @@
   });
 </script>
 
-<div class="flex h-screen w-screen items-center justify-center bg-surface">
-  <div
-    class="w-full max-w-lg rounded-lg border border-border bg-white p-8 shadow-sm"
-  >
+<div class="loading-page flex h-screen w-screen items-center justify-center">
+  <div class="halftone-bg"></div>
+
+  <div class="relative w-full max-w-lg border border-bratrax-border bg-bratrax-surface p-8">
+    <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
     <div class="mb-6 text-center">
-      <h1 class="text-xl font-semibold text-fg-primary">
-        Setting up your analytics
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        INITIALIZING
+      </div>
+      <h1 class="text-2xl font-black text-bratrax-text-headline">
+        Setting up your <span class="font-serif italic text-bratrax-acid">analytics</span>
       </h1>
-      <p class="mt-1 text-sm text-fg-secondary">
+      <p class="mt-2 text-sm font-light text-bratrax-text-body">
         This usually takes a few minutes. You can close this tab and come back
         — we'll keep working in the background.
       </p>
     </div>
 
     {#if error}
-      <div
-        class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-      >
+      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
         {error}
       </div>
     {/if}
@@ -179,61 +182,31 @@
         {@const state = status ? step.check(status) : "pending"}
         <div class="flex items-center gap-3">
           {#if state === "done"}
-            <div
-              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-100"
-            >
-              <svg
-                class="h-4 w-4 text-green-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M5 13l4 4L19 7"
-                />
+            <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center bg-bratrax-acid/20">
+              <svg class="h-4 w-4 text-bratrax-acid" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
           {:else if state === "running"}
-            <div
-              class="flex h-6 w-6 flex-shrink-0 items-center justify-center"
-            >
-              <div
-                class="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600"
-              ></div>
+            <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center">
+              <div class="h-5 w-5 animate-spin border-2 border-bratrax-border border-t-bratrax-acid"></div>
             </div>
           {:else if state === "error"}
-            <div
-              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-red-100"
-            >
-              <svg
-                class="h-4 w-4 text-red-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
+            <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center bg-bratrax-tomato/20">
+              <svg class="h-4 w-4 text-bratrax-tomato" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
           {:else}
-            <div
-              class="h-6 w-6 flex-shrink-0 rounded-full border-2 border-gray-200"
-            ></div>
+            <div class="h-6 w-6 flex-shrink-0 border-2 border-bratrax-border"></div>
           {/if}
 
           <span
             class="text-sm {state === 'done'
-              ? 'text-fg-primary'
+              ? 'text-bratrax-acid'
               : state === 'running'
-                ? 'font-medium text-fg-primary'
-                : 'text-fg-secondary'}"
+                ? 'font-medium text-bratrax-text-primary'
+                : 'text-bratrax-text-muted'}"
           >
             {step.label}
           </span>
@@ -243,20 +216,20 @@
 
     <!-- Tap-level extraction details -->
     {#if status && getTapDetails(status).length > 0}
-      <div class="mt-6 border-t border-border pt-4">
-        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-secondary">
+      <div class="mt-6 border-t border-bratrax-border pt-4">
+        <p class="mb-2 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
           Data sync progress
         </p>
         <div class="flex flex-col gap-1.5">
           {#each getTapDetails(status) as tap}
             <div class="flex items-center justify-between text-xs">
-              <span class="capitalize text-fg-secondary">{tap.name}</span>
-              <span class="font-mono text-fg-primary">
+              <span class="capitalize text-bratrax-text-body">{tap.name}</span>
+              <span class="font-mono text-bratrax-text-primary">
                 {tap.rows.toLocaleString()} rows
                 {#if tap.status === "running"}
-                  <span class="text-indigo-500">syncing</span>
+                  <span class="text-bratrax-acid">syncing</span>
                 {:else if tap.status === "done"}
-                  <span class="text-green-600">done</span>
+                  <span class="text-bratrax-acid">done</span>
                 {/if}
               </span>
             </div>
@@ -266,3 +239,22 @@
     {/if}
   </div>
 </div>
+
+<style>
+  .loading-page {
+    background-color: #0A0A0A;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .halftone-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(
+      rgba(212, 255, 0, 0.06) 1.5px,
+      transparent 1.5px
+    );
+    background-size: 8px 8px;
+  }
+</style>

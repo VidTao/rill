@@ -1,0 +1,21 @@
+services:
+  rill:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rill
+    ports:
+      - "9009:9009"
+      - "49009:49009"
+    environment:
+      BRATRAX_API_URL: ${BRATRAX_API_URL:-https://api.bratrax.com}
+      BRATRAX_USERS_DSN: ${BRATRAX_USERS_DSN}
+    volumes:
+      - ${RILL_PROJECT_DIR:-/home/bratrax/repositories/bratrax/generated/cod/rill}:/app/project
+      - rill-state:/home/rill/.rill
+    working_dir: /app/project
+    command: ["start", "--port", "9009", "--port-grpc", "49009", "--no-open", "."]
+    restart: unless-stopped
+
+volumes:
+  rill-state:

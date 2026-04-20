@@ -42,6 +42,7 @@ func (c *connection) ListGlob(ctx context.Context, glob string, skipDirs bool) (
 
 	fsRoot := os.DirFS(c.root)
 	glob = filepath.Clean(filepath.Join(".", glob))
+	glob = strings.ReplaceAll(glob, "\\", "/")
 
 	var entries []drivers.DirEntry
 	err := doublestar.GlobWalk(fsRoot, glob, func(p string, d fs.DirEntry) error {
@@ -55,7 +56,8 @@ func (c *connection) ListGlob(ctx context.Context, glob string, skipDirs bool) (
 		}
 
 		// Track file (p is already relative to the FS root)
-		p = filepath.Join(string(filepath.Separator), p)
+		// Always use forward slashes for consistency (parser expects "/rill.yaml", not "\rill.yaml")
+		p = "/" + strings.ReplaceAll(p, "\\", "/")
 		// Do not send files for ignored paths
 		if drivers.IsIgnored(p, c.ignorePaths) {
 			return nil

@@ -351,21 +351,26 @@
 </script>
 
 <div class="mx-auto w-full max-w-6xl px-6 py-12">
-  <div class="mb-10 text-center">
-    <h1 class="text-2xl font-semibold text-gray-800">Connect to platforms</h1>
-    <p class="mt-2 text-sm text-gray-500">
+  <div class="mb-10">
+    <div class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+      01 — CONNECTORS
+    </div>
+    <h1 class="text-3xl font-black tracking-tight text-bratrax-text-headline">
+      Connect to <span class="font-serif italic text-bratrax-acid">Platforms</span>
+    </h1>
+    <p class="mt-2 text-[15px] font-light text-bratrax-text-body">
       Link your advertising, e-commerce, and analytics accounts
     </p>
   </div>
 
   {#if errorMessage}
-    <div class="mx-auto mb-6 max-w-xl rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    <div class="mx-auto mb-6 max-w-xl border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-4 py-3 font-mono text-xs text-bratrax-tomato">
       <div class="flex items-start gap-2">
         <svg class="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
         </svg>
         <span>{errorMessage}</span>
-        <button class="ml-auto text-red-400 hover:text-red-600" on:click={() => { errorMessage = ""; }}>
+        <button class="ml-auto text-bratrax-tomato/60 hover:text-bratrax-tomato" on:click={() => { errorMessage = ""; }}>
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -376,18 +381,18 @@
 
   {#if $connectionsLoading}
     <div class="flex justify-center py-12">
-      <svg class="h-6 w-6 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+      <svg class="h-6 w-6 animate-spin text-bratrax-acid" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
     </div>
   {:else}
-    {#each CATEGORY_ORDER as category}
+    {#each CATEGORY_ORDER as category, i}
       {@const platforms = getPlatformsByCategory(category)}
       {#if platforms.length > 0}
         <section class="mb-10">
-          <h2 class="mb-4 text-lg font-medium text-gray-700">
-            {CATEGORY_LABELS[category]}
+          <h2 class="mb-4 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+            {String(i + 1).padStart(2, '0')} — {CATEGORY_LABELS[category]}
           </h2>
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {#each platforms as platform (platform.id)}

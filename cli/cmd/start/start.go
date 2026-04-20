@@ -31,6 +31,8 @@ func StartCmd(ch *cmdutil.Helper) *cobra.Command {
 	var allowedOrigins []string
 	var tlsCertPath string
 	var tlsKeyPath string
+	var multiTenant bool
+	var projectsDir string
 
 	startCmd := &cobra.Command{
 		Use:   "start [<path>]",
@@ -38,7 +40,13 @@ func StartCmd(ch *cmdutil.Helper) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var projectPath string
-			if len(args) > 0 {
+			// Multi-tenant mode: don't load any project at startup. Per-user instances are
+			// created lazily by the bratrax instance-router middleware.
+			if multiTenant {
+				if len(args) > 0 {
+					return fmt.Errorf("--multi-tenant is incompatible with a project path argument")
+				}
+			} else if len(args) > 0 {
 				var err error
 				projectPath, err = ResolveProjectPath(args[0])
 				if err != nil {
@@ -93,13 +101,13 @@ func StartCmd(ch *cmdutil.Helper) *cobra.Command {
 				}
 			}
 
-			// Default to the current directory if no path is provided
-			if projectPath == "" {
+			// Default to the current directory if no path is provided (skip in multi-tenant mode)
+			if projectPath == "" && !multiTenant {
 				projectPath = "."
 			}
 
 			// Check for WSL Windows partition usage (based on the project path)
-			if envdetect.IsWSLWindowsPartition(projectPath) {
+			if !multiTenant && envdetect.IsWSLWindowsPartition(projectPath) {
 				ch.PrintfWarn("%s\n", envdetect.GetWSLWarningMessage())
 				confirm, err := cmdutil.ConfirmPrompt(
 					"Do you want to continue anyway?",
@@ -157,6 +165,8 @@ func StartCmd(ch *cmdutil.Helper) *cobra.Command {
 				LocalURL:       localURL,
 				AllowedOrigins: allowedOrigins,
 				ServeUI:        !noUI,
+				MultiTenant:    multiTenant,
+				ProjectsDir:    projectsDir,
 			})
 			if err != nil {
 				return err
@@ -190,6 +200,8 @@ func StartCmd(ch *cmdutil.Helper) *cobra.Command {
 	startCmd.Flags().StringVar(&tlsCertPath, "tls-cert", "", "Path to TLS certificate")
 	startCmd.Flags().StringVar(&tlsKeyPath, "tls-key", "", "Path to TLS key file")
 	startCmd.Flags().StringSliceVarP(&allowedOrigins, "allowed-origins", "", []string{}, "Override allowed origins for CORS")
+	startCmd.Flags().BoolVar(&multiTenant, "multi-tenant", false, "Bratrax: start with no project loaded; create per-user instances on-demand from --projects-dir")
+	startCmd.Flags().StringVar(&projectsDir, "projects-dir", "", "Bratrax: directory containing per-client Rill projects (default $BRATRAX_PROJECTS_DIR or ./generated)")
 
 	// Deprecated support for "--var": replaced by "--env".
 	startCmd.Flags().StringSliceVarP(&envVarsOld, "var", "v", []string{}, "Set environment variables")

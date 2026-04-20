@@ -34,15 +34,19 @@ type AuthMapper struct {
 	clientStore ClientStoreInterface
 	jwks        *keyfunc.JWKS
 	logger      *zap.Logger
+	issuerURL   string
+	audienceURL string
 }
 
 // NewAuthMapper creates an AuthMapper with all required dependencies.
-func NewAuthMapper(userStore UserStoreInterface, clientStore ClientStoreInterface, jwks *keyfunc.JWKS, logger *zap.Logger) *AuthMapper {
+func NewAuthMapper(userStore UserStoreInterface, clientStore ClientStoreInterface, jwks *keyfunc.JWKS, logger *zap.Logger, issuerURL, audienceURL string) *AuthMapper {
 	return &AuthMapper{
 		userStore:   userStore,
 		clientStore: clientStore,
 		jwks:        jwks,
 		logger:      logger,
+		issuerURL:   issuerURL,
+		audienceURL: audienceURL,
 	}
 }
 
@@ -74,11 +78,11 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if !claims.VerifyIssuer(bratraxIssuerURL, true) {
+		if !claims.VerifyIssuer(a.issuerURL, true) {
 			writeJSONError(w, http.StatusUnauthorized, "invalid token issuer")
 			return
 		}
-		if !claims.VerifyAudience(bratraxAudienceURL, true) {
+		if !claims.VerifyAudience(a.audienceURL, true) {
 			writeJSONError(w, http.StatusUnauthorized, "invalid token audience")
 			return
 		}
@@ -101,37 +105,24 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 4. Resolve client based on role
-		//    Viewers without project_id are allowed through for onboarding routes
-		//    (they don't have a client yet — it's created by /onboard/start).
-		var client *Client
+		// 4. Resolve client via rill_users.client_id FK (admin & viewer alike).
+		//    Users without a linked client are allowed through for onboarding routes
+		//    (their client is created by /onboard/start).
 		isOnboardRoute := strings.HasPrefix(r.URL.Path, "/bratrax/onboard/") ||
 			strings.HasPrefix(r.URL.Path, "/onboard/") ||
 			strings.HasPrefix(r.URL.Path, "/bratrax/connectors/")
-		switch user.Role {
-		case "admin":
-			client, err = a.clientStore.GetDefault(r.Context())
-		case "viewer":
-			if user.ProjectID == nil {
-				if !isOnboardRoute {
-					writeJSONError(w, http.StatusUnauthorized, "viewer has no project assigned")
-					return
-				}
-				// Allow through without client for onboarding
-			} else {
-				client, err = a.clientStore.GetByRillProjectID(r.Context(), *user.ProjectID)
-			}
-		default:
+		if user.Role != "admin" && user.Role != "viewer" {
 			writeJSONError(w, http.StatusForbidden, fmt.Sprintf("unsupported role: %s", user.Role))
 			return
 		}
+		client, err := a.clientStore.GetByUserID(r.Context(), user.ID)
 		if err != nil {
 			a.logger.Error("client lookup failed", zap.Error(err))
 			writeJSONError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if client == nil && !isOnboardRoute {
-			writeJSONError(w, http.StatusForbidden, "no client associated with user")
+			writeJSONError(w, http.StatusForbidden, "no client provisioned for this user")
 			return
 		}
 
@@ -139,14 +130,15 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		// Uses case-insensitive matching to block all variations.
 		stripBratraxHeaders(r.Header)
 
-		// 6. Set identity headers for Flask
+		// 6. Set identity headers for Flask.
+		// X-Bratrax-Org-Id is retained for backwards compatibility with legacy Flask
+		// code (credentials.py, connectors/*.py) that reads it via helpers/auth.get_user_organization_id().
+		// It now always mirrors user.id — which is what it semantically was in the old schema.
 		r.Header.Set("user-id", strconv.Itoa(user.ID))
 		r.Header.Set("X-Bratrax-User-Id", strconv.Itoa(user.ID))
+		r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(user.ID))
 		if client != nil {
 			r.Header.Set("X-Bratrax-Client-Id", client.ClientID)
-			r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(client.OrganizationID))
-		} else {
-			r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(user.ID))
 		}
 		r.Header.Set("X-Bratrax-User-Email", user.Email)
 		r.Header.Set("X-Bratrax-User-Role", user.Role)
@@ -154,6 +146,49 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		// 7. Forward to next handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ResolveClientFromCookie validates the bratrax_auth JWT cookie on the request and returns
+// the authenticated user and their associated client. Returns (nil, nil, nil) if no cookie
+// or invalid token. Returns (user, nil, nil) if the user has no provisioned client yet.
+// Reusable from other middleware (e.g. the per-user instance router).
+func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, error) {
+	cookie, err := r.Cookie(bratraxCookieName)
+	if err != nil {
+		// Authorization header fallback (popup OAuth flows)
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			cookie = &http.Cookie{Value: strings.TrimPrefix(authHeader, "Bearer ")}
+		} else {
+			return nil, nil, nil
+		}
+	}
+
+	claims := &bratraxClaims{}
+	_, err = jwt.ParseWithClaims(cookie.Value, claims, a.jwks.Keyfunc, jwt.WithValidMethods([]string{"RS256"}))
+	if err != nil {
+		return nil, nil, nil
+	}
+	if !claims.VerifyIssuer(a.issuerURL, true) || !claims.VerifyAudience(a.audienceURL, true) {
+		return nil, nil, nil
+	}
+
+	userID, err := strconv.Atoi(claims.Subject)
+	if err != nil {
+		return nil, nil, nil
+	}
+	user, err := a.userStore.GetByID(r.Context(), userID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("user lookup: %w", err)
+	}
+	if user == nil {
+		return nil, nil, nil
+	}
+	client, err := a.clientStore.GetByUserID(r.Context(), user.ID)
+	if err != nil {
+		return user, nil, fmt.Errorf("client lookup: %w", err)
+	}
+	return user, client, nil
 }
 
 // stripBratraxHeaders removes all Bratrax identity headers from a request

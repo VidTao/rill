@@ -19,7 +19,6 @@
   import FileExplorer from "../../features/file-explorer/FileExplorer.svelte";
   import Resizer from "../Resizer.svelte";
   import { DEFAULT_NAV_WIDTH, MAX_NAV_WIDTH, MIN_NAV_WIDTH } from "../config";
-  import Footer from "./Footer.svelte";
   import SurfaceControlButton from "./SurfaceControlButton.svelte";
 
   const DEFAULT_PERCENTAGE = 0.4;
@@ -162,7 +161,6 @@
         {/if}
       </div>
     </div>
-    <Footer />
   </div>
 </nav>
 
@@ -221,10 +219,10 @@
   }
 
   button:hover {
-    @apply bg-gray-100;
+    @apply bg-surface-hover;
   }
 
   h3 {
-    @apply font-semibold text-[10px] uppercase;
+    @apply font-semibold text-sm uppercase;
   }
 </style>

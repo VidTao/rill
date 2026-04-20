@@ -146,39 +146,39 @@
 
 <div class="flex h-full flex-col overflow-hidden">
   <!-- Header -->
-  <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
+  <div class="flex items-center justify-between border-b border-bratrax-border px-4 py-2">
     <div class="flex items-center gap-3">
-      <a href="/workshop" class="text-sm text-gray-400 hover:text-gray-600">&larr; Workshop</a>
-      <h1 class="text-lg font-semibold text-gray-800">{data.clientName}</h1>
+      <a href="/workshop" class="font-mono text-[11px] text-bratrax-text-muted hover:text-bratrax-acid">&larr; WORKSHOP</a>
+      <h1 class="text-lg font-bold text-bratrax-text-headline">{data.clientName}</h1>
       {#if isDirty}
-        <span class="rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">unsaved</span>
+        <span class="bg-bratrax-acid/20 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-bratrax-acid">unsaved</span>
       {/if}
     </div>
 
     <div class="flex items-center gap-2">
       <button
-        class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        class="border border-bratrax-border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-acid hover:text-bratrax-acid disabled:opacity-50"
         on:click={handleSave}
         disabled={!isDirty || saving || phase !== "idle"}
       >
         {saving ? "Saving..." : "Save"}
       </button>
       <button
-        class="rounded border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+        class="border border-bratrax-cyan/40 bg-bratrax-cyan/10 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-cyan hover:bg-bratrax-cyan/20 disabled:opacity-50"
         on:click={handleValidate}
         disabled={phase !== "idle"}
       >
         {phase === "validating" ? "Validating..." : "Validate"}
       </button>
       <button
-        class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        class="bg-bratrax-acid px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
         on:click={handleCompile}
         disabled={phase !== "idle"}
       >
         {phase === "compiling" ? "Compiling..." : "Compile"}
       </button>
       <button
-        class="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+        class="bg-bratrax-acid px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
         on:click={openDeployConfirm}
         disabled={phase !== "idle"}
       >
@@ -188,15 +188,15 @@
   </div>
 
   {#if errorMessage}
-    <div class="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+    <div class="border-b border-bratrax-tomato/30 bg-bratrax-tomato/10 px-4 py-2 font-mono text-xs text-bratrax-tomato">
       {errorMessage}
-      <button class="ml-2 text-red-400 hover:text-red-600" on:click={() => { errorMessage = ""; }}>&times;</button>
+      <button class="ml-2 text-bratrax-tomato/60 hover:text-bratrax-tomato" on:click={() => { errorMessage = ""; }}>&times;</button>
     </div>
   {/if}
 
   {#if loading}
     <div class="flex flex-1 items-center justify-center">
-      <svg class="h-6 w-6 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+      <svg class="h-6 w-6 animate-spin text-bratrax-acid" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
@@ -205,35 +205,35 @@
     <!-- Main content: editor + results -->
     <div class="flex flex-1 overflow-hidden">
       <!-- Left: YAML editor -->
-      <div class="flex flex-1 flex-col overflow-hidden border-r border-gray-200">
+      <div class="flex flex-1 flex-col overflow-hidden border-r border-bratrax-border">
         <!-- Tabs + view toggle -->
-        <div class="flex items-center border-b border-gray-200 bg-gray-50">
+        <div class="flex items-center border-b border-bratrax-border bg-bratrax-bg">
           <div class="flex flex-1">
             {#each FILE_KEYS as key (key)}
               <button
-                class="relative px-4 py-2 text-sm transition
+                class="relative px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition
                   {activeTab === key
-                    ? 'bg-white text-blue-600 font-medium'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}"
+                    ? 'bg-bratrax-surface text-bratrax-acid border-b-2 border-bratrax-acid'
+                    : 'text-bratrax-text-muted hover:text-bratrax-text-body hover:bg-bratrax-hover'}"
                 on:click={() => { activeTab = key; }}
               >
                 {FILE_LABELS[key]}
                 {#if dirty[key]}
-                  <span class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-yellow-500" />
+                  <span class="absolute right-1 top-1 h-1.5 w-1.5 bg-bratrax-acid" />
                 {/if}
               </button>
             {/each}
           </div>
           {#if hasVisualEditor}
-            <div class="mr-2 flex rounded border border-gray-300 text-xs">
+            <div class="mr-2 flex border border-bratrax-border text-xs">
               <button
-                class="px-2 py-1 transition {viewMode === 'visual' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'}"
+                class="px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition {viewMode === 'visual' ? 'bg-bratrax-acid text-bratrax-bg' : 'text-bratrax-text-muted hover:bg-bratrax-hover'}"
                 on:click={() => { viewMode = "visual"; }}
               >
                 Visual
               </button>
               <button
-                class="px-2 py-1 transition {viewMode === 'yaml' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'}"
+                class="px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition {viewMode === 'yaml' ? 'bg-bratrax-acid text-bratrax-bg' : 'text-bratrax-text-muted hover:bg-bratrax-hover'}"
                 on:click={() => { viewMode = "yaml"; }}
               >
                 YAML
@@ -245,7 +245,7 @@
         <!-- Editor area -->
         {#if viewMode === "yaml" || !hasVisualEditor}
           <textarea
-            class="flex-1 resize-none bg-white p-4 font-mono text-sm text-gray-800 focus:outline-none"
+            class="flex-1 resize-none bg-bratrax-bg p-4 font-mono text-sm text-bratrax-text-primary focus:outline-none"
             value={files[activeTab]}
             on:input={handleEditorInput}
             spellcheck="false"
@@ -264,8 +264,8 @@
       </div>
 
       <!-- Right: Results panel -->
-      <div class="w-96 flex-shrink-0 overflow-y-auto bg-gray-50 p-4">
-        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <div class="w-96 flex-shrink-0 overflow-y-auto bg-bratrax-bg p-4">
+        <h3 class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
           Results
         </h3>
         <ResultsPanel {results} />
@@ -278,34 +278,36 @@
 {#if showDeployConfirm}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
     on:click|self={() => { showDeployConfirm = false; }}
   >
-    <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-      <h2 class="mb-4 text-lg font-semibold text-gray-800">Deploy {data.clientName}</h2>
+    <div class="relative w-full max-w-sm border border-bratrax-border bg-bratrax-surface p-6">
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
-      <label class="mb-3 flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" bind:checked={deployApply} class="rounded" />
+      <h2 class="mb-4 text-lg font-bold text-bratrax-text-headline">Deploy {data.clientName}</h2>
+
+      <label class="mb-3 flex items-center gap-2 text-sm text-bratrax-text-body">
+        <input type="checkbox" bind:checked={deployApply} class="accent-bratrax-acid" />
         Apply changes (not just dry-run)
       </label>
 
-      <label class="mb-4 flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" bind:checked={deployCreatePr} disabled={!deployApply} class="rounded" />
+      <label class="mb-4 flex items-center gap-2 text-sm text-bratrax-text-body">
+        <input type="checkbox" bind:checked={deployCreatePr} disabled={!deployApply} class="accent-bratrax-acid" />
         Create pull request
       </label>
 
       <div class="flex justify-end gap-2">
         <button
-          class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:bg-bratrax-hover"
           on:click={() => { showDeployConfirm = false; }}
         >
           Cancel
         </button>
         <button
-          class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          class="bg-bratrax-acid px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
           on:click={handleDeploy}
         >
-          {deployApply ? "Deploy" : "Dry Run"}
+          {deployApply ? "DEPLOY" : "DRY RUN"}
         </button>
       </div>
     </div>

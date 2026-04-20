@@ -55,20 +55,25 @@
 <div class="mx-auto w-full max-w-4xl px-6 py-12">
   <div class="mb-10 flex items-center justify-between">
     <div>
-      <h1 class="text-2xl font-semibold text-gray-800">Workshop</h1>
-      <p class="mt-1 text-sm text-gray-500">
-        Manage client data models — edit, compile, and deploy
+      <div class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        02 — WORKSHOP
+      </div>
+      <h1 class="text-3xl font-black tracking-tight text-bratrax-text-headline">
+        Client <span class="font-serif italic text-bratrax-acid">Models</span>
+      </h1>
+      <p class="mt-2 text-[15px] font-light text-bratrax-text-body">
+        Manage client data models — edit, compile, and&nbsp;deploy
       </p>
     </div>
     <div class="flex items-center gap-2">
       <a
         href="/workshop/catalogs"
-        class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+        class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-acid hover:text-bratrax-acid"
       >
         Source Catalogs
       </a>
       <button
-        class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        class="bg-bratrax-acid px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
         on:click={() => {
           showNewModal = true;
         }}
@@ -80,12 +85,10 @@
   </div>
 
   {#if errorMessage}
-    <div
-      class="mb-6 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-    >
+    <div class="mb-6 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-4 py-3 font-mono text-xs text-bratrax-tomato">
       {errorMessage}
       <button
-        class="ml-2 text-red-400 hover:text-red-600"
+        class="ml-2 text-bratrax-tomato/60 hover:text-bratrax-tomato"
         on:click={() => {
           errorMessage = "";
         }}>&times;</button
@@ -96,29 +99,18 @@
   {#if loading}
     <div class="flex justify-center py-12">
       <svg
-        class="h-6 w-6 animate-spin text-gray-400"
+        class="h-6 w-6 animate-spin text-bratrax-acid"
         fill="none"
         viewBox="0 0 24 24"
       >
-        <circle
-          class="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          stroke-width="4"
-        />
-        <path
-          class="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-        />
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
     </div>
   {:else if clients.length === 0}
-    <div class="rounded border border-dashed border-gray-300 px-8 py-16 text-center">
-      <p class="text-gray-500">No clients yet</p>
-      <p class="mt-1 text-sm text-gray-400">
+    <div class="border border-dashed border-bratrax-border px-8 py-16 text-center">
+      <p class="text-bratrax-text-muted">No clients yet</p>
+      <p class="mt-1 text-sm text-bratrax-text-muted">
         Create one from a template to get started
       </p>
     </div>
@@ -128,12 +120,12 @@
         {@const fileCount = [client.has_config, client.has_sources, client.has_ontology, client.has_tracking_plan].filter(Boolean).length}
         <a
           href="/workshop/{encodeURIComponent(client.name)}"
-          class="group rounded border border-gray-200 bg-white px-5 py-4 transition hover:border-blue-300 hover:shadow-sm"
+          class="group relative border border-bratrax-border border-t-4 border-t-bratrax-acid bg-bratrax-surface px-5 py-4 transition hover:border-bratrax-acid/50 hover:bg-bratrax-hover"
         >
-          <h3 class="font-medium text-gray-800 group-hover:text-blue-600">
+          <h3 class="font-semibold text-bratrax-text-headline group-hover:text-bratrax-acid">
             {client.name}
           </h3>
-          <p class="mt-1 text-xs text-gray-400">
+          <p class="mt-1 font-mono text-[10px] text-bratrax-text-muted">
             {fileCount} / 4 files
           </p>
         </a>
@@ -146,23 +138,25 @@
 {#if showNewModal}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
     on:click|self={() => {
       showNewModal = false;
     }}
   >
-    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-      <h2 class="mb-4 text-lg font-semibold text-gray-800">New Client</h2>
+    <div class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6">
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
+      <h2 class="mb-4 text-lg font-bold text-bratrax-text-headline">New Client</h2>
 
       {#if templates.length === 0}
-        <p class="text-sm text-gray-500">No templates available.</p>
+        <p class="text-sm text-bratrax-text-muted">No templates available.</p>
       {:else}
-        <label class="mb-1 block text-sm font-medium text-gray-700">
+        <label class="mb-1 block font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
           Template
         </label>
         <select
           bind:value={selectedTemplate}
-          class="mb-4 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          class="mb-4 w-full border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none focus:border-bratrax-acid"
         >
           <option value="" disabled>Select a template...</option>
           {#each templates as t (t.name)}
@@ -173,7 +167,7 @@
 
       <div class="flex justify-end gap-2">
         <button
-          class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:bg-bratrax-hover"
           on:click={() => {
             showNewModal = false;
           }}
@@ -181,11 +175,11 @@
           Cancel
         </button>
         <button
-          class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          class="bg-bratrax-acid px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
           on:click={handleCreate}
           disabled={!selectedTemplate || creating}
         >
-          {creating ? "Creating..." : "Create"}
+          {creating ? "CREATING..." : "CREATE"}
         </button>
       </div>
     </div>

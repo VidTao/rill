@@ -16,7 +16,6 @@ import (
 	"github.com/rilldata/rill/runtime/drivers"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
-	"golang.org/x/sys/unix"
 )
 
 const batchInterval = 250 * time.Millisecond
@@ -291,6 +290,4 @@ func (w *Watcher) addDir(p string, replay, errIfNotExist bool) error {
 	return nil
 }
 
-func isNotExists(err error) bool {
-	return os.IsNotExist(err) || errors.Is(err, unix.ENOENT)
-}
+// isNotExists is defined in platform-specific files (isnotexists_unix.go, isnotexists_windows.go)

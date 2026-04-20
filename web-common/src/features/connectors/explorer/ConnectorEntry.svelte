@@ -88,6 +88,6 @@
   }
 
   h4 {
-    @apply text-xs font-medium;
+    @apply text-sm font-medium;
   }
 </style>

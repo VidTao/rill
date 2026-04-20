@@ -41,43 +41,45 @@
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" on:click={onClose}>
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" on:click={onClose}>
     <div
-      class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
       on:click|stopPropagation
     >
-      <h2 class="mb-1 text-lg font-semibold text-gray-800">
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
+      <h2 class="mb-1 text-lg font-bold text-bratrax-text-headline">
         Select {platformName} Accounts
       </h2>
-      <p class="mb-4 text-sm text-gray-500">
+      <p class="mb-4 text-sm text-bratrax-text-muted">
         Choose which accounts to connect
       </p>
 
       {#if accounts.length === 0}
-        <p class="py-4 text-center text-sm text-gray-500">No accounts found.</p>
+        <p class="py-4 text-center text-sm text-bratrax-text-muted">No accounts found.</p>
       {:else}
-        <div class="mb-4 max-h-64 overflow-auto rounded border">
-          <div class="sticky top-0 border-b bg-gray-50 px-3 py-2">
+        <div class="mb-4 max-h-64 overflow-auto border border-bratrax-border">
+          <div class="sticky top-0 border-b border-bratrax-border bg-bratrax-bg px-3 py-2">
             <label class="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={allSelected}
                 on:change={toggleAll}
-                class="rounded"
+                class="accent-bratrax-acid"
               />
-              <span class="font-medium text-gray-600">Select All</span>
+              <span class="font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body">Select All</span>
             </label>
           </div>
           {#each accounts as account (account.id)}
-            <label class="flex items-center gap-2 border-b px-3 py-2 last:border-0 hover:bg-gray-50 text-sm cursor-pointer">
+            <label class="flex cursor-pointer items-center gap-2 border-b border-bratrax-border px-3 py-2 text-sm last:border-0 hover:bg-bratrax-hover">
               <input
                 type="checkbox"
                 checked={selectedIds.has(account.id)}
                 on:change={() => toggleAccount(account.id)}
-                class="rounded"
+                class="accent-bratrax-acid"
               />
-              <span class="text-gray-800">{account.name}</span>
-              <span class="text-xs text-gray-400">({account.id})</span>
+              <span class="text-bratrax-text-primary">{account.name}</span>
+              <span class="font-mono text-[10px] text-bratrax-text-muted">({account.id})</span>
             </label>
           {/each}
         </div>
@@ -86,7 +88,7 @@
       <div class="flex justify-end gap-2">
         <button
           type="button"
-          class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+          class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:bg-bratrax-hover"
           on:click={onClose}
           disabled={loading}
         >
@@ -94,11 +96,11 @@
         </button>
         <button
           type="button"
-          class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          class="bg-bratrax-acid px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
           on:click={handleSubmit}
           disabled={loading || selectedIds.size === 0}
         >
-          {loading ? "Connecting..." : `Connect ${selectedIds.size} Account${selectedIds.size !== 1 ? "s" : ""}`}
+          {loading ? "CONNECTING..." : `CONNECT ${selectedIds.size} ACCOUNT${selectedIds.size !== 1 ? "S" : ""}`}
         </button>
       </div>
     </div>

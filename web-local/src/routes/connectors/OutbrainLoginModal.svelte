@@ -22,40 +22,46 @@
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" on:click={onClose}>
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" on:click={onClose}>
     <div
-      class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
+      class="relative w-full max-w-sm border border-bratrax-border bg-bratrax-surface p-6"
       on:click|stopPropagation
     >
-      <h2 class="mb-4 text-lg font-semibold text-gray-800">Connect Outbrain</h2>
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
+      <h2 class="mb-4 text-lg font-bold text-bratrax-text-headline">Connect Outbrain</h2>
 
       <form on:submit|preventDefault={handleSubmit} class="flex flex-col gap-3">
         {#if error}
-          <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
             {error}
           </div>
         {/if}
 
         <div class="flex flex-col gap-1">
-          <label for="ob-user" class="text-sm font-medium text-gray-700">Username</label>
+          <label for="ob-user" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+            Username
+          </label>
           <input
             id="ob-user"
             type="text"
             bind:value={username}
             placeholder="your@email.com"
-            class="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            class="border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
             disabled={loading}
           />
         </div>
 
         <div class="flex flex-col gap-1">
-          <label for="ob-pass" class="text-sm font-medium text-gray-700">Password</label>
+          <label for="ob-pass" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+            Password
+          </label>
           <input
             id="ob-pass"
             type="password"
             bind:value={password}
             placeholder="Enter your password"
-            class="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            class="border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
             disabled={loading}
           />
         </div>
@@ -63,7 +69,7 @@
         <div class="flex justify-end gap-2">
           <button
             type="button"
-            class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+            class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:bg-bratrax-hover"
             on:click={onClose}
             disabled={loading}
           >
@@ -71,10 +77,10 @@
           </button>
           <button
             type="submit"
-            class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            class="bg-bratrax-acid px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
             disabled={loading}
           >
-            {loading ? "Connecting..." : "Connect"}
+            {loading ? "CONNECTING..." : "CONNECT"}
           </button>
         </div>
       </form>

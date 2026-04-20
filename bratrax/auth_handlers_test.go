@@ -79,10 +79,27 @@ func (m *mockUserStore) ListUsers(_ context.Context) ([]User, error) {
 	return m.users, nil
 }
 
+func (m *mockUserStore) LinkUserToClient(_ context.Context, userID int, clientID string) error {
+	for i := range m.users {
+		if m.users[i].ID == userID {
+			cid := clientID
+			m.users[i].ClientID = &cid
+			return nil
+		}
+	}
+	return nil
+}
+
+const (
+	testIssuerURL    = "http://localhost:9009/bratrax"
+	testAudienceURL  = "http://localhost:9009"
+	testSecureCookie = false
+)
+
 func setupAuthService(t *testing.T) (*AuthService, *mockUserStore) {
 	t.Helper()
 	store := newMockStore()
-	svc, err := NewAuthService(store, zap.NewNop())
+	svc, err := NewAuthService(store, zap.NewNop(), testIssuerURL, testAudienceURL, testSecureCookie)
 	require.NoError(t, err)
 	return svc, store
 }

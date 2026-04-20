@@ -29,33 +29,37 @@
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" on:click={onClose}>
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" on:click={onClose}>
     <div
-      class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
+      class="relative w-full max-w-sm border border-bratrax-border bg-bratrax-surface p-6"
       on:click|stopPropagation
     >
-      <h2 class="mb-4 text-lg font-semibold text-gray-800">Connect Shopify Store</h2>
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
+      <h2 class="mb-4 text-lg font-bold text-bratrax-text-headline">Connect Shopify Store</h2>
 
       <form on:submit|preventDefault={handleSubmit} class="flex flex-col gap-3">
         <div class="flex flex-col gap-1">
-          <label for="shop-url" class="text-sm font-medium text-gray-700">Store URL</label>
+          <label for="shop-url" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+            Store URL
+          </label>
           <input
             id="shop-url"
             type="text"
             bind:value={shopUrl}
             placeholder="my-store.myshopify.com"
-            class="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            class="border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
             disabled={loading}
           />
           {#if error}
-            <span class="text-xs text-red-600">{error}</span>
+            <span class="font-mono text-[10px] text-bratrax-tomato">{error}</span>
           {/if}
         </div>
 
         <div class="flex justify-end gap-2">
           <button
             type="button"
-            class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+            class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:bg-bratrax-hover"
             on:click={onClose}
             disabled={loading}
           >
@@ -63,10 +67,10 @@
           </button>
           <button
             type="submit"
-            class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            class="bg-bratrax-acid px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
             disabled={loading}
           >
-            {loading ? "Connecting..." : "Connect"}
+            {loading ? "CONNECTING..." : "CONNECT"}
           </button>
         </div>
       </form>

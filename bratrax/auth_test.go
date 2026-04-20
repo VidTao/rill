@@ -16,23 +16,29 @@ import (
 type mockClientStore struct {
 	defaultClient *Client
 	projectMap    map[string]*Client
+	userMap       map[int]*Client
 }
 
 func newMockClientStore() *mockClientStore {
+	codClient := &Client{
+		ClientID:     "cod",
+		CompanyName:  "Test Corp",
+		ClickhouseDB: "cod_db",
+	}
+	micazuClient := &Client{
+		ClientID:     "micazu",
+		CompanyName:  "Micazu BV",
+		ClickhouseDB: "micazu_db",
+	}
 	return &mockClientStore{
-		defaultClient: &Client{
-			ClientID:       "cod",
-			OrganizationID: 1,
-			CompanyName:    "Test Corp",
-			ClickhouseDB:   "cod_db",
-		},
+		defaultClient: codClient,
 		projectMap: map[string]*Client{
-			"micazu": {
-				ClientID:       "micazu",
-				OrganizationID: 2,
-				CompanyName:    "Micazu BV",
-				ClickhouseDB:   "micazu_db",
-			},
+			"micazu": micazuClient,
+		},
+		// user ID → client (replaces the old 1:1 organization_id == user.id mapping).
+		userMap: map[int]*Client{
+			1: codClient,    // admin user (id=1) owns the "cod" client
+			2: micazuClient, // viewer user (id=2) owns the "micazu" client
 		},
 	}
 }
@@ -49,15 +55,23 @@ func (m *mockClientStore) GetDefault(_ context.Context) (*Client, error) {
 	return m.defaultClient, nil
 }
 
+func (m *mockClientStore) GetByUserID(_ context.Context, userID int) (*Client, error) {
+	c, ok := m.userMap[userID]
+	if !ok {
+		return nil, nil
+	}
+	return c, nil
+}
+
 // setupAuthMapper creates an AuthMapper with mock stores and a real JWT issuer.
 func setupAuthMapper(t *testing.T) (*AuthMapper, *AuthService, *mockUserStore, *mockClientStore) {
 	t.Helper()
 	userStore := newMockStore()
 	clientStore := newMockClientStore()
-	authSvc, err := NewAuthService(userStore, zap.NewNop())
+	authSvc, err := NewAuthService(userStore, zap.NewNop(), testIssuerURL, testAudienceURL, testSecureCookie)
 	require.NoError(t, err)
 
-	mapper := NewAuthMapper(userStore, clientStore, authSvc.JWKS(), zap.NewNop())
+	mapper := NewAuthMapper(userStore, clientStore, authSvc.JWKS(), zap.NewNop(), testIssuerURL, testAudienceURL)
 	return mapper, authSvc, userStore, clientStore
 }
 

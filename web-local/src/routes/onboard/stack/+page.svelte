@@ -12,6 +12,8 @@
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "../../connectors/AccountSelectionModal.svelte";
 
+  const FB_APP_ID = "3518566538435783";
+
   // ---------------------------------------------------------------------------
   // Platform definitions
   // ---------------------------------------------------------------------------
@@ -45,8 +47,7 @@
         {
           id: "facebook_ads",
           name: "Facebook Ads",
-          type: "oauth_direct",
-          directAuthUrl: "https://www.facebook.com/v19.0/dialog/oauth?client_id=3518566538435783&redirect_uri={redirect}&scope=ads_read,ads_management&response_type=code",
+          type: "client_sdk",
           color: "#1877F2",
         },
         {
@@ -211,6 +212,10 @@
   let accountModalPlatform = "";
   let accountModalAccounts: Array<{ id: string; name: string }> = [];
   let googleAuthCode = "";
+  let fbAccessToken = "";
+  let fbEmail = "";
+  let fbSdkReady = false;
+  let googleManagerMap: Record<string, string> = {};
 
   // Load Google Identity Services SDK + fetch client_id from backend
   onMount(async () => {
@@ -235,20 +240,100 @@
       script.async = true;
       document.head.appendChild(script);
     }
+
+    loadFacebookSdk();
   });
+
+  function loadFacebookSdk() {
+    if ((window as any).FB) {
+      fbSdkReady = true;
+      return;
+    }
+    (window as any).fbAsyncInit = () => {
+      (window as any).FB?.init({
+        appId: FB_APP_ID,
+        cookie: true,
+        xfbml: false,
+        version: "v19.0",
+      });
+      fbSdkReady = true;
+    };
+    if (document.getElementById("facebook-jssdk")) return;
+    const script = document.createElement("script");
+    script.id = "facebook-jssdk";
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
+  function handleFacebookConnect() {
+    if (isConnected("facebook_ads")) return;
+    if (!fbSdkReady) {
+      error = "Facebook SDK is still loading. Please try again in a moment.";
+      return;
+    }
+    error = "";
+    loading = "facebook_ads";
+
+    (window as any).FB?.login(
+      (response: { authResponse?: { accessToken: string } }) => {
+        if (!response.authResponse) {
+          loading = "";
+          return;
+        }
+        const token = response.authResponse.accessToken;
+        fbAccessToken = token;
+        (window as any).FB?.api(
+          "/me",
+          { fields: "name,email" },
+          (userInfo: { email?: string }) => {
+            fbEmail = userInfo?.email ?? "";
+            (window as any).FB?.api(
+              "/me/adaccounts",
+              { access_token: token, fields: "account_id,name" },
+              (accountsResponse: {
+                data?: Array<{ account_id: string; name: string }>;
+              }) => {
+                loading = "";
+                const data = accountsResponse?.data ?? [];
+                if (data.length === 0) {
+                  error = "No Facebook ad accounts found for this user.";
+                  return;
+                }
+                accountModalPlatform = "Facebook Ads";
+                accountModalAccounts = data.map((a) => ({
+                  id: a.account_id,
+                  name: a.name || a.account_id,
+                }));
+                showAccountModal = true;
+              },
+            );
+          },
+        );
+      },
+      { scope: "email,ads_read,ads_management" },
+    );
+  }
 
   interface GoogleAdAccountNode {
     customer_id: string;
     name?: string;
     descriptive_name?: string;
+    manager_account_id?: string;
     children?: GoogleAdAccountNode[];
   }
 
   function flattenAccounts(accounts: GoogleAdAccountNode[]): Array<{ id: string; name: string }> {
     const flat: Array<{ id: string; name: string }> = [];
+    googleManagerMap = {};
     function walk(list: GoogleAdAccountNode[]) {
       for (const acc of list) {
-        flat.push({ id: String(acc.customer_id), name: acc.name || acc.descriptive_name || String(acc.customer_id) });
+        const id = String(acc.customer_id);
+        flat.push({ id, name: acc.name || acc.descriptive_name || id });
+        if (acc.manager_account_id) {
+          googleManagerMap[id] = String(acc.manager_account_id);
+        }
         if (acc.children) walk(acc.children);
       }
     }
@@ -315,22 +400,38 @@
     accountModalLoading = true;
     try {
       const host = get(runtime).host;
-      const res = await fetch(`${host}/bratrax/onboard/google/connect`, {
+      const isFacebook = accountModalPlatform === "Facebook Ads";
+      const endpoint = isFacebook
+        ? `${host}/bratrax/onboard/facebook/connect`
+        : `${host}/bratrax/onboard/google/connect`;
+      const body = isFacebook
+        ? {
+            short_lived_token: fbAccessToken,
+            email: fbEmail,
+            client_id: clientId,
+            selectedAccounts: selected,
+          }
+        : {
+            code: googleAuthCode,
+            client_id: clientId,
+            selectedAccounts: selected.map((a) => ({
+              ...a,
+              managerAccountId: googleManagerMap[a.accountId] || "",
+            })),
+          };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          code: googleAuthCode,
-          client_id: clientId,
-          selectedAccounts: selected,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as any).error || "Failed to connect accounts");
+        const resp = await res.json().catch(() => ({}));
+        throw new Error((resp as any).error || "Failed to connect accounts");
       }
 
-      connectedPlatforms.add("google_ads");
+      connectedPlatforms.add(isFacebook ? "facebook_ads" : "google_ads");
       connectedPlatforms = connectedPlatforms;
       showAccountModal = false;
     } catch (e) {
@@ -347,6 +448,7 @@
       handleDirectOAuth(platform);
     } else if (platform.type === "client_sdk") {
       if (platform.id === "google_ads") handleGoogleAdsConnect();
+      else if (platform.id === "facebook_ads") handleFacebookConnect();
     } else if (platform.type === "coming_soon") {
       // Do nothing
     } else {
@@ -399,17 +501,24 @@
   });
 </script>
 
-<div class="flex min-h-screen w-screen items-start justify-center bg-surface py-12">
-  <div class="w-full max-w-2xl rounded-lg border border-border bg-white p-8 shadow-sm">
+<div class="flex min-h-screen w-screen items-start justify-center bg-bratrax-bg py-12">
+  <div class="relative w-full max-w-2xl border border-bratrax-border bg-bratrax-surface p-8">
+    <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
     <div class="mb-6">
-      <h1 class="text-xl font-semibold text-fg-primary">Build your stack</h1>
-      <p class="mt-1 text-sm text-fg-secondary">
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        ONBOARDING
+      </div>
+      <h1 class="text-2xl font-black text-bratrax-text-headline">
+        Build your <span class="font-serif italic text-bratrax-acid">stack</span>
+      </h1>
+      <p class="mt-2 text-sm font-light text-bratrax-text-body">
         Connect the tools you use. We'll set up your analytics automatically.
       </p>
     </div>
 
     {#if error}
-      <div class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
         {error}
       </div>
     {/if}
@@ -418,11 +527,11 @@
       {#each categories as category}
         <div>
           <div class="mb-2 flex items-baseline gap-2">
-            <span class="text-xs font-semibold uppercase tracking-wide text-fg-secondary">
+            <span class="font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
               {category.title}
             </span>
             {#if category.subtitle}
-              <span class="text-xs text-fg-secondary">({category.subtitle})</span>
+              <span class="font-mono text-[10px] text-bratrax-text-muted">({category.subtitle})</span>
             {/if}
           </div>
           <div class="flex flex-wrap gap-2">
@@ -430,31 +539,31 @@
               <button
                 on:click={() => handleCardClick(platform)}
                 disabled={loading === platform.id || platform.id === "shopify" || platform.type === "coming_soon"}
-                class="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all
+                class="flex items-center gap-2 border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-all
                   {isConnected(platform.id)
-                    ? 'border-green-300 bg-green-50 text-green-800'
+                    ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
                     : isSelected(platform.id)
-                      ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
+                      ? 'border-bratrax-cyan/50 bg-bratrax-cyan/10 text-bratrax-cyan'
                       : platform.type === 'coming_soon'
-                        ? 'border-border bg-gray-50 text-fg-secondary cursor-not-allowed'
-                        : 'border-border bg-white text-fg-primary hover:border-gray-400 hover:bg-gray-50'}
+                        ? 'border-bratrax-border bg-bratrax-bg text-bratrax-text-muted cursor-not-allowed'
+                        : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}
                   {loading === platform.id ? 'opacity-50' : ''}
                   {platform.id === 'shopify' ? 'cursor-default' : ''}"
               >
                 <span
-                  class="h-3 w-3 rounded-full"
+                  class="h-3 w-3"
                   style="background-color: {platform.color}"
                 ></span>
                 {#if isConnected(platform.id)}
-                  <svg class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <svg class="h-4 w-4 text-bratrax-acid" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 {/if}
                 {platform.name}
                 {#if platform.type === "coming_soon"}
-                  <span class="text-xs text-fg-secondary">coming soon</span>
+                  <span class="text-bratrax-text-muted normal-case tracking-normal">coming soon</span>
                 {:else if loading === platform.id}
-                  <span class="text-xs text-fg-secondary">connecting...</span>
+                  <span class="text-bratrax-text-muted normal-case tracking-normal">connecting...</span>
                 {/if}
               </button>
             {/each}
@@ -463,8 +572,8 @@
       {/each}
     </div>
 
-    <div class="mt-8 flex items-center justify-between">
-      <p class="text-xs text-fg-secondary">
+    <div class="mt-8 flex items-center justify-between border-t border-bratrax-border pt-6">
+      <p class="font-mono text-[10px] text-bratrax-text-muted">
         {#if !hasAdPlatform}
           Connect at least 1 ad platform to continue
         {:else}
@@ -474,9 +583,9 @@
       <button
         on:click={handleActivate}
         disabled={!hasAdPlatform || activating}
-        class="rounded bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+        class="bg-bratrax-acid px-6 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
       >
-        {activating ? "Setting up..." : "Set up my analytics →"}
+        {activating ? "SETTING UP..." : "SET UP MY ANALYTICS →"}
       </button>
     </div>
   </div>
