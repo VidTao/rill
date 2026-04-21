@@ -1,0 +1,8 @@
+# Source: Dim Products
+# Ingests from ClickHouse dim table into DuckDB
+
+type: source
+connector: clickhouse
+sql: SELECT * FROM ziva.dim_products FINAL
+refresh:
+  cron: 0 * * * *

@@ -34,15 +34,19 @@ type AuthMapper struct {
 	clientStore ClientStoreInterface
 	jwks        *keyfunc.JWKS
 	logger      *zap.Logger
+	issuerURL   string
+	audienceURL string
 }
 
 // NewAuthMapper creates an AuthMapper with all required dependencies.
-func NewAuthMapper(userStore UserStoreInterface, clientStore ClientStoreInterface, jwks *keyfunc.JWKS, logger *zap.Logger) *AuthMapper {
+func NewAuthMapper(userStore UserStoreInterface, clientStore ClientStoreInterface, jwks *keyfunc.JWKS, logger *zap.Logger, issuerURL, audienceURL string) *AuthMapper {
 	return &AuthMapper{
 		userStore:   userStore,
 		clientStore: clientStore,
 		jwks:        jwks,
 		logger:      logger,
+		issuerURL:   issuerURL,
+		audienceURL: audienceURL,
 	}
 }
 
@@ -74,11 +78,11 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if !claims.VerifyIssuer(bratraxIssuerURL, true) {
+		if !claims.VerifyIssuer(a.issuerURL, true) {
 			writeJSONError(w, http.StatusUnauthorized, "invalid token issuer")
 			return
 		}
-		if !claims.VerifyAudience(bratraxAudienceURL, true) {
+		if !claims.VerifyAudience(a.audienceURL, true) {
 			writeJSONError(w, http.StatusUnauthorized, "invalid token audience")
 			return
 		}
@@ -165,7 +169,7 @@ func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, e
 	if err != nil {
 		return nil, nil, nil
 	}
-	if !claims.VerifyIssuer(bratraxIssuerURL, true) || !claims.VerifyAudience(bratraxAudienceURL, true) {
+	if !claims.VerifyIssuer(a.issuerURL, true) || !claims.VerifyAudience(a.audienceURL, true) {
 		return nil, nil, nil
 	}
 

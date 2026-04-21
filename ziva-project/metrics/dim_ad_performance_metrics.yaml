@@ -1,0 +1,67 @@
+# Metrics: Ad Performance
+# Generated from ontology object: AdPerformance
+
+type: metrics_view
+display_name: Ad Performance Analytics
+description: Daily ad performance metrics — GROUP BY campaign_id, ad_set_id, or ad_id for drill-down
+table: dim_ad_performance
+timeseries: date
+dimensions:
+- name: campaign_id
+  display_name: Campaign Id
+  column: campaign_id
+- name: campaign_name
+  display_name: Campaign Name
+  column: campaign_name
+- name: ad_set_id
+  display_name: Ad Set Id
+  column: ad_set_id
+- name: ad_id
+  display_name: Ad Id
+  column: ad_id
+- name: date
+  display_name: Date
+  column: date
+  description: Report date
+- name: channel
+  display_name: Channel
+  column: channel
+  description: Ad platform
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of ad performance records
+- name: total_spend
+  display_name: Spend
+  expression: sum("spend")
+  format_preset: currency_usd
+- name: total_impressions
+  display_name: Impressions
+  expression: sum("impressions")
+  format_preset: humanize
+- name: total_clicks
+  display_name: Clicks
+  expression: sum("clicks")
+  format_preset: humanize
+- name: total_ctr
+  display_name: Ctr
+  expression: sum("ctr")
+  format_preset: percentage
+  description: Click-through rate
+- name: total_cpc
+  display_name: Cpc
+  expression: sum("cpc")
+  format_preset: humanize
+  description: Cost per click
+- name: total_cpm
+  display_name: Cpm
+  expression: sum("cpm")
+  format_preset: humanize
+  description: Cost per thousand impressions
+- name: metric_total_spend
+  display_name: Total Spend
+  expression: SUM(spend)
+  description: Total ad spend across all platforms
+  format_preset: currency_usd

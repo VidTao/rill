@@ -1,0 +1,44 @@
+compiler: rillv1
+display_name: Ziva Analytics
+description: Analytics dashboard for Ziva
+olap_connector: duckdb
+ai_instructions: |
+  ## Knowledge Base
+  This client has a persistent knowledge base that compounds over time.
+
+  BEFORE answering any question:
+  1. Call workshop_read_knowledge with filepath "index.md" to see what context exists
+  2. Call workshop_read_knowledge with filepath "profile.md" for client identity
+  3. If the index lists relevant insights or patterns, read those too
+  4. Use this context in your answer — don't re-derive what's already known
+
+  AFTER answering — file an insight ONLY when your answer contains:
+  - A business conclusion (not just numbers): "ROAS dropped because X" not "ROAS is 2.3"
+  - A pattern or trend: "Q1 is strongest" or "Google Demand Gen outperforms Search"
+  - A new fact about the business: "23% of customers use payment plans"
+  - An anomaly or change: "Spend jumped 40% but revenue was flat"
+  Do NOT file for simple data lookups ("total revenue is $X", "you have N orders").
+  When filing: call workshop_write_knowledge with category "insights" and a descriptive filename.
+  Include: what was found, why it matters, recommended action.
+
+  If the user asks about data that doesn't exist in the dim tables:
+  1. This is an ontology gap, not a bug
+  2. Call workshop_write_knowledge with category "discoveries" to log it
+  3. Tell the user: "This data isn't in your analytics yet. I've logged it as a discovery."
+models:
+  materialize: true
+metrics_views:
+  smallest_time_grain: day
+  first_day_of_week: 1
+explores:
+  defaults:
+    time_range: P12M
+  time_zones:
+  - America/New_York
+  - UTC
+  time_ranges:
+  - PT24H
+  - P7D
+  - P30D
+  - P3M
+  - P12M

@@ -43,8 +43,8 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 		return nil, fmt.Errorf("bratrax: failed to create user store: %w", err)
 	}
 
-	// Auth service (ephemeral JWT issuer)
-	authSvc, err := NewAuthService(store, logger)
+	// Auth service (persistent JWT issuer)
+	authSvc, err := NewAuthService(store, logger, cfg.IssuerURL, cfg.AudienceURL, cfg.SecureCookie)
 	if err != nil {
 		store.Close()
 		return nil, fmt.Errorf("bratrax: failed to create auth service: %w", err)
@@ -53,7 +53,7 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	clientStore := NewClientStore(store.DB())
 
 	proxy := NewProxy(cfg.TargetURL, logger)
-	authMapper := NewAuthMapper(store, clientStore, authSvc.JWKS(), logger)
+	authMapper := NewAuthMapper(store, clientStore, authSvc.JWKS(), logger, cfg.IssuerURL, cfg.AudienceURL)
 
 	// Local health endpoint — confirms the proxy layer is alive.
 	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -12,6 +12,8 @@
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "../../connectors/AccountSelectionModal.svelte";
 
+  const FB_APP_ID = "3518566538435783";
+
   // ---------------------------------------------------------------------------
   // Platform definitions
   // ---------------------------------------------------------------------------
@@ -45,8 +47,7 @@
         {
           id: "facebook_ads",
           name: "Facebook Ads",
-          type: "oauth_direct",
-          directAuthUrl: "https://www.facebook.com/v19.0/dialog/oauth?client_id=3518566538435783&redirect_uri={redirect}&scope=ads_read,ads_management&response_type=code",
+          type: "client_sdk",
           color: "#1877F2",
         },
         {
@@ -211,6 +212,10 @@
   let accountModalPlatform = "";
   let accountModalAccounts: Array<{ id: string; name: string }> = [];
   let googleAuthCode = "";
+  let fbAccessToken = "";
+  let fbEmail = "";
+  let fbSdkReady = false;
+  let googleManagerMap: Record<string, string> = {};
 
   // Load Google Identity Services SDK + fetch client_id from backend
   onMount(async () => {
@@ -235,20 +240,100 @@
       script.async = true;
       document.head.appendChild(script);
     }
+
+    loadFacebookSdk();
   });
+
+  function loadFacebookSdk() {
+    if ((window as any).FB) {
+      fbSdkReady = true;
+      return;
+    }
+    (window as any).fbAsyncInit = () => {
+      (window as any).FB?.init({
+        appId: FB_APP_ID,
+        cookie: true,
+        xfbml: false,
+        version: "v19.0",
+      });
+      fbSdkReady = true;
+    };
+    if (document.getElementById("facebook-jssdk")) return;
+    const script = document.createElement("script");
+    script.id = "facebook-jssdk";
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
+  function handleFacebookConnect() {
+    if (isConnected("facebook_ads")) return;
+    if (!fbSdkReady) {
+      error = "Facebook SDK is still loading. Please try again in a moment.";
+      return;
+    }
+    error = "";
+    loading = "facebook_ads";
+
+    (window as any).FB?.login(
+      (response: { authResponse?: { accessToken: string } }) => {
+        if (!response.authResponse) {
+          loading = "";
+          return;
+        }
+        const token = response.authResponse.accessToken;
+        fbAccessToken = token;
+        (window as any).FB?.api(
+          "/me",
+          { fields: "name,email" },
+          (userInfo: { email?: string }) => {
+            fbEmail = userInfo?.email ?? "";
+            (window as any).FB?.api(
+              "/me/adaccounts",
+              { access_token: token, fields: "account_id,name" },
+              (accountsResponse: {
+                data?: Array<{ account_id: string; name: string }>;
+              }) => {
+                loading = "";
+                const data = accountsResponse?.data ?? [];
+                if (data.length === 0) {
+                  error = "No Facebook ad accounts found for this user.";
+                  return;
+                }
+                accountModalPlatform = "Facebook Ads";
+                accountModalAccounts = data.map((a) => ({
+                  id: a.account_id,
+                  name: a.name || a.account_id,
+                }));
+                showAccountModal = true;
+              },
+            );
+          },
+        );
+      },
+      { scope: "email,ads_read,ads_management" },
+    );
+  }
 
   interface GoogleAdAccountNode {
     customer_id: string;
     name?: string;
     descriptive_name?: string;
+    manager_account_id?: string;
     children?: GoogleAdAccountNode[];
   }
 
   function flattenAccounts(accounts: GoogleAdAccountNode[]): Array<{ id: string; name: string }> {
     const flat: Array<{ id: string; name: string }> = [];
+    googleManagerMap = {};
     function walk(list: GoogleAdAccountNode[]) {
       for (const acc of list) {
-        flat.push({ id: String(acc.customer_id), name: acc.name || acc.descriptive_name || String(acc.customer_id) });
+        const id = String(acc.customer_id);
+        flat.push({ id, name: acc.name || acc.descriptive_name || id });
+        if (acc.manager_account_id) {
+          googleManagerMap[id] = String(acc.manager_account_id);
+        }
         if (acc.children) walk(acc.children);
       }
     }
@@ -315,22 +400,38 @@
     accountModalLoading = true;
     try {
       const host = get(runtime).host;
-      const res = await fetch(`${host}/bratrax/onboard/google/connect`, {
+      const isFacebook = accountModalPlatform === "Facebook Ads";
+      const endpoint = isFacebook
+        ? `${host}/bratrax/onboard/facebook/connect`
+        : `${host}/bratrax/onboard/google/connect`;
+      const body = isFacebook
+        ? {
+            short_lived_token: fbAccessToken,
+            email: fbEmail,
+            client_id: clientId,
+            selectedAccounts: selected,
+          }
+        : {
+            code: googleAuthCode,
+            client_id: clientId,
+            selectedAccounts: selected.map((a) => ({
+              ...a,
+              managerAccountId: googleManagerMap[a.accountId] || "",
+            })),
+          };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          code: googleAuthCode,
-          client_id: clientId,
-          selectedAccounts: selected,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as any).error || "Failed to connect accounts");
+        const resp = await res.json().catch(() => ({}));
+        throw new Error((resp as any).error || "Failed to connect accounts");
       }
 
-      connectedPlatforms.add("google_ads");
+      connectedPlatforms.add(isFacebook ? "facebook_ads" : "google_ads");
       connectedPlatforms = connectedPlatforms;
       showAccountModal = false;
     } catch (e) {
@@ -347,6 +448,7 @@
       handleDirectOAuth(platform);
     } else if (platform.type === "client_sdk") {
       if (platform.id === "google_ads") handleGoogleAdsConnect();
+      else if (platform.id === "facebook_ads") handleFacebookConnect();
     } else if (platform.type === "coming_soon") {
       // Do nothing
     } else {
