@@ -19,11 +19,13 @@ Settings.defaultLocale = "en";
 export async function load({ url, depends, untrack, fetch }) {
   depends("init");
 
-  // Public routes — no authentication required
+  // Only /login and /signup are reachable without authentication. Every
+  // other path (including /onboard) requires an authenticated session;
+  // unauthenticated visitors are bounced to /login with the original
+  // destination preserved as a ?redirect= param.
   const isPublicRoute =
-    url.pathname.startsWith("/login") ||
-    url.pathname.startsWith("/signup") ||
-    url.pathname.startsWith("/onboard");
+    url.pathname.startsWith("/login") || url.pathname.startsWith("/signup");
+
   if (isPublicRoute) {
     return { initialized: false };
   }
@@ -34,6 +36,11 @@ export async function load({ url, depends, untrack, fetch }) {
   if (!user) {
     const redirectTo = encodeURIComponent(url.pathname + url.search);
     throw redirect(307, `/login?redirect=${redirectTo}`);
+  }
+
+  // Onboarding routes are auth-gated but don't require a Rill project yet.
+  if (url.pathname.startsWith("/onboard")) {
+    return { initialized: false };
   }
 
   // Skip Rill file initialization for /connectors pages
