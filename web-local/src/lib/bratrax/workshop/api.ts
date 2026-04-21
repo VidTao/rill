@@ -10,6 +10,8 @@ import type {
   TemplateSummary,
   CatalogSource,
   CatalogSearchResult,
+  KnowledgeFile,
+  KnowledgeFileContent,
 } from "./types";
 
 function getBaseUrl(): string {
@@ -124,4 +126,31 @@ export async function searchCatalog(
   return apiFetch<{ results: CatalogSearchResult[]; count: number }>(
     `/bratrax/api/v1/catalogs/search?q=${encodeURIComponent(query)}`,
   );
+}
+
+// ── Knowledge ──
+
+export async function listKnowledgeFiles(
+  name: string,
+): Promise<KnowledgeFile[]> {
+  const res = await apiFetch<{ client: string; files: KnowledgeFile[] }>(
+    `/bratrax/api/v1/clients/${encodeURIComponent(name)}/knowledge`,
+  );
+  return res.files;
+}
+
+export async function readKnowledgeFile(
+  name: string,
+  filepath: string,
+): Promise<KnowledgeFileContent> {
+  return apiFetch<KnowledgeFileContent>(
+    `/bratrax/api/v1/clients/${encodeURIComponent(name)}/knowledge/${filepath}`,
+  );
+}
+
+export async function getSystemPrompt(name: string): Promise<string> {
+  const res = await apiFetch<{ client: string; content: string }>(
+    `/bratrax/api/v1/clients/${encodeURIComponent(name)}/system-prompt`,
+  );
+  return res.content;
 }

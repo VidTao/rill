@@ -90,6 +90,11 @@ latest.txt
 /postgres/
 /clickhouse/
 
+# Bratrax test/scratch projects
+/test-shopify-project/
+**/tmp/
+pnpm-lock.yaml
+
 # Claude Code — personal / ephemeral (do not commit)
 .claude/CLAUDE.local.md
 .claude/settings.local.json
