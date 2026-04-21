@@ -501,7 +501,7 @@
   });
 </script>
 
-<div class="flex min-h-screen w-screen items-start justify-center bg-bratrax-bg py-12">
+<div class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12">
   <div class="relative w-full max-w-2xl border border-bratrax-border bg-bratrax-surface p-8">
     <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
