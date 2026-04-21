@@ -33,7 +33,7 @@ func (t *WorkshopWriteKnowledge) Spec() *mcp.Tool {
 	return &mcp.Tool{
 		Name:        WorkshopWriteKnowledgeName,
 		Title:       "Workshop: Write Knowledge",
-		Description: "Write a discovery, insight, or pattern to the client knowledge base. Auto-updates index.md and log.md.",
+		Description: "Write a discovery, insight, or pattern to the client's persistent knowledge base (stored outside the Rill project). This is the ONLY correct tool for filing knowledge entries — do NOT use write_file for this purpose. Auto-updates index.md and log.md.",
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Writing knowledge...",
 			"openai/toolInvocation/invoked":  "Wrote knowledge",

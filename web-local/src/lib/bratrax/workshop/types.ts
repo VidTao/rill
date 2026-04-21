@@ -124,6 +124,19 @@ export interface CatalogSearchResult {
   source_ref: string;
 }
 
+// ── Knowledge types ──
+
+export interface KnowledgeFile {
+  path: string;
+  size: number;
+  modified: string;
+}
+
+export interface KnowledgeFileContent {
+  path: string;
+  content: string;
+}
+
 export type WorkshopPhase = "idle" | "validating" | "compiling" | "deploying";
 
 export interface WorkshopResults {

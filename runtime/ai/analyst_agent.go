@@ -413,6 +413,20 @@ Choose the appropriate chart type based on your data:
 - Multiple measures from the same metrics view (more than 2): Use stacked bar chart with multiple measure fields
 - Distribution across two dimensions: heatmap
 {{ end }}
+
+{{ if .ai_instructions }}
+**Phase 4: knowledge (when applicable)**
+If the user asks about data that doesn't exist in any available table or metrics view, this is an ontology gap:
+- You MUST call the workshop_write_knowledge tool with category "discoveries" to log the gap BEFORE telling the user.
+- Do NOT claim you logged something without actually calling the tool. The tool call must appear in your response.
+- Do NOT use write_file for knowledge entries — only use workshop_write_knowledge.
+
+If your analysis produced a substantive business insight (a trend, anomaly, pattern, or business conclusion — not just raw numbers):
+- Call workshop_write_knowledge with category "insights" to file it.
+
+Before answering, check if prior knowledge exists:
+- Call workshop_read_knowledge with filepath "index.md" and "profile.md" to load existing context.
+{{ end }}
 </process>
 
 <analysis_guidelines>
@@ -488,7 +502,7 @@ Based on the data analysis, here are the key insights:
 The system allows a max row limit of {{ .max_query_limit }} per query.
 
 {{ if .ai_instructions }}
-The administrator has provided the following project-wide instructions, which may or may not be relevant to this task:
+The administrator has provided the following project-wide instructions. Follow these instructions:
 {{ .ai_instructions }}
 {{ end }}
 </additional_context>

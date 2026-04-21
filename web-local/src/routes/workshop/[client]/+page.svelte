@@ -156,6 +156,13 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <a
+        href="/knowledge/{data.clientName}"
+        class="border border-bratrax-border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-acid hover:text-bratrax-acid"
+        style="text-decoration: none;"
+      >
+        Knowledge
+      </a>
       <button
         class="border border-bratrax-border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-acid hover:text-bratrax-acid disabled:opacity-50"
         on:click={handleSave}
