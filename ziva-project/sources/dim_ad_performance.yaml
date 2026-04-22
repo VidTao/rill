@@ -1,0 +1,10 @@
+# Source: dim_ad_performance
+# refreshed
+
+type: source
+connector: clickhouse
+sql: "SELECT\n    client_id,\n    campaign_id,\n    campaign_name,\n    ad_set_id,\n\
+  \    ad_id,\n    date,\n    spend,\n    impressions,\n    clicks,\n    ctr,\n  \
+  \  cpc,\n    cpm,\n    channel\nFROM ziva.dim_ad_performance FINAL"
+refresh:
+  cron: 0 * * * *

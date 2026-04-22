@@ -1,0 +1,36 @@
+# Metrics: Campaign
+# Generated from ontology object: Campaign
+
+type: metrics_view
+display_name: Campaign Analytics
+description: A paid media campaign — metadata only, attributed revenue via attribution_weights JOIN
+table: dim_campaigns
+dimensions:
+- name: campaign_id
+  display_name: Campaign Id
+  column: campaign_id
+- name: campaign_name
+  display_name: Campaign Name
+  column: campaign_name
+- name: status
+  display_name: Status
+  column: status
+- name: objective
+  display_name: Objective
+  column: objective
+  description: Campaign objective
+- name: channel
+  display_name: Channel
+  column: channel
+  description: 'Ad platform: meta, google, or tiktok'
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of campaign records
+- name: metric_total_campaigns
+  display_name: Total Campaigns
+  expression: COUNT(DISTINCT campaign_id)
+  description: Total campaigns across platforms
+  format_preset: humanize

@@ -1,0 +1,8 @@
+# Source: Attribution Weights (bridge table)
+# Joins touchpoints → orders → campaigns for cross-object metrics
+
+type: source
+connector: clickhouse
+sql: SELECT * FROM ziva.attribution_weights FINAL
+refresh:
+  cron: 0 * * * *

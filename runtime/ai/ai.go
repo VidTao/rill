@@ -83,6 +83,8 @@ func NewRunner(rt *runtime.Runtime, activity *activity.Client) *Runner {
 	RegisterTool(r, &WorkshopDeploy{Runtime: rt})
 	RegisterTool(r, &WorkshopListTemplates{Runtime: rt})
 	RegisterTool(r, &WorkshopGetCatalogs{Runtime: rt})
+	RegisterTool(r, &WorkshopWriteKnowledge{Runtime: rt})
+	RegisterTool(r, &WorkshopReadKnowledge{Runtime: rt})
 
 	// Bratrax catalog tools
 	RegisterTool(r, &CatalogListTaps{Runtime: rt})

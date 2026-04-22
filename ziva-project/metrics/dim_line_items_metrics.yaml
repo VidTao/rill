@@ -1,0 +1,47 @@
+# Metrics: Line Item
+# Generated from ontology object: LineItem
+
+type: metrics_view
+display_name: Line Item Analytics
+description: A line item within a Shopify order
+table: dim_line_items
+dimensions:
+- name: line_item_id
+  display_name: Line Item Id
+  column: line_item_id
+- name: order_id
+  display_name: Order Id
+  column: order_id
+- name: product_id
+  display_name: Product Id
+  column: product_id
+- name: title
+  display_name: Title
+  column: title
+- name: sku
+  display_name: Sku
+  column: sku
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of line item records
+- name: total_quantity
+  display_name: Quantity
+  expression: sum("quantity")
+  format_preset: humanize
+- name: total_price
+  display_name: Price
+  expression: sum("price")
+  format_preset: currency_usd
+- name: metric_total_line_items
+  display_name: Total Line Items
+  expression: COUNT(DISTINCT line_item_id)
+  description: Total line items sold
+  format_preset: humanize
+- name: metric_units_sold
+  display_name: Units Sold
+  expression: SUM(quantity)
+  description: Total units sold
+  format_preset: humanize

@@ -1,0 +1,14 @@
+# Source: dim_customers
+
+type: source
+connector: clickhouse
+sql: "SELECT\n    client_id,\n    customer_id,\n    email,\n    first_name,\n    last_name,\n\
+  \    toDateTime(ifNull(created_at, now())) AS created_at,\n    ifNull(total_spent,\
+  \ 0) AS total_spent,\n    toInt64(ifNull(orders_count, 0)) AS orders_count,\n  \
+  \  acquisition_channel,\n    acquisition_campaign,\n    ifNull(avg_order_value,\
+  \ 0) AS avg_order_value,\n    ltv_tier,\n    ifNull(total_paid, 0) AS total_paid,\n\
+  \    ifNull(total_refunded, 0) AS total_refunded,\n    ifNull(net_ltv, 0) AS net_ltv,\n\
+  \    toDateTime(ifNull(last_active_at, now())) AS last_active_at,\n    toInt64(ifNull(days_since_last_order,\
+  \ 0)) AS days_since_last_order\nFROM ziva.dim_customers FINAL"
+refresh:
+  cron: 0 * * * *

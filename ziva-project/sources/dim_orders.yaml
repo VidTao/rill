@@ -1,0 +1,10 @@
+# Source: dim_orders
+
+type: source
+connector: clickhouse
+sql: "SELECT\n    client_id,\n    order_id,\n    customer_id,\n    total_price,\n\
+  \    subtotal_price,\n    total_tax,\n    total_discounts,\n    currency,\n    financial_status,\n\
+  \    order_type,\n    fulfillment_status,\n    created_at,\n    customer_order_number\n\
+  FROM ziva.dim_orders FINAL"
+refresh:
+  cron: 0 * * * *

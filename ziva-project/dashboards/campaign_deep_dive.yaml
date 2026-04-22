@@ -1,0 +1,117 @@
+# Canvas Dashboard: Attribution
+# Pivot table + trend charts for media buyer decision-making
+# Global filters: Attribution Model, Date Range, Channel
+
+type: canvas
+display_name: "Attribution"
+
+filters:
+  enable: true
+
+defaults:
+  time_range: P30D
+
+time_ranges:
+  - P7D
+  - P14D
+  - P30D
+  - P3M
+  - P12M
+  - rill-TD
+  - rill-WTD
+  - rill-MTD
+  - inf
+
+rows:
+  # ─── Section 1: Attribution Pivot Table ─────────────────────
+  - items:
+      - width: 12
+        pivot:
+          metrics_view: cross_metrics
+          col_dimensions: []
+          row_dimensions:
+            - channel_group
+            - campaign
+            - adset
+            - ad
+          measures:
+            - metric_spend
+            - metric_roas
+            - metric_attributed_revenue
+            - metric_attributed_orders
+            - metric_cpa
+            - metric_attributed_aov
+            - metric_nc_roas
+            - metric_nc_purchases
+            - metric_repeat_purchases
+    height: 600px
+
+  # ─── Section 2: Spend vs Revenue Trend ──────────────────────
+  - items:
+      - width: 12
+        markdown:
+          content: "### Spend vs Revenue Trend"
+    height: 40px
+
+  - items:
+      - width: 6
+        line_chart:
+          metrics_view: cross_metrics
+          title: "Attributed Revenue"
+          x:
+            field: date
+            type: temporal
+          y:
+            field: metric_attributed_revenue
+            type: quantitative
+            zeroBasedOrigin: true
+          color:
+            field: channel_group
+            type: nominal
+      - width: 6
+        line_chart:
+          metrics_view: cross_metrics
+          title: "Ad Spend"
+          x:
+            field: date
+            type: temporal
+          y:
+            field: metric_spend
+            type: quantitative
+            zeroBasedOrigin: true
+          color:
+            field: channel_group
+            type: nominal
+    height: 300px
+
+  # ─── Section 3: Channel Mix ─────────────────────────────────
+  - items:
+      - width: 12
+        markdown:
+          content: "### Channel Mix"
+    height: 40px
+
+  - items:
+      - width: 6
+        donut_chart:
+          metrics_view: cross_metrics
+          title: "Revenue by Channel"
+          color:
+            field: channel_group
+            type: nominal
+          measure:
+            field: metric_attributed_revenue
+            type: quantitative
+            showTotal: true
+      - width: 6
+        donut_chart:
+          metrics_view: cross_metrics
+          title: "Spend by Channel"
+          color:
+            field: channel_group
+            type: nominal
+          measure:
+            field: metric_spend
+            type: quantitative
+            showTotal: true
+    height: 300px

@@ -1,0 +1,14 @@
+type: explore
+title: "TZ Test — Total Sales (Transactions)"
+metrics_view: dim_transactions_metrics
+
+time_zones:
+  - America/New_York
+  - UTC
+
+defaults:
+  time_range: P7D
+  measures:
+    - metric_total_sales
+    - metric_transaction_refunds
+    - metric_transaction_revenue

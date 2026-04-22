@@ -1,0 +1,113 @@
+# Metrics: Store
+# Generated from ontology object: Store
+
+type: metrics_view
+display_name: Store Analytics
+description: The business as a whole — blended KPIs across commerce, ads, refunds, and custom costs
+table: dim_store
+timeseries: ts
+dimensions:
+- name: ts
+  display_name: Ts
+  column: ts
+  description: Event timestamp (order created_at, ad date, refund date, spend date)
+- name: record_type
+  display_name: Record Type
+  column: record_type
+  description: 'Source record type: order, ad, refund, custom_spend'
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of store records
+- name: total_gross_sales
+  display_name: Gross Sales
+  expression: sum("gross_sales")
+  format_preset: humanize
+  description: Gross sales revenue — subtotal + discounts (before deductions)
+- name: total_discounts
+  display_name: Discounts
+  expression: sum("discounts")
+  format_preset: humanize
+  description: Discount amount applied to order
+- name: total_net_sales
+  display_name: Net Sales
+  expression: sum("net_sales")
+  format_preset: humanize
+  description: Net sales — subtotal after discounts, before tax/shipping
+- name: total_revenue
+  display_name: Revenue
+  expression: sum("revenue")
+  format_preset: currency_usd
+  description: Order total (subtotal + tax + shipping - discounts)
+- name: total_spend
+  display_name: Spend
+  expression: sum("spend")
+  format_preset: currency_usd
+  description: Ad platform spend
+- name: total_returns
+  display_name: Returns
+  expression: sum("returns")
+  format_preset: humanize
+  description: Refund amount
+- name: total_impressions
+  display_name: Impressions
+  expression: sum("impressions")
+  format_preset: humanize
+  description: Ad impressions
+- name: total_clicks
+  display_name: Clicks
+  expression: sum("clicks")
+  format_preset: humanize
+  description: Ad clicks
+- name: total_custom_spend
+  display_name: Custom Spend
+  expression: sum("custom_spend")
+  format_preset: currency_usd
+  description: Non-platform expenses (agency, software, influencer, etc.)
+- name: metric_store_total_sales
+  display_name: Store Total Sales
+  expression: SUM(net_sales) - SUM(returns)
+  description: Shopify Total Sales — subtotal minus refunds
+  format_preset: currency_usd
+- name: metric_blended_spend
+  display_name: Blended Spend
+  expression: SUM(spend)
+  description: Total ad spend across all platforms
+  format_preset: currency_usd
+- name: metric_blended_roas
+  display_name: Blended Roas
+  expression: (SUM(net_sales) - SUM(returns)) / NULLIF(SUM(spend), 0)
+  description: Blended ROAS — Total Sales / ad spend
+  format_preset: humanize
+- name: metric_blended_cpa
+  display_name: Blended Cpa
+  expression: SUM(spend) / NULLIF(SUM(CASE WHEN revenue > 0 THEN 1 ELSE 0 END), 0)
+  description: Blended CPA — ad spend / orders with revenue > 0
+  format_preset: currency_usd
+- name: metric_store_gross_sales
+  display_name: Store Gross Sales
+  expression: SUM(gross_sales)
+  description: Gross Sales
+  format_preset: currency_usd
+- name: metric_store_returns
+  display_name: Store Returns
+  expression: SUM(returns)
+  description: Total refund amount
+  format_preset: currency_usd
+- name: metric_store_discounts
+  display_name: Store Discounts
+  expression: SUM(discounts)
+  description: Total discounts
+  format_preset: currency_usd
+- name: metric_mer
+  display_name: Mer
+  expression: (SUM(spend) + SUM(custom_spend)) / NULLIF(SUM(net_sales) - SUM(returns), 0)
+  description: MER — total spend (ads + custom) / Total Sales
+  format_preset: humanize
+- name: metric_total_spend_all
+  display_name: Total Spend All
+  expression: SUM(spend) + SUM(custom_spend)
+  description: All costs — ad spend + custom spend
+  format_preset: currency_usd

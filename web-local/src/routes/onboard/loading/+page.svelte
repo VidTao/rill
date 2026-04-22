@@ -1,13 +1,27 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
+  import { get } from "svelte/store";
   import { goto } from "$app/navigation";
   import { onboardStatus, onboardMe } from "$lib/bratrax/onboarding/api";
   import type { OnboardStatus } from "$lib/bratrax/onboarding/api";
+  import {
+    runtimeServiceListResources,
+    V1ReconcileStatus,
+    type V1Resource,
+    type V1ResourceName,
+  } from "@rilldata/web-common/runtime-client";
+  import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+  import { ResourceKind } from "@rilldata/web-common/features/entity-management/resource-selectors";
+
+  type VerifyState = "pending" | "running" | "done" | "error";
 
   let status: OnboardStatus | null = null;
   let error = "";
   let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let verifyInterval: ReturnType<typeof setInterval> | null = null;
   let clientId = "";
+  let verifyState: VerifyState = "pending";
+  let redirectTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ---------------------------------------------------------------------------
   // Step display configuration
@@ -84,6 +98,13 @@
         return "pending";
       },
     },
+    {
+      label: "Verifying dashboards",
+      check: (s) => {
+        if (s.step !== "ready") return "pending";
+        return verifyState;
+      },
+    },
   ];
 
   // ---------------------------------------------------------------------------
@@ -122,8 +143,8 @@
 
       if (status.step === "ready") {
         if (pollInterval) clearInterval(pollInterval);
-        // Brief delay so user sees "Dashboards ready" before redirect
-        setTimeout(() => goto("/canvas/performance_overview"), 1500);
+        pollInterval = null;
+        startVerification();
       }
 
       if (status.step === "error") {
@@ -135,6 +156,120 @@
       error = e instanceof Error ? e.message : String(e);
       if (pollInterval) clearInterval(pollInterval);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rill resource verification
+  //
+  // After the backend marks activation as "ready", the Rill runtime still needs
+  // to finish parsing the generated project YAML and reconciling each resource
+  // (connectors, sources, models, metrics views, dashboards). Redirecting to a
+  // canvas before its upstream metrics view is idle produces empty/broken
+  // charts. We poll ListResources until every resource transitively referenced
+  // by a Canvas/Explore dashboard is IDLE with no reconcileError.
+  // ---------------------------------------------------------------------------
+  function refKey(ref: V1ResourceName | undefined): string {
+    return `${ref?.kind ?? ""}/${ref?.name ?? ""}`;
+  }
+
+  function collectRequired(resources: V1Resource[]): Set<string> {
+    const byKey = new Map<string, V1Resource>();
+    for (const r of resources) {
+      byKey.set(refKey(r.meta?.name), r);
+    }
+
+    const required = new Set<string>();
+    const queue: string[] = [];
+    for (const r of resources) {
+      const kind = r.meta?.name?.kind;
+      if (kind === ResourceKind.Canvas || kind === ResourceKind.Explore) {
+        const k = refKey(r.meta?.name);
+        required.add(k);
+        queue.push(k);
+      }
+    }
+
+    while (queue.length > 0) {
+      const k = queue.shift()!;
+      const res = byKey.get(k);
+      for (const ref of res?.meta?.refs ?? []) {
+        const rk = refKey(ref);
+        if (!required.has(rk)) {
+          required.add(rk);
+          queue.push(rk);
+        }
+      }
+    }
+
+    return required;
+  }
+
+  async function verify() {
+    try {
+      const instanceId = get(runtime).instanceId;
+      const resp = await runtimeServiceListResources(instanceId);
+      const resources = resp.resources ?? [];
+
+      const required = collectRequired(resources);
+
+      // No dashboards in the project yet — parser hasn't caught up; keep polling.
+      const hasDashboard = resources.some((r) => {
+        const kind = r.meta?.name?.kind;
+        return kind === ResourceKind.Canvas || kind === ResourceKind.Explore;
+      });
+      if (!hasDashboard) {
+        verifyState = "running";
+        return;
+      }
+
+      const failed: string[] = [];
+      let anyPending = false;
+
+      for (const r of resources) {
+        const k = refKey(r.meta?.name);
+        if (!required.has(k)) continue;
+        if (r.meta?.reconcileError) {
+          failed.push(r.meta?.name?.name ?? k);
+          continue;
+        }
+        if (r.meta?.reconcileStatus !== V1ReconcileStatus.RECONCILE_STATUS_IDLE) {
+          anyPending = true;
+        }
+      }
+
+      if (failed.length > 0) {
+        verifyState = "error";
+        error = `Failed to build: ${failed.join(", ")}`;
+        if (verifyInterval) clearInterval(verifyInterval);
+        verifyInterval = null;
+        return;
+      }
+
+      if (anyPending) {
+        verifyState = "running";
+        return;
+      }
+
+      verifyState = "done";
+      if (verifyInterval) clearInterval(verifyInterval);
+      verifyInterval = null;
+      // Brief delay so user sees the final checkmark before redirect
+      redirectTimer = setTimeout(
+        () => goto("/canvas/performance_overview"),
+        1500,
+      );
+    } catch (e) {
+      // Swallow transient errors — the runtime may be momentarily unreachable
+      // as it restarts to pick up newly-deployed project files. Keep polling.
+      verifyState = "running";
+      console.warn("Rill resource verification failed, retrying:", e);
+    }
+  }
+
+  function startVerification() {
+    verifyState = "running";
+    verify();
+    verifyInterval = setInterval(verify, 2000);
   }
 
   onMount(async () => {
@@ -149,6 +284,8 @@
 
   onDestroy(() => {
     if (pollInterval) clearInterval(pollInterval);
+    if (verifyInterval) clearInterval(verifyInterval);
+    if (redirectTimer) clearTimeout(redirectTimer);
   });
 </script>
 

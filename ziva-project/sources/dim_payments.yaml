@@ -1,0 +1,10 @@
+# Source: dim_payments
+
+type: source
+connector: clickhouse
+sql: "SELECT\n    client_id,\n    payment_id,\n    order_id,\n    customer_id,\n \
+  \   customer_email,\n    ifNull(amount, 0) AS amount,\n    payment_type,\n    toInt64(ifNull(payment_number,\
+  \ 0)) AS payment_number,\n    status,\n    order_type,\n    toDateTime(ifNull(created_at,\
+  \ now())) AS created_at\nFROM ziva.dim_payments FINAL"
+refresh:
+  cron: 0 * * * *

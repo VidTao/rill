@@ -1,0 +1,91 @@
+# Metrics: Customer
+# Generated from ontology object: Customer
+
+type: metrics_view
+display_name: Customer Analytics
+description: A customer who has purchased from the store
+table: dim_customers
+timeseries: created_at
+dimensions:
+- name: customer_id
+  display_name: Customer Id
+  column: customer_id
+- name: email
+  display_name: Email
+  column: email
+- name: first_name
+  display_name: First Name
+  column: first_name
+- name: last_name
+  display_name: Last Name
+  column: last_name
+- name: created_at
+  display_name: Created At
+  column: created_at
+- name: acquisition_channel
+  display_name: Acquisition Channel
+  column: acquisition_channel
+  description: First-touch acquisition channel (utm_source)
+- name: acquisition_campaign
+  display_name: Acquisition Campaign
+  column: acquisition_campaign
+  description: First-touch acquisition campaign (utm_campaign)
+- name: ltv_tier
+  display_name: Ltv Tier
+  column: ltv_tier
+  description: LTV segment for cohort analysis
+- name: last_active_at
+  display_name: Last Active At
+  column: last_active_at
+  description: Last activity timestamp (any event)
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of customer records
+- name: total_total_spent
+  display_name: Total Spent
+  expression: sum("total_spent")
+  format_preset: humanize
+  description: Total amount spent (Shopify snapshot)
+- name: total_orders_count
+  display_name: Orders Count
+  expression: sum("orders_count")
+  format_preset: humanize
+  description: Number of orders (Shopify snapshot)
+- name: total_avg_order_value
+  display_name: Avg Order Value
+  expression: sum("avg_order_value")
+  format_preset: humanize
+  description: Average order value (total_spent / orders_count)
+- name: total_total_paid
+  display_name: Total Paid
+  expression: sum("total_paid")
+  format_preset: humanize
+  description: Total money actually collected from this customer
+- name: total_total_refunded
+  display_name: Total Refunded
+  expression: sum("total_refunded")
+  format_preset: humanize
+  description: Total money refunded to this customer
+- name: total_net_ltv
+  display_name: Net Ltv
+  expression: sum("net_ltv")
+  format_preset: humanize
+  description: True lifetime value (paid minus refunded)
+- name: total_days_since_last_order
+  display_name: Days Since Last Order
+  expression: avg("days_since_last_order")
+  format_preset: humanize
+  description: Days since last order (for retention/churn)
+- name: metric_total_customers
+  display_name: Total Customers
+  expression: COUNT(DISTINCT customer_id)
+  description: Total customers with at least one order
+  format_preset: humanize
+- name: metric_avg_ltv
+  display_name: Avg Ltv
+  expression: AVG(total_spent)
+  description: Average customer lifetime value
+  format_preset: humanize

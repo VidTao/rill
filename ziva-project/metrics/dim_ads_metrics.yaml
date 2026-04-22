@@ -1,0 +1,34 @@
+# Metrics: Ad
+# Generated from ontology object: Ad
+
+type: metrics_view
+display_name: Ad Analytics
+description: An individual ad across platforms
+table: dim_ads
+dimensions:
+- name: ad_id
+  display_name: Ad Id
+  column: ad_id
+- name: ad_name
+  display_name: Ad Name
+  column: ad_name
+- name: campaign_id
+  display_name: Campaign Id
+  column: campaign_id
+- name: ad_set_id
+  display_name: Ad Set Id
+  column: ad_set_id
+  description: Parent ad set or ad group
+- name: status
+  display_name: Status
+  column: status
+- name: channel
+  display_name: Channel
+  column: channel
+  description: Ad platform
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of ad records

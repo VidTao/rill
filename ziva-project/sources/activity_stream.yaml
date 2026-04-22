@@ -1,0 +1,8 @@
+# Source: Activity Stream
+# Ingests from ClickHouse into DuckDB
+
+type: source
+connector: clickhouse
+sql: SELECT * FROM ziva.activity_stream FINAL
+refresh:
+  cron: 0 * * * *

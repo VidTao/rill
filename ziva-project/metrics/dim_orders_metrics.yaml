@@ -1,0 +1,121 @@
+# Metrics: Order
+# Aligned to Shopify Total Sales Breakdown
+
+type: metrics_view
+display_name: Order Analytics
+description: Shopify order metrics — aligned to Shopify Admin total sales breakdown
+table: dim_orders
+timeseries: created_at
+dimensions:
+- name: order_id
+  display_name: Order Id
+  column: order_id
+- name: customer_id
+  display_name: Customer Id
+  column: customer_id
+- name: currency
+  display_name: Currency
+  column: currency
+- name: financial_status
+  display_name: Financial Status
+  column: financial_status
+- name: order_type
+  display_name: Order Type
+  column: order_type
+- name: fulfillment_status
+  display_name: Fulfillment Status
+  column: fulfillment_status
+- name: created_at
+  display_name: Created At
+  column: created_at
+measures:
+# ─── Shopify Total Sales Breakdown (exact match) ───
+- name: metric_gross_sales
+  display_name: Gross Sales
+  expression: SUM(subtotal_price + total_discounts)
+  description: Line item prices before discounts (Shopify Gross Sales)
+  format_preset: currency_usd
+- name: metric_discounts
+  display_name: Discounts
+  expression: SUM(total_discounts)
+  description: Total discount amount applied
+  format_preset: currency_usd
+- name: metric_returns
+  display_name: Returns
+  expression: SUM(CASE WHEN financial_status IN ('refunded', 'partially_refunded') THEN total_price ELSE 0 END)
+  description: Revenue from refunded orders
+  format_preset: currency_usd
+- name: metric_taxes
+  display_name: Taxes
+  expression: SUM(total_tax)
+  description: Total tax collected
+  format_preset: currency_usd
+- name: metric_total_sales
+  display_name: Total Sales
+  expression: SUM(CASE WHEN financial_status NOT IN ('refunded') THEN subtotal_price ELSE 0 END)
+  description: Net sales — subtotal excluding fully refunded orders
+  format_preset: currency_usd
+# ─── Core order metrics ───
+- name: metric_total_orders
+  display_name: Total Orders
+  expression: COUNT(DISTINCT order_id)
+  description: Total number of orders
+  format_preset: humanize
+- name: metric_total_revenue
+  display_name: Order Revenue
+  expression: SUM(total_price)
+  description: Total order revenue (subtotal — same as total_price for Ziva, no tax/shipping)
+  format_preset: currency_usd
+- name: metric_avg_order_value
+  display_name: Avg Order Value
+  expression: SUM(subtotal_price) / NULLIF(COUNT(DISTINCT order_id), 0)
+  description: Average order value
+  format_preset: currency_usd
+- name: metric_true_aov
+  display_name: True Aov
+  expression: SUM(subtotal_price) / NULLIF(COUNT(DISTINCT order_id) FILTER (WHERE total_price > 0), 0)
+  description: True AOV — subtotal / orders with positive revenue
+  format_preset: currency_usd
+- name: metric_orders_gt_0
+  display_name: Orders > 0
+  expression: COUNT(DISTINCT order_id) FILTER (WHERE total_price > 0)
+  description: Orders with positive revenue
+  format_preset: humanize
+# ─── New vs Returning ───
+- name: metric_new_customers_pct
+  display_name: New Customers Pct
+  expression: CAST(COUNT(DISTINCT CASE WHEN customer_order_number = 1 THEN order_id END) AS DOUBLE) / NULLIF(COUNT(DISTINCT order_id), 0)
+  description: Percentage of orders from first-time customers
+  format_preset: percentage
+  valid_percent_of_total: false
+- name: metric_returning_customers_pct
+  display_name: Returning Customers Pct
+  expression: CAST(COUNT(DISTINCT CASE WHEN customer_order_number > 1 THEN order_id END) AS DOUBLE) / NULLIF(COUNT(DISTINCT order_id), 0)
+  description: Percentage of orders from returning customers
+  format_preset: percentage
+  valid_percent_of_total: false
+- name: metric_new_customer_orders
+  display_name: New Customer Orders
+  expression: COUNT(DISTINCT CASE WHEN customer_order_number = 1 THEN order_id END)
+  description: Orders from first-time customers
+  format_preset: humanize
+- name: metric_new_customer_revenue
+  display_name: New Customer Revenue
+  expression: SUM(CASE WHEN customer_order_number = 1 THEN total_price ELSE 0 END)
+  description: Revenue from first-time customers
+  format_preset: currency_usd
+- name: metric_returning_customer_revenue
+  display_name: Returning Customer Revenue
+  expression: SUM(CASE WHEN customer_order_number > 1 THEN total_price ELSE 0 END)
+  description: Revenue from returning customers
+  format_preset: currency_usd
+- name: metric_total_discounts
+  display_name: Discounts
+  expression: SUM(total_discounts)
+  description: Total discount amount applied
+  format_preset: currency_usd
+- name: metric_sale_taxes
+  display_name: Taxes
+  expression: SUM(total_tax)
+  description: Total tax collected
+  format_preset: currency_usd

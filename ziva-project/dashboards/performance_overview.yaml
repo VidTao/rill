@@ -1,0 +1,125 @@
+# Canvas Dashboard: Performance Overview
+# Triple Whale-style KPI scorecard grid
+# Auto-generated from ontology metrics
+
+type: canvas
+display_name: "Performance Overview"
+
+rows:
+  - items:
+      - width: 12
+        markdown:
+          content: "## Key Metrics"
+    height: 40px
+
+  - items:
+      - width: 4
+        kpi_grid:
+          metrics_view: dim_store_metrics
+          measures:
+            - metric_store_total_sales
+      - width: 4
+        kpi_grid:
+          metrics_view: dim_store_metrics
+          measures:
+            - metric_blended_spend
+      - width: 4
+        kpi_grid:
+          metrics_view: dim_store_metrics
+          measures:
+            - metric_blended_roas
+    height: 140px
+
+  # ─── Section divider ───
+  - items:
+      - width: 12
+        markdown:
+          content: "### Store Breakdown"
+    height: 40px
+
+  - items:
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_gross_sales
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_total_orders
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_transactions_metrics
+          measures:
+            - metric_transaction_refunds
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_sale_taxes
+    height: 140px
+  - items:
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_true_aov
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_avg_order_value
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_taxes
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_new_customers_pct
+    height: 140px
+  - items:
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_returning_customers_pct
+      - width: 3
+        kpi_grid:
+          comparison:
+            - delta
+            - percent_change
+          measures:
+            - metric_orders_gt_0
+          metrics_view: dim_orders_metrics
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_new_customer_orders
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_line_items_metrics
+          measures:
+            - metric_units_sold
+    height: 140px
+  - items:
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_new_customer_revenue
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_returning_customer_revenue
+      - width: 3
+        kpi_grid:
+          metrics_view: dim_orders_metrics
+          measures:
+            - metric_total_discounts
+    height: 140px

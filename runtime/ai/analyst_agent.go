@@ -168,6 +168,8 @@ func (t *AnalystAgent) Handler(ctx context.Context, args *AnalystAgentArgs) (*An
 	if !args.DisableCharts {
 		tools = append(tools, CreateChartName)
 	}
+	// Bratrax knowledge tools (read/write client knowledge base)
+	tools = append(tools, WorkshopReadKnowledgeName, WorkshopWriteKnowledgeName)
 
 	// Build completion messages
 	systemPrompt, err := t.systemPrompt(ctx, metricsViewNames, args)

@@ -1,0 +1,26 @@
+# Metrics: Product
+# Generated from ontology object: Product
+
+type: metrics_view
+display_name: Product Analytics
+description: A product in the catalog
+table: dim_products
+dimensions:
+- name: product_id
+  display_name: Product Id
+  column: product_id
+- name: title
+  display_name: Title
+  column: title
+- name: vendor
+  display_name: Vendor
+  column: vendor
+- name: product_type
+  display_name: Product Type
+  column: product_type
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of product records

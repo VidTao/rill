@@ -1,0 +1,79 @@
+# Metrics: Payment
+# Generated from ontology object: Payment
+
+type: metrics_view
+display_name: Payment Analytics
+description: An individual money movement. Each purchase, installment, or refund = one Payment row.
+table: dim_payments
+timeseries: created_at
+dimensions:
+- name: payment_id
+  display_name: Payment Id
+  column: payment_id
+  description: 'Shopify: {order_id}-pay-0 or {refund_id}. CF2: {order_id}-pay-{paid_count} or {order_id}-refund-{date}.'
+- name: order_id
+  display_name: Order Id
+  column: order_id
+- name: customer_id
+  display_name: Customer Id
+  column: customer_id
+  description: Numeric customer/contact ID from source CRM
+- name: customer_email
+  display_name: Customer Email
+  column: customer_email
+  description: Customer email for identity matching and cross-CRM dedup
+- name: payment_type
+  display_name: Payment Type
+  column: payment_type
+  description: initial (first payment), installment (recurring), refund, partial_refund
+- name: status
+  display_name: Status
+  column: status
+  description: paid, refunded, partially_refunded
+- name: created_at
+  display_name: Created At
+  column: created_at
+  description: 'When the payment was processed. Shopify: order created_at or refund created_at. CF2: webhook arrival time.'
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of payment records
+- name: total_amount
+  display_name: Amount
+  expression: sum("amount")
+  format_preset: currency_usd
+  description: Positive for payments, negative for refunds
+- name: total_payment_number
+  display_name: Payment Number
+  expression: sum("payment_number")
+  format_preset: humanize
+  description: Which installment (0=initial/one-time, 1-6 for payment plans)
+- name: metric_total_collected
+  display_name: Total Collected
+  expression: SUM(amount)
+  description: Total cash collected (all payments)
+  format_preset: humanize
+- name: metric_total_refunded
+  display_name: Total Refunded
+  expression: SUM(amount)
+  description: Total cash refunded
+  format_preset: currency_usd
+- name: metric_net_collected
+  display_name: Net Collected
+  expression: SUM(amount)
+  description: Net cash collected (payments minus refunds)
+  format_preset: humanize
+- name: metric_total_payments
+  display_name: Total Payments
+  expression: COUNT(DISTINCT payment_id)
+  description: Total successful payments
+  format_preset: humanize
+- name: metric_refund_rate
+  display_name: Refund Rate
+  expression: SUM(CASE WHEN payment_type = 'refund' THEN ABS(amount) ELSE 0 END) / NULLIF(SUM(CASE WHEN status = 'paid' THEN
+    amount ELSE 0 END), 0)
+  description: Percentage of revenue refunded
+  format_preset: percentage
+  valid_percent_of_total: false

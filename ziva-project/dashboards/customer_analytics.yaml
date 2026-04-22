@@ -1,0 +1,89 @@
+# Canvas Dashboard: Customer Analytics
+# LTV, cohorts, acquisition channels, retention
+
+type: canvas
+display_name: "Customer Analytics"
+
+rows:
+  # Row 1: Customer KPIs
+  - items:
+      - kpi_grid:
+          metrics_view: dim_customers_metrics
+          measures:
+            - metric_total_customers
+            - metric_avg_ltv
+            - total_total_spent
+          comparison:
+            - delta
+            - percent_change
+        width: 12
+    height: 160px
+
+  # Row 2: LTV by acquisition channel + LTV tier distribution
+  - items:
+      - stacked_bar:
+          metrics_view: dim_customers_metrics
+          title: "LTV by acquisition channel"
+          x:
+            field: acquisition_channel
+            type: nominal
+          y:
+            field: total_lifetime_value
+            type: quantitative
+          color:
+            field: acquisition_channel
+            type: nominal
+        width: 6
+      - stacked_bar:
+          metrics_view: dim_customers_metrics
+          title: "Customers by LTV tier"
+          x:
+            field: ltv_tier
+            type: nominal
+          y:
+            field: record_count
+            type: quantitative
+          color:
+            field: ltv_tier
+            type: nominal
+        width: 6
+    height: 300px
+
+  # Row 3: New customers over time + Avg days since last order
+  - items:
+      - stacked_bar:
+          metrics_view: dim_customers_metrics
+          title: "New customers over time"
+          x:
+            field: created_at
+            type: temporal
+          y:
+            field: record_count
+            type: quantitative
+        width: 6
+      - stacked_bar:
+          metrics_view: dim_customers_metrics
+          title: "Customers by acquisition campaign"
+          x:
+            field: acquisition_campaign
+            type: nominal
+          y:
+            field: record_count
+            type: quantitative
+        width: 6
+    height: 300px
+
+  # Row 4: Customer detail table
+  - items:
+      - table:
+          metrics_view: dim_customers_metrics
+          title: "Customer details"
+          columns:
+            - acquisition_channel
+            - acquisition_campaign
+            - ltv_tier
+            - metric_total_customers
+            - total_lifetime_value
+            - metric_avg_ltv
+        width: 12
+    height: 350px

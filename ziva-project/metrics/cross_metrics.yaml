@@ -1,0 +1,115 @@
+# Metrics: Cross-Object (Attribution)
+# Auto-generated from ontology cross-object metrics with 'via'
+# Joins orders + ad performance via attribution_weights
+
+type: metrics_view
+display_name: Attribution Analytics
+description: Attributed ROAS, CPA, revenue by campaign — supports 5 attribution models
+model: cross_metrics
+timeseries: date
+default_dimensions:
+- attribution_model
+dimensions:
+- name: date
+  display_name: Date
+  column: date
+- name: attribution_model
+  display_name: Attribution Model
+  column: attribution_model
+# --- 6-level attribution taxonomy (drill-down order) ---
+- name: channel_group
+  display_name: Channel
+  column: channel_group
+- name: medium
+  display_name: Medium
+  column: medium
+- name: source
+  display_name: Source
+  column: source
+- name: campaign
+  display_name: Campaign
+  column: campaign
+- name: adset
+  display_name: Ad Set
+  column: adset
+- name: ad
+  display_name: Ad
+  column: ad
+measures:
+- name: metric_attributed_revenue
+  display_name: Attributed Revenue
+  expression: SUM(total_price * weight)
+  description: Revenue attributed to ad campaigns
+  format_preset: currency_usd
+- name: metric_attributed_orders
+  display_name: Attributed Orders
+  expression: COUNT(DISTINCT CASE WHEN order_id != '' THEN order_id END)
+  description: Orders attributed to ad campaigns
+  format_preset: humanize
+- name: metric_roas
+  display_name: ROAS
+  expression: SUM(total_price * weight) / NULLIF(SUM(spend), 0)
+  description: Return on ad spend (attributed revenue / ad spend)
+  format_preset: humanize
+- name: metric_cpa
+  display_name: CPA
+  expression: SUM(spend) / NULLIF(COUNT(DISTINCT CASE WHEN order_id != '' THEN order_id END), 0)
+  description: Cost per acquisition (ad spend / attributed orders)
+  format_preset: currency_usd
+- name: metric_attributed_aov
+  display_name: AOV
+  expression: SUM(total_price * weight) / NULLIF(COUNT(DISTINCT CASE WHEN order_id != '' THEN order_id END), 0)
+  description: Average order value (attributed)
+  format_preset: currency_usd
+- name: metric_nc_roas
+  display_name: NC ROAS
+  expression: SUM(CASE WHEN orders_count = 1 THEN total_price * weight ELSE 0 END) / NULLIF(SUM(spend), 0)
+  description: ROAS from first-time customers only
+  format_preset: humanize
+- name: metric_nc_cpa
+  display_name: NC CPA
+  expression: SUM(spend) / NULLIF(COUNT(DISTINCT CASE WHEN orders_count = 1 THEN order_id END), 0)
+  description: Cost per new customer acquisition
+  format_preset: currency_usd
+- name: metric_nc_purchases
+  display_name: New Purchases
+  expression: COUNT(DISTINCT CASE WHEN orders_count = 1 THEN order_id END)
+  description: Orders from first-time customers
+  format_preset: humanize
+- name: metric_nc_revenue
+  display_name: NC Revenue
+  expression: SUM(CASE WHEN orders_count = 1 THEN total_price * weight ELSE 0 END)
+  description: Revenue from first-time customers
+  format_preset: currency_usd
+- name: metric_repeat_purchases
+  display_name: Repeat Purchases
+  expression: COUNT(DISTINCT CASE WHEN orders_count > 1 THEN order_id END)
+  description: Orders from returning customers
+  format_preset: humanize
+- name: metric_spend
+  display_name: Spend
+  expression: SUM(spend)
+  format_preset: currency_usd
+- name: metric_impressions
+  display_name: Impressions
+  expression: SUM(impressions)
+  format_preset: humanize
+- name: metric_clicks
+  display_name: Clicks
+  expression: SUM(clicks)
+  format_preset: humanize
+- name: metric_ctr
+  display_name: CTR
+  expression: SUM(clicks)::DOUBLE / NULLIF(SUM(impressions), 0)
+  description: Click-through rate
+  format_preset: percentage
+- name: metric_cpm
+  display_name: CPM
+  expression: SUM(spend) / NULLIF(SUM(impressions), 0) * 1000
+  description: Cost per thousand impressions
+  format_preset: currency_usd
+- name: metric_new_customer_roas
+  display_name: New Customer Roas
+  expression: SUM(CASE WHEN orders_count = 1 THEN total_price * weight ELSE 0 END) / NULLIF(SUM(spend), 0)
+  description: ROAS from first-time customers only
+  format_preset: currency_usd

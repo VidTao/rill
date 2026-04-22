@@ -59,7 +59,17 @@ func (e *warehouseToSelfExecutor) Execute(ctx context.Context, opts *drivers.Mod
 		return nil, err
 	}
 
-	m := &ModelInputProperties{SQL: "SELECT * FROM " + fromClause}
+	// When allow_empty was set on the source, the warehouse driver injects a
+	// sentinel `__rill_placeholder` column on every NDJSON row (NULL for real
+	// rows, 1 for the single typed-placeholder row emitted on empty results).
+	// Filter the placeholder and strip the sentinel column so the final table
+	// exposes only user-visible columns with correct types.
+	selectSQL := "SELECT * FROM " + fromClause
+	if allowEmpty, _ := opts.InputProperties["allow_empty"].(bool); allowEmpty {
+		selectSQL = "SELECT * EXCLUDE (__rill_placeholder) FROM " + fromClause + " WHERE __rill_placeholder IS NULL"
+	}
+
+	m := &ModelInputProperties{SQL: selectSQL}
 	propsMap := make(map[string]any)
 	if err := mapstructure.Decode(m, &propsMap); err != nil {
 		return nil, err

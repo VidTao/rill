@@ -1,0 +1,65 @@
+# Metrics: Transaction
+# Generated from ontology object: Transaction
+
+type: metrics_view
+display_name: Transaction Analytics
+description: An individual payment event. Each capture, refund, or void on an order.
+table: dim_transactions
+timeseries: created_at
+dimensions:
+- name: transaction_id
+  display_name: Transaction Id
+  column: transaction_id
+- name: order_id
+  display_name: Order Id
+  column: order_id
+- name: kind
+  display_name: Kind
+  column: kind
+  description: 'Transaction type: authorization, capture, sale, refund, void'
+- name: currency
+  display_name: Currency
+  column: currency
+- name: gateway
+  display_name: Gateway
+  column: gateway
+  description: 'Payment gateway: shopify_payments, paypal, klarna, etc.'
+- name: status
+  display_name: Status
+  column: status
+  description: success, failure, pending, error
+- name: created_at
+  display_name: Created At
+  column: created_at
+measures:
+- name: record_count
+  display_name: Record Count
+  expression: count(*)
+  format_preset: humanize
+  description: Total number of transaction records
+- name: total_amount
+  display_name: Amount
+  expression: sum("amount")
+  format_preset: currency_usd
+- name: metric_total_sales
+  display_name: Total Sales
+  expression: SUM(CASE WHEN kind IN ('capture', 'sale') THEN amount ELSE 0 END) - SUM(CASE WHEN kind = 'refund' THEN ABS(amount) ELSE 0 END)
+  description: Net sales (captures + sales minus refunds)
+  format_preset: currency_usd
+- name: metric_transaction_refunds
+  display_name: Transaction Refunds
+  expression: SUM(CASE WHEN kind = 'refund' THEN ABS(amount) ELSE 0 END)
+  description: Total refunded amount (by refund date, not order date)
+  format_preset: currency_usd
+- name: metric_transaction_captures
+  display_name: Transaction Captures
+  expression: SUM(CASE WHEN kind IN ('capture', 'sale') THEN amount ELSE 0 END)
+  description: Total captured (successful payments)
+  format_preset: currency_usd
+- name: metric_transaction_refund_rate
+  display_name: Transaction Refund Rate
+  expression: SUM(CASE WHEN kind = 'refund' THEN amount ELSE 0 END) / NULLIF(SUM(CASE WHEN kind = 'capture' THEN amount ELSE
+    0 END), 0)
+  description: Refund amount as percentage of captured revenue
+  format_preset: percentage
+  valid_percent_of_total: false
