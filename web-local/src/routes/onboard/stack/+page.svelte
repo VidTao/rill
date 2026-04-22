@@ -137,13 +137,13 @@
 
   $: hasAdPlatform = [...connectedPlatforms].some((p) => adPlatformIds.has(p));
 
-  function isConnected(id: string): boolean {
-    return connectedPlatforms.has(id);
-  }
-
-  function isSelected(id: string): boolean {
-    return selectedPlatforms.has(id);
-  }
+  // Reactive declarations so the template sees connectedPlatforms /
+  // selectedPlatforms as direct dependencies. Using a function declaration
+  // hides the Set behind an opaque call, so Svelte only re-renders when
+  // some OTHER reactive variable changes (observed: card didn't turn green
+  // after connect, only refreshed when `loading` flipped on the next click).
+  $: isConnected = (id: string): boolean => connectedPlatforms.has(id);
+  $: isSelected = (id: string): boolean => selectedPlatforms.has(id);
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -225,43 +225,40 @@
   let googleManagerMap: Record<string, string> = {};
   let tiktokState = "";
 
-  // Single onMount: seed client_id + connected platforms from the server,
-  // handle any OAuth return params, then load the Google/Facebook SDKs.
-  onMount(async () => {
-    // 1. Fetch client_id + onboarding state from the backend.
+  // Single source of truth for "which platforms are connected": the server.
+  // Rebuilds the connectedPlatforms Set as a new reference so Svelte
+  // reactivity always fires (Set.add + self-assign is unreliable).
+  async function refreshFromServer() {
     const me = await onboardMe();
-    if (me?.client_id) {
-      clientId = me.client_id;
+    if (!me?.client_id) return;
+    clientId = me.client_id;
 
-      // Seed connectedPlatforms from both sources for robustness:
-      //   connected_platforms — legacy array, written by every OAuth handler
-      //   stack_selections    — authoritative; presence of a {platform}_credentials
-      //                         key means credentials are on file
-      for (const p of me.connected_platforms || []) {
-        if (typeof p === "object" && p.platform) {
-          connectedPlatforms.add(p.platform);
-        }
+    const next = new Set<string>();
+    for (const p of me.connected_platforms || []) {
+      if (typeof p === "object" && p.platform) {
+        next.add(p.platform);
       }
-      for (const p of connectedFromStackSelections(me.stack_selections)) {
-        connectedPlatforms.add(p);
-      }
-      connectedPlatforms = connectedPlatforms;
     }
+    for (const p of connectedFromStackSelections(me.stack_selections)) {
+      next.add(p);
+    }
+    connectedPlatforms = next;
+  }
 
-    // 2. Legacy OAuth-return: /connectors/callback/[platform] can redirect
-    //    back here with ?connected=<platform>.
+  onMount(async () => {
+    // 1. Pull initial state from the server.
+    await refreshFromServer();
+
+    // 2. Legacy OAuth-return: /connectors/callback/[platform] redirects here
+    //    with ?connected=<platform>. Record it, then re-read from server.
     const justConnected = $page.url.searchParams.get("connected");
-    if (justConnected) {
-      connectedPlatforms.add(justConnected);
-      connectedPlatforms = connectedPlatforms;
-      if (clientId) {
-        try {
-          await onboardConnect(clientId, justConnected);
-        } catch {
-          // Non-fatal — connection is typically already recorded by the
-          // token endpoint that served the callback.
-        }
+    if (justConnected && clientId) {
+      try {
+        await onboardConnect(clientId, justConnected);
+      } catch {
+        // Non-fatal — the token endpoint likely already recorded it.
       }
+      await refreshFromServer();
     }
 
     // 3. TikTok Business redirects back here with ?auth_code=…&state=… when
@@ -529,14 +526,16 @@
         throw new Error((resp as any).error || "Failed to connect accounts");
       }
 
-      connectedPlatforms.add(connectedKey);
-      connectedPlatforms = connectedPlatforms;
       showAccountModal = false;
 
       if (isTikTok) {
         sessionStorage.removeItem("tiktok_ads_oauth_state");
         tiktokState = "";
       }
+
+      // Re-pull from the server so the card renders from the source of
+      // truth. Also guarantees a fresh Set reference for Svelte reactivity.
+      await refreshFromServer();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
