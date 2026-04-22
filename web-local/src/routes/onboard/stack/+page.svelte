@@ -8,6 +8,7 @@
     onboardConnect,
     onboardActivate,
     onboardMe,
+    connectedFromStackSelections,
   } from "$lib/bratrax/onboarding/api";
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "../../connectors/AccountSelectionModal.svelte";
@@ -125,7 +126,7 @@
   // ---------------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------------
-  let connectedPlatforms: Set<string> = new Set(["shopify"]); // Shopify already connected
+  let connectedPlatforms: Set<string> = new Set();
   let selectedPlatforms: Set<string> = new Set(["shopify_only"]);
   let loading = "";
   let error = "";
@@ -224,22 +225,56 @@
   let googleManagerMap: Record<string, string> = {};
   let tiktokState = "";
 
-  // Load Google Identity Services SDK + fetch client_id from backend
+  // Single onMount: seed client_id + connected platforms from the server,
+  // handle any OAuth return params, then load the Google/Facebook SDKs.
   onMount(async () => {
-    // Fetch client_id reliably from backend (not sessionStorage)
+    // 1. Fetch client_id + onboarding state from the backend.
     const me = await onboardMe();
     if (me?.client_id) {
       clientId = me.client_id;
-      // Also populate connected platforms from backend state
+
+      // Seed connectedPlatforms from both sources for robustness:
+      //   connected_platforms — legacy array, written by every OAuth handler
+      //   stack_selections    — authoritative; presence of a {platform}_credentials
+      //                         key means credentials are on file
       for (const p of me.connected_platforms || []) {
         if (typeof p === "object" && p.platform) {
           connectedPlatforms.add(p.platform);
         }
       }
+      for (const p of connectedFromStackSelections(me.stack_selections)) {
+        connectedPlatforms.add(p);
+      }
       connectedPlatforms = connectedPlatforms;
     }
 
-    // Load GIS SDK for Google Ads popup OAuth
+    // 2. Legacy OAuth-return: /connectors/callback/[platform] can redirect
+    //    back here with ?connected=<platform>.
+    const justConnected = $page.url.searchParams.get("connected");
+    if (justConnected) {
+      connectedPlatforms.add(justConnected);
+      connectedPlatforms = connectedPlatforms;
+      if (clientId) {
+        try {
+          await onboardConnect(clientId, justConnected);
+        } catch {
+          // Non-fatal — connection is typically already recorded by the
+          // token endpoint that served the callback.
+        }
+      }
+    }
+
+    // 3. TikTok Business redirects back here with ?auth_code=…&state=… when
+    //    the tenant finishes authorising. Verify CSRF state, then open the
+    //    same AccountSelectionModal used by Google/Facebook.
+    const tiktokAuthCode = $page.url.searchParams.get("auth_code");
+    const tiktokStateParam = $page.url.searchParams.get("state");
+    const expectedTiktokState = sessionStorage.getItem("tiktok_ads_oauth_state");
+    if (tiktokAuthCode && tiktokStateParam && expectedTiktokState === tiktokStateParam) {
+      await handleTikTokReturn(tiktokAuthCode, tiktokStateParam);
+    }
+
+    // 4. Load Google Identity Services SDK (Google Ads popup OAuth).
     if (!document.getElementById("gis-sdk")) {
       const script = document.createElement("script");
       script.id = "gis-sdk";
@@ -248,17 +283,8 @@
       document.head.appendChild(script);
     }
 
+    // 5. Load Facebook SDK (Facebook Ads popup OAuth).
     loadFacebookSdk();
-
-    // TikTok Business redirects back here with ?auth_code=…&state=… when the
-    // tenant finishes authorizing. Detect that, exchange the code, and open
-    // the same AccountSelectionModal used by Google/Facebook.
-    const tiktokAuthCode = $page.url.searchParams.get("auth_code");
-    const tiktokStateParam = $page.url.searchParams.get("state");
-    const expectedTiktokState = sessionStorage.getItem("tiktok_ads_oauth_state");
-    if (tiktokAuthCode && tiktokStateParam && expectedTiktokState === tiktokStateParam) {
-      await handleTikTokReturn(tiktokAuthCode, tiktokStateParam);
-    }
   });
 
   async function handleTikTokReturn(code: string, state: string) {
@@ -557,25 +583,6 @@
     }
   }
 
-  // Check URL params for OAuth callback results
-
-  onMount(async () => {
-    // If returning from OAuth callback, the platform was connected
-    const justConnected = $page.url.searchParams.get("connected") || $page.url.searchParams.get("state");
-    if (justConnected) {
-      connectedPlatforms.add(justConnected);
-      connectedPlatforms = connectedPlatforms;
-
-      // Record in backend
-      if (clientId) {
-        try {
-          await onboardConnect(clientId, justConnected);
-        } catch {
-          // Non-fatal
-        }
-      }
-    }
-  });
 </script>
 
 <div class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12">

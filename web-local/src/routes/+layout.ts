@@ -5,6 +5,10 @@ import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
 import { get } from "svelte/store";
 import { bratraxGetMe } from "$lib/bratrax/auth";
 import { bratraxUser, bratraxAuthChecked } from "$lib/bratrax/auth-store";
+import {
+  onboardMe,
+  getOnboardResumeRoute,
+} from "$lib/bratrax/onboarding/api";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient.js";
 import {
   getRuntimeServiceListFilesQueryKey,
@@ -36,6 +40,22 @@ export async function load({ url, depends, untrack, fetch }) {
   if (!user) {
     const redirectTo = encodeURIComponent(url.pathname + url.search);
     throw redirect(307, `/login?redirect=${redirectTo}`);
+  }
+
+  // Resume incomplete onboarding: if the user's rill_onboarding_state.step
+  // maps to a specific /onboard/* page and they're not already on it,
+  // redirect. Prefix match allows sub-routes (e.g. /onboard/shopify/callback
+  // stays put while the target is /onboard/shopify).
+  try {
+    const me = await onboardMe();
+    const target = getOnboardResumeRoute(me?.step);
+    if (target && !url.pathname.startsWith(target)) {
+      throw redirect(307, target);
+    }
+  } catch (e) {
+    // Rethrow SvelteKit redirects; swallow anything else so a transient
+    // /onboard/me failure doesn't block the rest of the app from loading.
+    if (e && typeof e === "object" && "status" in e && "location" in e) throw e;
   }
 
   // Onboarding routes are auth-gated but don't require a Rill project yet.
