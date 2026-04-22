@@ -39,12 +39,9 @@
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" on:click={onClose}>
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
     <div
       class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
-      on:click|stopPropagation
     >
       <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
