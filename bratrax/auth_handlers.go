@@ -300,7 +300,7 @@ func (s *AuthService) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 // HandleSignup handles POST /bratrax/auth/signup.
 // Public endpoint (no authentication required) for Lite self-serve signup.
-// Creates user with viewer role and sets JWT cookie in one step.
+// Creates user with admin role and sets JWT cookie in one step.
 func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -334,8 +334,7 @@ func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create user as viewer (Lite users never get admin)
-	user, err := s.store.CreateUser(r.Context(), req.Email, req.Password, req.CompanyName, "viewer", nil)
+	user, err := s.store.CreateUser(r.Context(), req.Email, req.Password, req.CompanyName, "admin", nil)
 	if err != nil {
 		s.logger.Error("signup: create user failed", zap.Error(err))
 		writeJSONError(w, http.StatusConflict, "email already registered")

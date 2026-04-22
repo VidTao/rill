@@ -59,7 +59,8 @@
         {
           id: "tiktok_ads",
           name: "TikTok Ads",
-          type: "coming_soon",
+          type: "oauth",
+          authUrlPath: "/bratrax/onboard/tiktok/auth-url",
           color: "#000000",
         },
         {
@@ -162,6 +163,11 @@
       // Store which platform we're connecting for the callback
       sessionStorage.setItem("onboard_oauth_platform", platform.id);
       sessionStorage.setItem("onboard_oauth_return", "/onboard/stack");
+
+      // Platforms that use CSRF state (e.g. TikTok) echo it back in the callback URL.
+      if (data.state) {
+        sessionStorage.setItem(`${platform.id}_oauth_state`, data.state);
+      }
 
       window.location.href = data.url;
     } catch (e) {
