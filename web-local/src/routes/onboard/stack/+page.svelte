@@ -222,6 +222,7 @@
   let fbEmail = "";
   let fbSdkReady = false;
   let googleManagerMap: Record<string, string> = {};
+  let tiktokState = "";
 
   // Load Google Identity Services SDK + fetch client_id from backend
   onMount(async () => {
@@ -248,7 +249,55 @@
     }
 
     loadFacebookSdk();
+
+    // TikTok Business redirects back here with ?auth_code=…&state=… when the
+    // tenant finishes authorizing. Detect that, exchange the code, and open
+    // the same AccountSelectionModal used by Google/Facebook.
+    const tiktokAuthCode = $page.url.searchParams.get("auth_code");
+    const tiktokStateParam = $page.url.searchParams.get("state");
+    const expectedTiktokState = sessionStorage.getItem("tiktok_ads_oauth_state");
+    if (tiktokAuthCode && tiktokStateParam && expectedTiktokState === tiktokStateParam) {
+      await handleTikTokReturn(tiktokAuthCode, tiktokStateParam);
+    }
   });
+
+  async function handleTikTokReturn(code: string, state: string) {
+    error = "";
+    loading = "tiktok_ads";
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(
+        `${host}/bratrax/onboard/tiktok/accounts?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? "Failed to list TikTok advertisers");
+      }
+      const body = (await res.json()) as {
+        state: string;
+        advertisers: Array<{ id: string; name: string }>;
+      };
+      tiktokState = body.state;
+      accountModalAccounts = body.advertisers.map((a) => ({
+        id: a.id,
+        name: a.name || a.id,
+      }));
+      accountModalPlatform = "TikTok Ads";
+      showAccountModal = true;
+
+      // Strip the callback params so a refresh doesn't re-trigger.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("auth_code");
+      url.searchParams.delete("state");
+      url.searchParams.delete("scopes");
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = "";
+    }
+  }
 
   function loadFacebookSdk() {
     if ((window as any).FB) {
@@ -407,24 +456,41 @@
     try {
       const host = get(runtime).host;
       const isFacebook = accountModalPlatform === "Facebook Ads";
-      const endpoint = isFacebook
-        ? `${host}/bratrax/onboard/facebook/connect`
-        : `${host}/bratrax/onboard/google/connect`;
-      const body = isFacebook
-        ? {
-            short_lived_token: fbAccessToken,
-            email: fbEmail,
-            client_id: clientId,
-            selectedAccounts: selected,
-          }
-        : {
-            code: googleAuthCode,
-            client_id: clientId,
-            selectedAccounts: selected.map((a) => ({
-              ...a,
-              managerAccountId: googleManagerMap[a.accountId] || "",
-            })),
-          };
+      const isTikTok = accountModalPlatform === "TikTok Ads";
+
+      let endpoint: string;
+      let body: Record<string, unknown>;
+      let connectedKey: string;
+
+      if (isTikTok) {
+        endpoint = `${host}/bratrax/onboard/tiktok/connect`;
+        body = {
+          state: tiktokState,
+          client_id: clientId,
+          selected_advertiser_ids: selected.map((a) => a.accountId),
+        };
+        connectedKey = "tiktok_ads";
+      } else if (isFacebook) {
+        endpoint = `${host}/bratrax/onboard/facebook/connect`;
+        body = {
+          short_lived_token: fbAccessToken,
+          email: fbEmail,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "facebook_ads";
+      } else {
+        endpoint = `${host}/bratrax/onboard/google/connect`;
+        body = {
+          code: googleAuthCode,
+          client_id: clientId,
+          selectedAccounts: selected.map((a) => ({
+            ...a,
+            managerAccountId: googleManagerMap[a.accountId] || "",
+          })),
+        };
+        connectedKey = "google_ads";
+      }
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -437,9 +503,14 @@
         throw new Error((resp as any).error || "Failed to connect accounts");
       }
 
-      connectedPlatforms.add(isFacebook ? "facebook_ads" : "google_ads");
+      connectedPlatforms.add(connectedKey);
       connectedPlatforms = connectedPlatforms;
       showAccountModal = false;
+
+      if (isTikTok) {
+        sessionStorage.removeItem("tiktok_ads_oauth_state");
+        tiktokState = "";
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
