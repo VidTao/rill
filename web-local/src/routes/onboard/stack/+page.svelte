@@ -88,7 +88,7 @@
           id: "klaviyo",
           name: "Klaviyo",
           type: "oauth",
-          authUrlPath: "/bratrax/connectors/klaviyo/auth-url",
+          authUrlPath: "/bratrax/onboard/klaviyo/auth-url",
           color: "#2D2D2D",
         },
       ],
@@ -224,6 +224,7 @@
   let fbSdkReady = false;
   let googleManagerMap: Record<string, string> = {};
   let tiktokState = "";
+  let klaviyoState = "";
 
   // Single source of truth for "which platforms are connected": the server.
   // Rebuilds the connectedPlatforms Set as a new reference so Svelte
@@ -271,6 +272,19 @@
       await handleTikTokReturn(tiktokAuthCode, tiktokStateParam);
     }
 
+    // 3b. Klaviyo redirects back with ?code=…&state=…. Verify CSRF state,
+    //     exchange the code, and open AccountSelectionModal.
+    const klaviyoCode = $page.url.searchParams.get("code");
+    const klaviyoStateParam = $page.url.searchParams.get("state");
+    const expectedKlaviyoState = sessionStorage.getItem("klaviyo_oauth_state");
+    if (
+      klaviyoCode &&
+      klaviyoStateParam &&
+      expectedKlaviyoState === klaviyoStateParam
+    ) {
+      await handleKlaviyoReturn(klaviyoCode, klaviyoStateParam);
+    }
+
     // 4. Load Google Identity Services SDK (Google Ads popup OAuth).
     if (!document.getElementById("gis-sdk")) {
       const script = document.createElement("script");
@@ -312,6 +326,44 @@
       // Strip the callback params so a refresh doesn't re-trigger.
       const url = new URL(window.location.href);
       url.searchParams.delete("auth_code");
+      url.searchParams.delete("state");
+      url.searchParams.delete("scopes");
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = "";
+    }
+  }
+
+  async function handleKlaviyoReturn(code: string, state: string) {
+    error = "";
+    loading = "klaviyo";
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(
+        `${host}/bratrax/onboard/klaviyo/accounts?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? "Failed to list Klaviyo accounts");
+      }
+      const body = (await res.json()) as {
+        state: string;
+        accounts: Array<{ id: string; name: string }>;
+      };
+      klaviyoState = body.state;
+      accountModalAccounts = body.accounts.map((a) => ({
+        id: a.id,
+        name: a.name || a.id,
+      }));
+      accountModalPlatform = "Klaviyo";
+      showAccountModal = true;
+
+      // Strip the callback params so a refresh doesn't re-trigger.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("code");
       url.searchParams.delete("state");
       url.searchParams.delete("scopes");
       window.history.replaceState({}, "", url.toString());
@@ -480,12 +532,21 @@
       const host = get(runtime).host;
       const isFacebook = accountModalPlatform === "Facebook Ads";
       const isTikTok = accountModalPlatform === "TikTok Ads";
+      const isKlaviyo = accountModalPlatform === "Klaviyo";
 
       let endpoint: string;
       let body: Record<string, unknown>;
       let connectedKey: string;
 
-      if (isTikTok) {
+      if (isKlaviyo) {
+        endpoint = `${host}/bratrax/onboard/klaviyo/connect`;
+        body = {
+          state: klaviyoState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "klaviyo";
+      } else if (isTikTok) {
         endpoint = `${host}/bratrax/onboard/tiktok/connect`;
         body = {
           state: tiktokState,
@@ -531,6 +592,10 @@
       if (isTikTok) {
         sessionStorage.removeItem("tiktok_ads_oauth_state");
         tiktokState = "";
+      }
+      if (isKlaviyo) {
+        sessionStorage.removeItem("klaviyo_oauth_state");
+        klaviyoState = "";
       }
 
       // Re-pull from the server so the card renders from the source of

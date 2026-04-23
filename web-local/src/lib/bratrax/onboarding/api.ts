@@ -63,6 +63,7 @@ const CRED_KEY_TO_PLATFORM: Record<string, string> = {
   google_ads_credentials: "google_ads",
   facebook_ads_credentials: "facebook_ads",
   tiktok_ads_credentials: "tiktok_ads",
+  klaviyo_credentials: "klaviyo",
 };
 
 /**
