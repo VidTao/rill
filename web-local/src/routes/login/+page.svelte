@@ -19,7 +19,7 @@
       // Clear stale query cache from previous session/instance.
       // Without this, dashboards can show infinite spinner instead of rendering.
       queryClient.clear();
-      const redirect = $page.url.searchParams.get("redirect") || "/";
+      const redirect = $page.url.searchParams.get("redirect") || "/developer";
       await goto(redirect);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);

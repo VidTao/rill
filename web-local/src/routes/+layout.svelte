@@ -105,7 +105,7 @@
 
         <nav class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0">
           <a
-            href="/"
+            href="/developer"
             class="bratrax-nav-link"
             class:active={!onConnectorsPage && !onWorkshopPage}
           >
