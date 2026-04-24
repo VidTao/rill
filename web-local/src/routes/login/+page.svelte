@@ -41,8 +41,17 @@
       <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
         SERVICE-AS-SOFTWARE ANALYTICS
       </div>
-      <h1 class="text-3xl font-black tracking-tight text-bratrax-text-headline">
-        BRAT<span class="font-serif italic text-bratrax-acid">R</span>AX<span class="text-bratrax-acid">.</span>
+      <h1 class="flex justify-center">
+        <img
+          src="/img/bratrax/bratrax-logo-light.png"
+          alt="Bratrax"
+          class="brand-logo brand-logo-light h-8 w-auto"
+        />
+        <img
+          src="/img/bratrax/bratrax-logo-dark.png"
+          alt="Bratrax"
+          class="brand-logo brand-logo-dark h-8 w-auto"
+        />
       </h1>
       <p class="mt-3 font-mono text-xs text-bratrax-text-muted">
         Sign in to continue
@@ -131,5 +140,18 @@
   .login-input:focus {
     border-color: #D4FF00 !important;
     box-shadow: 0 0 0 1px rgba(212, 255, 0, 0.25) !important;
+  }
+
+  /* Filename describes the logo color, not the theme:
+     dark-colored logo (brand-logo-dark) on light theme for contrast,
+     light-colored logo (brand-logo-light) on dark theme. */
+  .brand-logo {
+    display: none;
+  }
+  :global(html:not(.dark)) .brand-logo-dark {
+    display: block;
+  }
+  :global(html.dark) .brand-logo-light {
+    display: block;
   }
 </style>
