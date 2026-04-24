@@ -12,7 +12,13 @@
     try {
       const res = await fetch(url, { cache: "no-cache" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      html = await res.text();
+      const raw = await res.text();
+      // Make links inside the srcdoc iframe navigate the top-level browser
+      // window instead of staying trapped inside the iframe.
+      html = raw.replace(
+        /<head(\s[^>]*)?>/i,
+        (match) => `${match}<base target="_top">`,
+      );
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
