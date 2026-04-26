@@ -45,8 +45,8 @@ func TestZeroJSONValueForClickHouseType(t *testing.T) {
 		{"Date32", "1970-01-01"},
 		{"DateTime", "1970-01-01 00:00:00"},
 		{"DateTime('UTC')", "1970-01-01 00:00:00"},
-		{"DateTime64(3)", "1970-01-01 00:00:00"},
-		{"DateTime64(6, 'UTC')", "1970-01-01 00:00:00"},
+		{"DateTime64(3)", "1970-01-01 00:00:00.000"},
+		{"DateTime64(6, 'UTC')", "1970-01-01 00:00:00.000"},
 
 		// Decimal — encoded as string to preserve precision
 		{"Decimal(38, 4)", "0"},

@@ -5,9 +5,11 @@
   import { GeneratingMessage } from "@rilldata/web-common/components/generating-message";
   import { generatingCanvas } from "@rilldata/web-common/features/canvas/ai-generation/generateCanvas";
   import DeveloperChat from "@rilldata/web-common/features/chat/DeveloperChat.svelte";
+  import Markdown from "@rilldata/web-common/components/markdown/Markdown.svelte";
   import Editor from "@rilldata/web-common/features/editor/Editor.svelte";
   import FileWorkspaceHeader from "@rilldata/web-common/features/editor/FileWorkspaceHeader.svelte";
   import { getExtensionsForFile } from "@rilldata/web-common/features/editor/getExtensionsForFile";
+  import { extractFileExtension } from "@rilldata/web-common/features/entity-management/file-path-utils";
   import { ResourceKind } from "@rilldata/web-common/features/entity-management/resource-selectors";
   import { directoryState } from "@rilldata/web-common/features/file-explorer/directory-store";
   import CanvasWorkspace from "@rilldata/web-common/features/workspaces/CanvasWorkspace.svelte";
@@ -57,6 +59,9 @@
 
   $: resource = $resourceQuery.data;
 
+  $: isMarkdown = extractFileExtension(path) === ".md";
+  $: editorContent = fileArtifact.editorContent;
+
   $: extensions =
     resourceKind === ResourceKind.API
       ? [customYAMLwithJSONandSQL]
@@ -103,14 +108,24 @@
           filePath={path}
           hasUnsavedChanges={$hasUnsavedChanges}
         />
-        <WorkspaceEditorContainer slot="body" error={parseError?.message}>
-          <Editor
-            {fileArtifact}
-            {extensions}
-            bind:editor
-            bind:autoSave={$autoSave}
-          />
-        </WorkspaceEditorContainer>
+        {#if isMarkdown}
+          <div slot="body" class="size-full overflow-y-auto p-6">
+            {#if $editorContent}
+              <Markdown content={$editorContent} />
+            {:else}
+              <p class="text-sm text-gray-400">Loading...</p>
+            {/if}
+          </div>
+        {:else}
+          <WorkspaceEditorContainer slot="body" error={parseError?.message}>
+            <Editor
+              {fileArtifact}
+              {extensions}
+              bind:editor
+              bind:autoSave={$autoSave}
+            />
+          </WorkspaceEditorContainer>
+        {/if}
       </WorkspaceContainer>
     {/if}
   </div>

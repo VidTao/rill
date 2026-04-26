@@ -115,11 +115,22 @@ func (it *warehouseFileIterator) Next(ctx context.Context) ([]string, error) {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
-		// Convert []byte values to strings for JSON compatibility.
-		// The clickhouse-go driver returns some types as []byte.
+		// Convert []byte and time.Time values for JSON compatibility.
+		// The clickhouse-go driver returns some types as []byte, and
+		// DateTime64 as time.Time which json.Marshal encodes as RFC3339
+		// ("2026-02-22T10:35:42.123Z"). DuckDB's read_json auto-detect
+		// does not recognise RFC3339 with fractional seconds as TIMESTAMP,
+		// so we format to "YYYY-MM-DD HH:MM:SS.ffffff" instead.
 		for k, v := range row {
-			if b, ok := v.([]byte); ok {
-				row[k] = string(b)
+			switch val := v.(type) {
+			case []byte:
+				row[k] = string(val)
+			case time.Time:
+				row[k] = val.Format("2006-01-02 15:04:05.000000")
+			case *time.Time:
+				if val != nil {
+					row[k] = val.Format("2006-01-02 15:04:05.000000")
+				}
 			}
 		}
 
@@ -256,8 +267,10 @@ func zeroJSONValueForClickHouseType(typ string, logger *zap.Logger) interface{} 
 		return ""
 	case stem == "Date", stem == "Date32":
 		return "1970-01-01"
-	case stem == "DateTime", stem == "DateTime64":
+	case stem == "DateTime":
 		return "1970-01-01 00:00:00"
+	case stem == "DateTime64":
+		return "1970-01-01 00:00:00.000"
 	case strings.HasPrefix(stem, "Decimal"):
 		// Encode as string to preserve precision through JSON inference.
 		return "0"
