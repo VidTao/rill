@@ -86,6 +86,7 @@
 
   $: onConnectorsPage = $page.url.pathname.startsWith("/connectors");
   $: onWorkshopPage = $page.url.pathname.startsWith("/workshop");
+  $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
 </script>
 
 <QueryClientProvider client={queryClient}>
@@ -107,7 +108,7 @@
           <a
             href="/developer"
             class="bratrax-nav-link"
-            class:active={!onConnectorsPage && !onWorkshopPage}
+            class:active={!onConnectorsPage && !onWorkshopPage && !onCostSettingsPage}
           >
             Developer
           </a>
@@ -124,6 +125,13 @@
             class:active={onWorkshopPage}
           >
             Workshop
+          </a>
+          <a
+            href="/cost-settings"
+            class="bratrax-nav-link"
+            class:active={onCostSettingsPage}
+          >
+            Cost Settings
           </a>
         </nav>
       {/if}

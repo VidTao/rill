@@ -108,24 +108,26 @@
           filePath={path}
           hasUnsavedChanges={$hasUnsavedChanges}
         />
-        {#if isMarkdown}
-          <div slot="body" class="size-full overflow-y-auto p-6">
-            {#if $editorContent}
-              <Markdown content={$editorContent} />
-            {:else}
-              <p class="text-sm text-gray-400">Loading...</p>
-            {/if}
-          </div>
-        {:else}
-          <WorkspaceEditorContainer slot="body" error={parseError?.message}>
-            <Editor
-              {fileArtifact}
-              {extensions}
-              bind:editor
-              bind:autoSave={$autoSave}
-            />
-          </WorkspaceEditorContainer>
-        {/if}
+        <svelte:fragment slot="body">
+          {#if isMarkdown}
+            <div class="size-full overflow-y-auto p-6">
+              {#if $editorContent}
+                <Markdown content={$editorContent} />
+              {:else}
+                <p class="text-sm text-gray-400">Loading...</p>
+              {/if}
+            </div>
+          {:else}
+            <WorkspaceEditorContainer error={parseError?.message}>
+              <Editor
+                {fileArtifact}
+                {extensions}
+                bind:editor
+                bind:autoSave={$autoSave}
+              />
+            </WorkspaceEditorContainer>
+          {/if}
+        </svelte:fragment>
       </WorkspaceContainer>
     {/if}
   </div>
