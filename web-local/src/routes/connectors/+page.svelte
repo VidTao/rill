@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import { get } from "svelte/store";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import {
@@ -23,12 +24,13 @@
   interface Platform {
     id: string;          // matches connected_platforms[].platform + stack_selections key prefix
     name: string;
-    type: "oauth" | "client_sdk";
+    type: "oauth" | "client_sdk" | "shopify";  // shopify needs a shop-domain input page first
     authUrlPath?: string;  // for redirect OAuth (TikTok / Klaviyo)
     color: string;
   }
 
   const platforms: Platform[] = [
+    { id: "shopify",      name: "Shopify",      type: "shopify",                                                          color: "#95BF47" },
     { id: "google_ads",   name: "Google Ads",   type: "client_sdk",                                                       color: "#4285F4" },
     { id: "facebook_ads", name: "Facebook Ads", type: "client_sdk",                                                       color: "#1877F2" },
     { id: "tiktok_ads",   name: "TikTok Ads",   type: "oauth",      authUrlPath: "/bratrax/onboard/tiktok/auth-url",      color: "#000000" },
@@ -37,7 +39,6 @@
     // --- Re-enable as each platform is migrated to rill_onboarding_state ---
     // { id: "pinterest_ads", name: "Pinterest",   type: "oauth", authUrlPath: "/bratrax/connectors/pinterest/auth-url",   color: "#E60023" },
     // { id: "amazon_ads",    name: "Amazon Ads",  type: "oauth", authUrlPath: "/bratrax/connectors/amazon-ads/auth-url",  color: "#FF9900" },
-    // { id: "shopify",       name: "Shopify",     type: "oauth", authUrlPath: "/bratrax/connectors/shopify/auth-url",     color: "#95BF47" },
     // { id: "outbrain",      name: "Outbrain",    type: "oauth", authUrlPath: "/bratrax/connectors/outbrain/auth-url",    color: "#EE6E33" },
   ];
 
@@ -51,11 +52,13 @@
   let loading = "";
   let error = "";
 
-  // "View accounts" modal
+  // "View accounts" modal — generic shape for ad platforms (accounts list)
+  // plus a Shopify-specific shape (single store with shop + name + currency).
   let showInfoModal = false;
   let infoModalPlatform = "";
   let infoModalAccounts: Array<{ id: string; name: string }> = [];
   let infoModalConnectedAt = "";
+  let infoModalShopify: { shop: string; shopName: string; currency: string } | null = null;
 
   // OAuth completion modal (used by Google + Facebook popup flows; TikTok &
   // Klaviyo use redirect → land on /onboard/stack → bounce back here).
@@ -357,21 +360,45 @@
   // ---------------------------------------------------------------------------
   function handleView(platform: Platform) {
     const cred = stackSelections[`${platform.id}_credentials`] || {};
-    // TikTok stores accounts under `advertisers`; everyone else uses `accounts`.
-    const list: any[] = cred.accounts || cred.advertisers || [];
-    infoModalAccounts = list.map((a: any) => ({
-      id: String(a.accountId || a.id || a.account_id || ""),
-      name: a.accountName || a.name || a.account_name || a.id || "(unnamed)",
-    }));
     infoModalConnectedAt = connectedAt[platform.id] || cred.connected_at || "";
     infoModalPlatform = platform.name;
+
+    if (platform.id === "shopify") {
+      // Single-store shape — no accounts list.
+      infoModalShopify = {
+        shop: cred.shop || "",
+        shopName: cred.shop_name || "",
+        currency: cred.currency || "",
+      };
+      infoModalAccounts = [];
+    } else {
+      // Multi-account shape: TikTok stores them under `advertisers`; everyone else uses `accounts`.
+      const list: any[] = cred.accounts || cred.advertisers || [];
+      infoModalAccounts = list.map((a: any) => ({
+        id: String(a.accountId || a.id || a.account_id || ""),
+        name: a.accountName || a.name || a.account_name || a.id || "(unnamed)",
+      }));
+      infoModalShopify = null;
+    }
     showInfoModal = true;
+  }
+
+  function handleShopifyConnect() {
+    if (isConnected("shopify")) return;
+    // Shopify needs a shop-domain input first — delegate to the existing
+    // /onboard/shopify page (which has the input form + redirect-to-Shopify
+    // OAuth init). The callback at /onboard/shopify/callback honors
+    // onboard_oauth_return and bounces back here.
+    sessionStorage.setItem("onboard_oauth_return", "/connectors");
+    goto("/onboard/shopify");
   }
 
   function handleCardConnect(platform: Platform) {
     if (platform.type === "client_sdk") {
       if (platform.id === "google_ads") handleGoogleAdsConnect();
       else if (platform.id === "facebook_ads") handleFacebookConnect();
+    } else if (platform.type === "shopify") {
+      handleShopifyConnect();
     } else {
       handleOAuthConnect(platform);
     }
@@ -510,25 +537,57 @@
         </p>
       {/if}
 
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px] text-bratrax-acid/70">
-        Accounts ({infoModalAccounts.length})
-      </div>
-
-      {#if infoModalAccounts.length === 0}
-        <p class="font-mono text-xs text-bratrax-text-muted">No accounts on file.</p>
-      {:else}
-        <ul class="flex max-h-80 flex-col gap-1.5 overflow-y-auto">
-          {#each infoModalAccounts as acct}
+      {#if infoModalShopify}
+        <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px] text-bratrax-acid/70">
+          Store
+        </div>
+        <ul class="flex flex-col gap-1.5">
+          {#if infoModalShopify.shopName}
             <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
+              <div class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">Name</div>
               <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
-                {acct.name}
-              </div>
-              <div class="font-mono text-[10px] text-bratrax-text-muted truncate">
-                {acct.id}
+                {infoModalShopify.shopName}
               </div>
             </li>
-          {/each}
+          {/if}
+          {#if infoModalShopify.shop}
+            <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
+              <div class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">Domain</div>
+              <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
+                {infoModalShopify.shop}
+              </div>
+            </li>
+          {/if}
+          {#if infoModalShopify.currency}
+            <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
+              <div class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">Currency</div>
+              <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
+                {infoModalShopify.currency}
+              </div>
+            </li>
+          {/if}
         </ul>
+      {:else}
+        <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px] text-bratrax-acid/70">
+          Accounts ({infoModalAccounts.length})
+        </div>
+
+        {#if infoModalAccounts.length === 0}
+          <p class="font-mono text-xs text-bratrax-text-muted">No accounts on file.</p>
+        {:else}
+          <ul class="flex max-h-80 flex-col gap-1.5 overflow-y-auto">
+            {#each infoModalAccounts as acct}
+              <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
+                <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
+                  {acct.name}
+                </div>
+                <div class="font-mono text-[10px] text-bratrax-text-muted truncate">
+                  {acct.id}
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       {/if}
     </div>
   </div>

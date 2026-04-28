@@ -226,6 +226,13 @@
   let tiktokState = "";
   let klaviyoState = "";
 
+  // True when this page was hit purely as the OAuth-callback dispatcher for a
+  // flow initiated elsewhere (e.g. /connectors). The "Build your stack" UI is
+  // hidden in this mode — we render a minimal "Completing connection…" screen
+  // and let the AccountSelectionModal pop on top, then goto(returnTo) once
+  // the user submits. Detected synchronously in onMount before paint.
+  let isOAuthBounce = false;
+
   // Single source of truth for "which platforms are connected": the server.
   // Rebuilds the connectedPlatforms Set as a new reference so Svelte
   // reactivity always fires (Set.add + self-assign is unreliable).
@@ -247,6 +254,17 @@
   }
 
   onMount(async () => {
+    // 0. Detect "OAuth-callback dispatcher" mode synchronously, before any
+    //    awaits. If the URL has an OAuth-callback param AND the originating
+    //    page wants us to bounce somewhere else, hide the build-your-stack UI
+    //    so the user only sees the AccountSelectionModal during the flash.
+    const hasCallback =
+      $page.url.searchParams.has("code") ||
+      $page.url.searchParams.has("auth_code");
+    const returnTo = sessionStorage.getItem("onboard_oauth_return");
+    isOAuthBounce =
+      hasCallback && returnTo !== null && returnTo !== "/onboard/stack";
+
     // 1. Pull initial state from the server.
     await refreshFromServer();
 
@@ -658,6 +676,18 @@
 
 </script>
 
+{#if isOAuthBounce}
+  <div class="flex h-screen w-screen items-center justify-center bg-bratrax-bg">
+    <div class="text-center">
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        ONBOARDING
+      </div>
+      <div class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted">
+        Completing connection…
+      </div>
+    </div>
+  </div>
+{:else}
 <div class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12">
   <div class="relative w-full max-w-2xl border border-bratrax-border bg-bratrax-surface p-8">
     <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
@@ -747,6 +777,7 @@
     </div>
   </div>
 </div>
+{/if}
 
 <AccountSelectionModal
   open={showAccountModal}

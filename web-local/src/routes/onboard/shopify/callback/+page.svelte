@@ -38,10 +38,14 @@
         throw new Error(body.error ?? "Failed to connect Shopify");
       }
 
-      // Step 2: Redirect to Build Your Stack (Screen 3)
-      // (connection is already recorded by the token endpoint)
+      // Step 2: Honor the return-to set by the originating page. /onboard/shopify
+      // (the default onboarding path) sets it to "/onboard/stack"; /connectors
+      // sets it to "/connectors". Falls back to /onboard/stack for the legacy
+      // path that didn't set sessionStorage.
       status = "Connected! Redirecting...";
-      await goto("/onboard/stack");
+      const returnTo = sessionStorage.getItem("onboard_oauth_return") || "/onboard/stack";
+      sessionStorage.removeItem("onboard_oauth_return");
+      await goto(returnTo);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
