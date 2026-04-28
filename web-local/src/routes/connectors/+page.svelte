@@ -60,6 +60,11 @@
   let infoModalConnectedAt = "";
   let infoModalShopify: { shop: string; shopName: string; currency: string } | null = null;
 
+  // Disconnect confirmation modal — replaces the browser-native confirm() so
+  // the prompt matches Bratrax styling.
+  let showConfirmModal = false;
+  let confirmPlatform: Platform | null = null;
+
   // OAuth completion modal (used by Google + Facebook popup flows; TikTok &
   // Klaviyo use redirect → land on /onboard/stack → bounce back here).
   let showAccountModal = false;
@@ -337,12 +342,18 @@
   // ---------------------------------------------------------------------------
   // Disconnect
   // ---------------------------------------------------------------------------
-  async function handleDisconnect(platform: Platform) {
+  function requestDisconnect(platform: Platform) {
     if (!isConnected(platform.id)) return;
     if (!clientId) return;
-    if (!confirm(
-      `Disconnect ${platform.name}? This removes all stored credentials and account selections for this platform.`,
-    )) return;
+    confirmPlatform = platform;
+    showConfirmModal = true;
+  }
+
+  async function confirmDisconnect() {
+    const platform = confirmPlatform;
+    showConfirmModal = false;
+    confirmPlatform = null;
+    if (!platform || !clientId) return;
     error = "";
     loading = platform.id;
     try {
@@ -472,7 +483,7 @@
                 View accounts
               </button>
               <button
-                on:click={() => handleDisconnect(platform)}
+                on:click={() => requestDisconnect(platform)}
                 disabled={loading === platform.id}
                 class="border border-bratrax-tomato/40 bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10 disabled:opacity-50"
               >
@@ -589,6 +600,51 @@
           </ul>
         {/if}
       {/if}
+    </div>
+  </div>
+{/if}
+
+{#if showConfirmModal && confirmPlatform}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    on:click={() => (showConfirmModal = false)}
+    on:keydown={(e) => e.key === "Escape" && (showConfirmModal = false)}
+    role="presentation"
+  >
+    <div
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-tomato"></div>
+
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80">
+        Confirm disconnect
+      </div>
+      <h2 class="text-lg font-black text-bratrax-text-headline">
+        Disconnect {confirmPlatform.name}?
+      </h2>
+      <p class="mt-3 text-sm font-light text-bratrax-text-body">
+        This removes all stored credentials and account selections for {confirmPlatform.name} from your workspace. You can reconnect at any time.
+      </p>
+
+      <div class="mt-6 flex items-center justify-end gap-2">
+        <button
+          on:click={() => (showConfirmModal = false)}
+          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+        >
+          Cancel
+        </button>
+        <button
+          on:click={confirmDisconnect}
+          class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
+        >
+          Disconnect
+        </button>
+      </div>
     </div>
   </div>
 {/if}
