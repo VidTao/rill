@@ -186,3 +186,17 @@ export async function onboardStatus(
     `/bratrax/onboard/status?client_id=${encodeURIComponent(clientId)}`,
   );
 }
+
+export async function onboardDisconnect(
+  clientId: string,
+  platform: string,
+): Promise<{ status: string; platform: string }> {
+  return apiFetch<{ status: string; platform: string }>(
+    "/bratrax/onboard/disconnect",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_id: clientId, platform }),
+    },
+  );
+}

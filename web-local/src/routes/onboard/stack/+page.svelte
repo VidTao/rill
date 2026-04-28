@@ -601,6 +601,15 @@
       // Re-pull from the server so the card renders from the source of
       // truth. Also guarantees a fresh Set reference for Svelte reactivity.
       await refreshFromServer();
+
+      // Honor the return-to set by the originating page. When the OAuth was
+      // initiated from /connectors (or any other page), bounce back there
+      // after the modal completes. Default "/onboard/stack" is a no-op.
+      const returnTo = sessionStorage.getItem("onboard_oauth_return") || "/onboard/stack";
+      sessionStorage.removeItem("onboard_oauth_return");
+      if (returnTo && returnTo !== "/onboard/stack") {
+        await goto(returnTo);
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {

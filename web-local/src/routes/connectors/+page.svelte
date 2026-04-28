@@ -1,91 +1,145 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { PlatformConfig, AdvertisingConnection, CrmConnection } from "$lib/bratrax/connectors/types";
+  import { get } from "svelte/store";
+  import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import {
-    CATEGORY_ORDER,
-    CATEGORY_LABELS,
-    getPlatformsByCategory,
-  } from "$lib/bratrax/connectors/platforms";
-  import {
-    platformConnections,
-    adConnections,
-    crmConnections,
-    connectionsLoading,
-    fetchAllConnections,
-  } from "$lib/bratrax/connectors/connection-store";
-  import {
-    getAuthUrl,
-    getShopifyAuthUrl,
-    submitOutbrainCredentials,
-    exchangeFacebookTokens,
-    getGoogleAdAccounts,
-    exchangeGoogleTokens,
-    type AdAccountInfo,
-    type GoogleAdAccount,
-  } from "$lib/bratrax/connectors/api";
-  import PlatformCard from "./PlatformCard.svelte";
-  import ConnectionDetailModal from "./ConnectionDetailModal.svelte";
-  import ShopifyUrlModal from "./ShopifyUrlModal.svelte";
-  import OutbrainLoginModal from "./OutbrainLoginModal.svelte";
+    onboardMe,
+    onboardDisconnect,
+    connectedFromStackSelections,
+  } from "$lib/bratrax/onboarding/api";
+  import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "./AccountSelectionModal.svelte";
 
-  // ── SDK config ──
   const FB_APP_ID = "3518566538435783";
-  const GOOGLE_CLIENT_ID = "452833261444-1amauhc3bsundipofc2qvf3sonikknpa.apps.googleusercontent.com";
 
-  // ── Error state ──
-  let errorMessage = "";
+  // ---------------------------------------------------------------------------
+  // Platform registry
+  //
+  // Only the 4 platforms migrated to the new rill_onboarding_state surface are
+  // active. Pinterest / Amazon / Shopify / Outbrain remain commented out for
+  // re-enablement one-by-one as their backends migrate off the legacy
+  // bratrax_advertising_connections + bratrax_user_platform_credentials path.
+  // ---------------------------------------------------------------------------
+  interface Platform {
+    id: string;          // matches connected_platforms[].platform + stack_selections key prefix
+    name: string;
+    type: "oauth" | "client_sdk";
+    authUrlPath?: string;  // for redirect OAuth (TikTok / Klaviyo)
+    color: string;
+  }
 
-  // ── Modal state ──
-  let shopifyModalOpen = false;
-  let outbrainModalOpen = false;
-  let detailModalOpen = false;
-  let detailPlatformName = "";
-  let detailAdAccounts: AdvertisingConnection[] = [];
-  let detailCrmAccounts: CrmConnection[] = [];
+  const platforms: Platform[] = [
+    { id: "google_ads",   name: "Google Ads",   type: "client_sdk",                                                       color: "#4285F4" },
+    { id: "facebook_ads", name: "Facebook Ads", type: "client_sdk",                                                       color: "#1877F2" },
+    { id: "tiktok_ads",   name: "TikTok Ads",   type: "oauth",      authUrlPath: "/bratrax/onboard/tiktok/auth-url",      color: "#000000" },
+    { id: "klaviyo",      name: "Klaviyo",      type: "oauth",      authUrlPath: "/bratrax/onboard/klaviyo/auth-url",     color: "#2D2D2D" },
 
-  // ── Account selection modal state ──
-  let accountModalOpen = false;
+    // --- Re-enable as each platform is migrated to rill_onboarding_state ---
+    // { id: "pinterest_ads", name: "Pinterest",   type: "oauth", authUrlPath: "/bratrax/connectors/pinterest/auth-url",   color: "#E60023" },
+    // { id: "amazon_ads",    name: "Amazon Ads",  type: "oauth", authUrlPath: "/bratrax/connectors/amazon-ads/auth-url",  color: "#FF9900" },
+    // { id: "shopify",       name: "Shopify",     type: "oauth", authUrlPath: "/bratrax/connectors/shopify/auth-url",     color: "#95BF47" },
+    // { id: "outbrain",      name: "Outbrain",    type: "oauth", authUrlPath: "/bratrax/connectors/outbrain/auth-url",    color: "#EE6E33" },
+  ];
+
+  // ---------------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------------
+  let connectedPlatforms: Set<string> = new Set();
+  let stackSelections: Record<string, any> = {};
+  let connectedAt: Record<string, string> = {};
+  let clientId = "";
+  let loading = "";
+  let error = "";
+
+  // "View accounts" modal
+  let showInfoModal = false;
+  let infoModalPlatform = "";
+  let infoModalAccounts: Array<{ id: string; name: string }> = [];
+  let infoModalConnectedAt = "";
+
+  // OAuth completion modal (used by Google + Facebook popup flows; TikTok &
+  // Klaviyo use redirect → land on /onboard/stack → bounce back here).
+  let showAccountModal = false;
   let accountModalPlatform = "";
   let accountModalAccounts: Array<{ id: string; name: string }> = [];
   let accountModalLoading = false;
-
-  // Facebook-specific state
+  let googleAuthCode = "";
   let fbAccessToken = "";
   let fbEmail = "";
-
-  // Google-specific state
-  let googleAuthCode = "";
-
-  // Loading state per platform
-  let loadingPlatform = "";
-
-  // ── SDK loading ──
   let fbSdkReady = false;
-  let googleSdkReady = false;
+  let googleManagerMap: Record<string, string> = {};
 
-  onMount(() => {
-    loadFacebookSdk();
-    loadGoogleSdk();
-  });
+  // ---------------------------------------------------------------------------
+  // Status
+  // ---------------------------------------------------------------------------
+  async function refreshFromServer() {
+    const me = await onboardMe();
+    if (!me?.client_id) return;
+    clientId = me.client_id;
+    stackSelections = me.stack_selections || {};
+
+    const next = new Set<string>();
+    const dates: Record<string, string> = {};
+    for (const p of me.connected_platforms || []) {
+      if (typeof p === "object" && p?.platform) {
+        next.add(p.platform);
+        if (p.connected_at) dates[p.platform] = p.connected_at;
+      }
+    }
+    for (const p of connectedFromStackSelections(stackSelections)) next.add(p);
+    connectedPlatforms = next;
+    connectedAt = dates;
+  }
+
+  $: isConnected = (id: string): boolean => connectedPlatforms.has(id);
+
+  // ---------------------------------------------------------------------------
+  // OAuth init handlers (mirror /onboard/stack — only difference: return-to
+  // is set to /connectors so the dispatcher in /onboard/stack bounces here
+  // after Klaviyo / TikTok complete).
+  // ---------------------------------------------------------------------------
+  async function handleOAuthConnect(platform: Platform) {
+    if (isConnected(platform.id)) return;
+    if (!platform.authUrlPath) return;
+    error = "";
+    loading = platform.id;
+
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(`${host}${platform.authUrlPath}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Failed to get auth URL for ${platform.name}`);
+      const data = await res.json();
+
+      sessionStorage.setItem("onboard_oauth_platform", platform.id);
+      sessionStorage.setItem("onboard_oauth_return", "/connectors");
+      if (data.state) {
+        sessionStorage.setItem(`${platform.id}_oauth_state`, data.state);
+      }
+
+      window.location.href = data.url;
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      loading = "";
+    }
+  }
 
   function loadFacebookSdk() {
-    if (typeof window === "undefined") return;
-    // @ts-ignore
-    window.fbAsyncInit = () => {
-      // @ts-ignore
-      window.FB?.init({
-        appId: FB_APP_ID,
-        cookie: true,
-        xfbml: false,
-        version: "v18.0",
-      });
-      fbSdkReady = true;
-    };
-    if (document.getElementById("facebook-jssdk")) {
+    if ((window as any).FB) {
       fbSdkReady = true;
       return;
     }
+    (window as any).fbAsyncInit = () => {
+      (window as any).FB?.init({
+        appId: FB_APP_ID,
+        cookie: true,
+        xfbml: false,
+        version: "v19.0",
+      });
+      fbSdkReady = true;
+    };
+    if (document.getElementById("facebook-jssdk")) return;
     const script = document.createElement("script");
     script.id = "facebook-jssdk";
     script.src = "https://connect.facebook.net/en_US/sdk.js";
@@ -94,353 +148,388 @@
     document.head.appendChild(script);
   }
 
-  function loadGoogleSdk() {
-    if (typeof window === "undefined") return;
-    if (document.getElementById("google-gsi")) {
-      googleSdkReady = true;
-      return;
-    }
-    const script = document.createElement("script");
-    script.id = "google-gsi";
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => { googleSdkReady = true; };
-    document.head.appendChild(script);
-  }
-
-  // ── Helpers ──
-
-  function isConnected(platform: PlatformConfig): boolean {
-    return !!$platformConnections[platform.connectionKey];
-  }
-
-  function getConnectedDate(platform: PlatformConfig): string {
-    const conn = $platformConnections[platform.connectionKey];
-    if (!conn) return "";
-    try {
-      return new Date(conn.created_at).toLocaleDateString();
-    } catch {
-      return conn.created_at;
-    }
-  }
-
-  function showError(msg: string) {
-    errorMessage = msg;
-    setTimeout(() => { errorMessage = ""; }, 8000);
-  }
-
-  // ── Facebook flow ──
-
   function handleFacebookConnect() {
+    if (isConnected("facebook_ads")) return;
     if (!fbSdkReady) {
-      showError("Facebook SDK is still loading. Please try again in a moment.");
+      error = "Facebook SDK is still loading. Please try again in a moment.";
       return;
     }
-    loadingPlatform = "facebook";
-    // @ts-ignore
-    window.FB?.login(
+    error = "";
+    loading = "facebook_ads";
+
+    (window as any).FB?.login(
       (response: { authResponse?: { accessToken: string } }) => {
         if (!response.authResponse) {
-          loadingPlatform = "";
+          loading = "";
           return;
         }
         const token = response.authResponse.accessToken;
         fbAccessToken = token;
-        // Get user email
-        // @ts-ignore
-        window.FB?.api("/me", { fields: "name,email" }, (userInfo: { email?: string }) => {
-          fbEmail = userInfo?.email ?? "";
-          // Get ad accounts
-          // @ts-ignore
-          window.FB?.api(
-            "/me/adaccounts",
-            { access_token: token, fields: "account_id,name" },
-            (accountsResponse: { data?: Array<{ account_id: string; name: string }> }) => {
-              loadingPlatform = "";
-              const data = accountsResponse?.data ?? [];
-              if (data.length === 0) {
-                showError("No Facebook ad accounts found for this user.");
-                return;
-              }
-              accountModalPlatform = "Facebook Ads";
-              accountModalAccounts = data.map((a) => ({
-                id: a.account_id,
-                name: a.name || a.account_id,
-              }));
-              accountModalOpen = true;
-            },
-          );
-        });
+        (window as any).FB?.api(
+          "/me",
+          { fields: "name,email" },
+          (userInfo: { email?: string }) => {
+            fbEmail = userInfo?.email ?? "";
+            (window as any).FB?.api(
+              "/me/adaccounts",
+              { access_token: token, fields: "account_id,name" },
+              (accountsResponse: {
+                data?: Array<{ account_id: string; name: string }>;
+              }) => {
+                loading = "";
+                const data = accountsResponse?.data ?? [];
+                if (data.length === 0) {
+                  error = "No Facebook ad accounts found for this user.";
+                  return;
+                }
+                accountModalPlatform = "Facebook Ads";
+                accountModalAccounts = data.map((a) => ({
+                  id: a.account_id,
+                  name: a.name || a.account_id,
+                }));
+                showAccountModal = true;
+              },
+            );
+          },
+        );
       },
-      { scope: "email,ads_read" },
+      { scope: "email,ads_read,ads_management" },
     );
   }
 
-  async function handleFacebookAccountsSelected(selected: AdAccountInfo[]) {
-    accountModalLoading = true;
-    try {
-      await exchangeFacebookTokens(fbAccessToken, fbEmail, selected);
-      accountModalOpen = false;
-      accountModalLoading = false;
-      await fetchAllConnections();
-    } catch (e) {
-      accountModalLoading = false;
-      showError(e instanceof Error ? e.message : "Failed to connect Facebook accounts");
-    }
+  interface GoogleAdAccountNode {
+    customer_id: string;
+    name?: string;
+    descriptive_name?: string;
+    manager_account_id?: string;
+    children?: GoogleAdAccountNode[];
   }
 
-  // ── Google flow ──
-
-  function handleGoogleConnect() {
-    if (!googleSdkReady) {
-      showError("Google SDK is still loading. Please try again in a moment.");
-      return;
+  function flattenAccounts(accounts: GoogleAdAccountNode[]): Array<{ id: string; name: string }> {
+    const flat: Array<{ id: string; name: string }> = [];
+    googleManagerMap = {};
+    function walk(list: GoogleAdAccountNode[]) {
+      for (const acc of list) {
+        const id = String(acc.customer_id);
+        flat.push({ id, name: acc.name || acc.descriptive_name || id });
+        if (acc.manager_account_id) {
+          googleManagerMap[id] = String(acc.manager_account_id);
+        }
+        if (acc.children) walk(acc.children);
+      }
     }
-    loadingPlatform = "google-ads";
+    walk(accounts);
+    return flat;
+  }
+
+  async function handleGoogleAdsConnect() {
+    if (isConnected("google_ads")) return;
+    error = "";
+    loading = "google_ads";
+
     try {
-      // @ts-ignore
+      const google = (window as any).google;
+      if (!google?.accounts?.oauth2) {
+        throw new Error("Google SDK not loaded. Please refresh and try again.");
+      }
+
       const client = google.accounts.oauth2.initCodeClient({
-        client_id: GOOGLE_CLIENT_ID,
+        client_id: "452833261444-1amauhc3bsundipofc2qvf3sonikknpa.apps.googleusercontent.com",
         scope: "https://www.googleapis.com/auth/adwords",
         ux_mode: "popup",
         callback: async (response: { code?: string; error?: string }) => {
           if (response.error || !response.code) {
-            loadingPlatform = "";
-            if (response.error !== "access_denied") {
-              showError(response.error ?? "Google login was cancelled.");
-            }
+            error = response.error || "Authorization cancelled";
+            loading = "";
             return;
           }
+
           googleAuthCode = response.code;
-          // Fetch available ad accounts
+          loading = "google_ads";
+
           try {
-            const accounts = await getGoogleAdAccounts(response.code);
-            loadingPlatform = "";
-            // Flatten the hierarchy for selection
-            const flat: Array<{ id: string; name: string }> = [];
-            function flatten(list: GoogleAdAccount[]) {
-              for (const acc of list) {
-                flat.push({
-                  id: acc.customer_id,
-                  name: acc.name || acc.customer_id,
-                });
-                if (acc.children) flatten(acc.children);
-              }
+            const host = get(runtime).host;
+            const res = await fetch(
+              `${host}/bratrax/onboard/google/accounts?code=${encodeURIComponent(response.code)}`,
+              { credentials: "include" },
+            );
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new Error((body as any).error || "Failed to list accounts");
             }
-            flatten(Array.isArray(accounts) ? accounts : [accounts]);
-            if (flat.length === 0) {
-              showError("No Google Ads accounts found.");
-              return;
-            }
+            const data = await res.json();
+            const accounts = (data as any).data || [];
+            accountModalAccounts = flattenAccounts(accounts);
             accountModalPlatform = "Google Ads";
-            accountModalAccounts = flat;
-            accountModalOpen = true;
+            showAccountModal = true;
           } catch (e) {
-            loadingPlatform = "";
-            showError(e instanceof Error ? e.message : "Failed to fetch Google Ads accounts");
+            error = e instanceof Error ? e.message : String(e);
+          } finally {
+            loading = "";
           }
         },
       });
       client.requestCode();
     } catch (e) {
-      loadingPlatform = "";
-      showError(e instanceof Error ? e.message : "Failed to start Google login");
+      error = e instanceof Error ? e.message : String(e);
+      loading = "";
     }
   }
 
-  async function handleGoogleAccountsSelected(selected: AdAccountInfo[]) {
+  // ---------------------------------------------------------------------------
+  // Account-selection dispatcher (Google + Facebook only — TikTok/Klaviyo
+  // complete on /onboard/stack and bounce here via goto). No return-to
+  // navigation needed here since we're already on /connectors.
+  // ---------------------------------------------------------------------------
+  async function handleAccountSelection(selected: AdAccountInfo[]) {
     accountModalLoading = true;
     try {
-      await exchangeGoogleTokens(googleAuthCode, selected);
-      accountModalOpen = false;
-      accountModalLoading = false;
-      await fetchAllConnections();
-    } catch (e) {
-      accountModalLoading = false;
-      showError(e instanceof Error ? e.message : "Failed to connect Google Ads accounts");
-    }
-  }
+      const host = get(runtime).host;
+      const isFacebook = accountModalPlatform === "Facebook Ads";
 
-  // ── Generic connect handler ──
+      let endpoint: string;
+      let body: Record<string, unknown>;
 
-  async function handleConnect(platform: PlatformConfig) {
-    errorMessage = "";
-
-    // Facebook: client-side SDK flow
-    if (platform.id === "facebook") {
-      handleFacebookConnect();
-      return;
-    }
-
-    // Google Ads: client-side SDK flow
-    if (platform.id === "google-ads") {
-      handleGoogleConnect();
-      return;
-    }
-
-    if (platform.flowType === "oauth-modal-input" && platform.id === "shopify") {
-      shopifyModalOpen = true;
-      return;
-    }
-
-    if (platform.flowType === "credential-modal" && platform.id === "outbrain") {
-      outbrainModalOpen = true;
-      return;
-    }
-
-    loadingPlatform = platform.id;
-    try {
-      const params: Record<string, string> = {};
-      if (platform.flowType === "oauth-redirect-region" && platform.regions) {
-        const region = platform.regions[0];
-        params.region = region;
-        sessionStorage.setItem(`bratrax-region-${platform.apiSlug}`, region);
+      if (isFacebook) {
+        endpoint = `${host}/bratrax/onboard/facebook/connect`;
+        body = {
+          short_lived_token: fbAccessToken,
+          email: fbEmail,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+      } else {
+        // Google Ads
+        endpoint = `${host}/bratrax/onboard/google/connect`;
+        body = {
+          code: googleAuthCode,
+          client_id: clientId,
+          selectedAccounts: selected.map((a) => ({
+            ...a,
+            managerAccountId: googleManagerMap[a.accountId] || "",
+          })),
+        };
       }
-      const url = await getAuthUrl(
-        platform.apiSlug,
-        Object.keys(params).length > 0 ? params : undefined,
-      );
-      window.location.href = url;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const resp = await res.json().catch(() => ({}));
+        throw new Error((resp as any).error || "Failed to connect accounts");
+      }
+
+      showAccountModal = false;
+      await refreshFromServer();
     } catch (e) {
-      loadingPlatform = "";
-      showError(e instanceof Error ? e.message : `Failed to connect ${platform.name}`);
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      accountModalLoading = false;
     }
   }
 
-  async function handleShopifySubmit(shopUrl: string) {
-    loadingPlatform = "shopify";
+  // ---------------------------------------------------------------------------
+  // Disconnect
+  // ---------------------------------------------------------------------------
+  async function handleDisconnect(platform: Platform) {
+    if (!isConnected(platform.id)) return;
+    if (!clientId) return;
+    if (!confirm(
+      `Disconnect ${platform.name}? This removes all stored credentials and account selections for this platform.`,
+    )) return;
+    error = "";
+    loading = platform.id;
     try {
-      const url = await getShopifyAuthUrl(shopUrl);
-      sessionStorage.setItem("bratrax-shopify-shop", shopUrl);
-      window.location.href = url;
+      await onboardDisconnect(clientId, platform.id);
+      await refreshFromServer();
     } catch (e) {
-      loadingPlatform = "";
-      showError(e instanceof Error ? e.message : "Failed to connect Shopify");
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = "";
     }
   }
 
-  async function handleOutbrainSubmit(encodedAuth: string) {
-    loadingPlatform = "outbrain";
-    try {
-      await submitOutbrainCredentials(encodedAuth);
-      outbrainModalOpen = false;
-      loadingPlatform = "";
-      await fetchAllConnections();
-    } catch (e) {
-      loadingPlatform = "";
-      showError(e instanceof Error ? e.message : "Failed to connect Outbrain");
+  // ---------------------------------------------------------------------------
+  // View accounts modal
+  // ---------------------------------------------------------------------------
+  function handleView(platform: Platform) {
+    const cred = stackSelections[`${platform.id}_credentials`] || {};
+    // TikTok stores accounts under `advertisers`; everyone else uses `accounts`.
+    const list: any[] = cred.accounts || cred.advertisers || [];
+    infoModalAccounts = list.map((a: any) => ({
+      id: String(a.accountId || a.id || a.account_id || ""),
+      name: a.accountName || a.name || a.account_name || a.id || "(unnamed)",
+    }));
+    infoModalConnectedAt = connectedAt[platform.id] || cred.connected_at || "";
+    infoModalPlatform = platform.name;
+    showInfoModal = true;
+  }
+
+  function handleCardConnect(platform: Platform) {
+    if (platform.type === "client_sdk") {
+      if (platform.id === "google_ads") handleGoogleAdsConnect();
+      else if (platform.id === "facebook_ads") handleFacebookConnect();
+    } else {
+      handleOAuthConnect(platform);
     }
   }
 
-  function handleViewDetails(platform: PlatformConfig) {
-    detailPlatformName = platform.name;
-    detailAdAccounts = $adConnections[platform.connectionKey] ?? [];
-    detailCrmAccounts = $crmConnections[platform.connectionKey] ?? [];
-    detailModalOpen = true;
-  }
-
-  // Account selection callback router
-  function handleAccountsSubmit(selected: AdAccountInfo[]) {
-    if (accountModalPlatform === "Facebook Ads") {
-      handleFacebookAccountsSelected(selected);
-    } else if (accountModalPlatform === "Google Ads") {
-      handleGoogleAccountsSelected(selected);
+  // ---------------------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------------------
+  onMount(async () => {
+    await refreshFromServer();
+    loadFacebookSdk();
+    if (!document.getElementById("gis-sdk")) {
+      const script = document.createElement("script");
+      script.id = "gis-sdk";
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      document.head.appendChild(script);
     }
-  }
+  });
 </script>
 
-<div class="mx-auto w-full max-w-6xl px-6 py-12">
-  <div class="mb-10">
-    <div class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
-      01 — CONNECTORS
-    </div>
-    <h1 class="text-3xl font-black tracking-tight text-bratrax-text-headline">
-      Connect to <span class="font-serif italic text-bratrax-acid">Platforms</span>
-    </h1>
-    <p class="mt-2 text-[15px] font-light text-bratrax-text-body">
-      Link your advertising, e-commerce, and analytics accounts
-    </p>
-  </div>
+<div class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12">
+  <div class="relative w-full max-w-2xl border border-bratrax-border bg-bratrax-surface p-8">
+    <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
-  {#if errorMessage}
-    <div class="mx-auto mb-6 max-w-xl border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-4 py-3 font-mono text-xs text-bratrax-tomato">
-      <div class="flex items-start gap-2">
-        <svg class="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-        </svg>
-        <span>{errorMessage}</span>
-        <button class="ml-auto text-bratrax-tomato/60 hover:text-bratrax-tomato" on:click={() => { errorMessage = ""; }}>
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+    <div class="mb-6">
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        CONNECTORS
       </div>
+      <h1 class="text-2xl font-black text-bratrax-text-headline">
+        Manage your <span class="font-serif italic text-bratrax-acid">connections</span>
+      </h1>
+      <p class="mt-2 text-sm font-light text-bratrax-text-body">
+        Connect, view, or disconnect your data sources. Changes apply immediately.
+      </p>
     </div>
-  {/if}
 
-  {#if $connectionsLoading}
-    <div class="flex justify-center py-12">
-      <svg class="h-6 w-6 animate-spin text-bratrax-acid" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
-    </div>
-  {:else}
-    {#each CATEGORY_ORDER as category, i}
-      {@const platforms = getPlatformsByCategory(category)}
-      {#if platforms.length > 0}
-        <section class="mb-10">
-          <h2 class="mb-4 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
-            {String(i + 1).padStart(2, '0')} — {CATEGORY_LABELS[category]}
-          </h2>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {#each platforms as platform (platform.id)}
-              <PlatformCard
-                name={platform.name}
-                logo={platform.logo}
-                description={platform.description}
-                connected={isConnected(platform)}
-                connectedDate={getConnectedDate(platform)}
-                loading={loadingPlatform === platform.id}
-                onConnect={() => handleConnect(platform)}
-                onViewDetails={() => handleViewDetails(platform)}
-              />
-            {/each}
+    {#if error}
+      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+        {error}
+      </div>
+    {/if}
+
+    <div class="flex flex-col gap-3">
+      {#each platforms as platform}
+        <div class="flex items-center justify-between gap-4 border border-bratrax-border bg-bratrax-bg px-4 py-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="h-3 w-3 flex-shrink-0" style="background-color: {platform.color}"></span>
+            <span class="font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-headline truncate">
+              {platform.name}
+            </span>
+            {#if isConnected(platform.id)}
+              <span class="flex items-center gap-1 border border-bratrax-acid/50 bg-bratrax-acid/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid">
+                <span class="h-1.5 w-1.5 rounded-full bg-bratrax-acid"></span>
+                Connected
+              </span>
+            {:else}
+              <span class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">
+                Not connected
+              </span>
+            {/if}
           </div>
-        </section>
-      {/if}
-    {/each}
-  {/if}
+
+          <div class="flex items-center gap-2 flex-shrink-0">
+            {#if isConnected(platform.id)}
+              <button
+                on:click={() => handleView(platform)}
+                disabled={loading === platform.id}
+                class="border border-bratrax-border bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover disabled:opacity-50"
+              >
+                View accounts
+              </button>
+              <button
+                on:click={() => handleDisconnect(platform)}
+                disabled={loading === platform.id}
+                class="border border-bratrax-tomato/40 bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10 disabled:opacity-50"
+              >
+                {loading === platform.id ? "Disconnecting…" : "Disconnect"}
+              </button>
+            {:else}
+              <button
+                on:click={() => handleCardConnect(platform)}
+                disabled={loading === platform.id}
+                class="bg-bratrax-acid px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+              >
+                {loading === platform.id ? "Connecting…" : "Connect"}
+              </button>
+            {/if}
+          </div>
+        </div>
+      {/each}
+    </div>
+  </div>
 </div>
 
-<ShopifyUrlModal
-  open={shopifyModalOpen}
-  loading={loadingPlatform === "shopify"}
-  onSubmit={handleShopifySubmit}
-  onClose={() => { shopifyModalOpen = false; }}
-/>
-
-<OutbrainLoginModal
-  open={outbrainModalOpen}
-  loading={loadingPlatform === "outbrain"}
-  onSubmit={handleOutbrainSubmit}
-  onClose={() => { outbrainModalOpen = false; }}
-/>
-
-<ConnectionDetailModal
-  open={detailModalOpen}
-  platformName={detailPlatformName}
-  adAccounts={detailAdAccounts}
-  crmAccounts={detailCrmAccounts}
-  onClose={() => { detailModalOpen = false; }}
-/>
-
 <AccountSelectionModal
-  open={accountModalOpen}
+  open={showAccountModal}
   loading={accountModalLoading}
   platformName={accountModalPlatform}
   accounts={accountModalAccounts}
-  onSubmit={handleAccountsSubmit}
-  onClose={() => { accountModalOpen = false; }}
+  onSubmit={handleAccountSelection}
+  onClose={() => { showAccountModal = false; }}
 />
+
+{#if showInfoModal}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    on:click={() => (showInfoModal = false)}
+    on:keydown={(e) => e.key === "Escape" && (showInfoModal = false)}
+    role="presentation"
+  >
+    <div
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      tabindex="-1"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
+      <div class="mb-4 flex items-baseline justify-between">
+        <h2 class="text-lg font-black text-bratrax-text-headline">
+          {infoModalPlatform}
+        </h2>
+        <button
+          on:click={() => (showInfoModal = false)}
+          class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted hover:text-bratrax-text-body"
+        >
+          Close
+        </button>
+      </div>
+
+      {#if infoModalConnectedAt}
+        <p class="mb-3 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
+          Connected: {new Date(infoModalConnectedAt).toLocaleString()}
+        </p>
+      {/if}
+
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px] text-bratrax-acid/70">
+        Accounts ({infoModalAccounts.length})
+      </div>
+
+      {#if infoModalAccounts.length === 0}
+        <p class="font-mono text-xs text-bratrax-text-muted">No accounts on file.</p>
+      {:else}
+        <ul class="flex max-h-80 flex-col gap-1.5 overflow-y-auto">
+          {#each infoModalAccounts as acct}
+            <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
+              <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
+                {acct.name}
+              </div>
+              <div class="font-mono text-[10px] text-bratrax-text-muted truncate">
+                {acct.id}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  </div>
+{/if}
