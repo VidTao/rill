@@ -55,7 +55,7 @@ export const s3Schema: MultiStepFormSchema = {
       type: "string",
       title: "Region",
       description:
-        "Rill uses your default AWS region unless you set it explicitly.",
+        "Bratrax uses your default AWS region unless you set it explicitly.",
       "x-placeholder": "us-east-1",
       "x-step": "connector",
       "x-visible-if": { auth_method: "access_keys" },

@@ -177,7 +177,7 @@
 </script>
 
 <svelte:head>
-  <title>{canvasTitle || `${canvasName} - Rill`}</title>
+  <title>{canvasTitle || `${canvasName} - Bratrax`}</title>
 </svelte:head>
 
 <slot {ready} {reconcileErrorMessage} {isLoading} {isReconciling} />

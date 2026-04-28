@@ -29,7 +29,7 @@ func (t *WorkshopCompile) Spec() *mcp.Tool {
 	return &mcp.Tool{
 		Name:        WorkshopCompileName,
 		Title:       "Workshop: Compile",
-		Description: "Compile the YAML configuration for a workshop client. Generates Dataform .sqlx artifacts, Meltano config, and Rill metrics views.",
+		Description: "Compile the YAML configuration for a workshop client. Generates Dataform .sqlx artifacts, Meltano config, and Bratrax metrics views.",
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Compiling...",
 			"openai/toolInvocation/invoked":  "Compiled",

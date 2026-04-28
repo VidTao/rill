@@ -1,8 +1,8 @@
 ---
-description: Detailed instructions and examples for developing canvas dashboard resources in Rill
+description: Detailed instructions and examples for developing canvas dashboard resources in Bratrax
 ---
 
-# Instructions for developing a canvas dashboard in Rill
+# Instructions for developing a canvas dashboard in Bratrax
 
 ## Introduction
 

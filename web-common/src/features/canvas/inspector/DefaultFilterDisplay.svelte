@@ -32,7 +32,7 @@
   <div class="page-param">
     <p class="text-fg-secondary mb-4">
       The filters listed below are saved as your default view and will
-      automatically apply each time you open this dashboard in Rill Cloud.
+      automatically apply each time you open this dashboard in Bratrax.
     </p>
 
     <CanvasFilterChipsReadOnly

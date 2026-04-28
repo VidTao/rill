@@ -125,7 +125,7 @@
   </div>
 
   <div class="flex flex-col mx-auto w-fit gap-y-2 text-xs text-slate-500">
-    <div class="font-semibold text-center">Tips for data workflow in rill</div>
+    <div class="font-semibold text-center">Tips for data workflow in Bratrax</div>
     <ul class="list-decimal">
       <li>Import data – Add or drag files (Parquet, NDJSON, CSV).</li>
       <li>Model sources – Combine and shape data with SQL.</li>

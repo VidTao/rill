@@ -160,7 +160,7 @@ Classify the feedback into one of three categories:
 		- Project-level or metrics view-level AI instructions are missing
 3. "user" - The user's question was vague, ambiguous, or lacked sufficient context. You responded reasonably given the input.
 
-If you are unsure which category to use, choose "rill" so the Rill team can take a closer look.
+If you are unsure which category to use, choose "rill" so the Bratrax team can take a closer look.
 </categories>
 
 <output_format>

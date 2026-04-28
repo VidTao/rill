@@ -13,7 +13,7 @@
 </script>
 
 <svelte:head>
-  <title>Rill Developer</title>
+  <title>Bratrax Developer</title>
 </svelte:head>
 
 <div class="flex size-full overflow-hidden">

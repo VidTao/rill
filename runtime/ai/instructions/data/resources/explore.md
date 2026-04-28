@@ -1,12 +1,12 @@
 ---
-description: Detailed instructions and examples for developing explore dashboard resources in Rill
+description: Detailed instructions and examples for developing explore dashboard resources in Bratrax
 ---
 
-# Instructions for developing an explore dashboard in Rill
+# Instructions for developing an explore dashboard in Bratrax
 
 ## Introduction
 
-Explore dashboards are resources that configure an interactive, drill-down dashboard for a metrics view. They are Rill's default dashboard type, designed for explorative slice-and-dice analysis of a single metrics view.
+Explore dashboards are resources that configure an interactive, drill-down dashboard for a metrics view. They are Bratrax's default dashboard type, designed for explorative slice-and-dice analysis of a single metrics view.
 
 Explore dashboards are lightweight resources that sit downstream of a metrics view in the project DAG. Their reconcile logic is fast (validation only), so they can be created and modified freely without performance concerns.
 

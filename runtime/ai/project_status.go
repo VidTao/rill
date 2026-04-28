@@ -34,7 +34,7 @@ func (t *ProjectStatus) Spec() *mcp.Tool {
 	return &mcp.Tool{
 		Name:        ProjectStatusName,
 		Title:       "Get project status",
-		Description: "Returns the reconcile status of resources in the Rill project, including any parse errors.",
+		Description: "Returns the reconcile status of resources in the Bratrax project, including any parse errors.",
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Getting project status...",
 			"openai/toolInvocation/invoked":  "Got project status",

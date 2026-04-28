@@ -82,7 +82,7 @@ export const clickhouseSchema: MultiStepFormSchema = {
       type: "boolean",
       title: "Managed",
       description:
-        "This option uses ClickHouse as an OLAP engine with Rill-managed infrastructure. No additional configuration is required - Rill will handle the setup and management of your ClickHouse instance.",
+        "This option uses ClickHouse as an OLAP engine with Bratrax-managed infrastructure. No additional configuration is required - Bratrax will handle the setup and management of your ClickHouse instance.",
       default: true,
       "x-informational": true,
       "x-visible-if": {

@@ -49,7 +49,7 @@
     fatal
     statusCode={500}
     header="Error connecting to runtime"
-    body="Try restarting the Rill via the CLI"
+    body="Try restarting Bratrax via the CLI"
   />
 {:else}
   <slot />

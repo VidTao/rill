@@ -18,9 +18,9 @@ export const duckdbSchema: MultiStepFormSchema = {
       default: "rill-managed",
       "x-display": "select",
       "x-select-style": "rich",
-      "x-enum-labels": ["Rill Managed", "Local File"],
+      "x-enum-labels": ["Bratrax Managed", "Local File"],
       "x-enum-descriptions": [
-        "Rill manages your DuckDB infrastructure",
+        "Bratrax manages your DuckDB infrastructure",
         "Connect to your own DuckDB database file",
       ],
       "x-ui-only": true,
@@ -34,7 +34,7 @@ export const duckdbSchema: MultiStepFormSchema = {
       type: "boolean",
       title: "Managed",
       description:
-        "This option uses DuckDB as an OLAP engine with Rill-managed infrastructure. No additional configuration is required - Rill will handle the setup and management of your DuckDB instance.",
+        "This option uses DuckDB as an OLAP engine with Bratrax-managed infrastructure. No additional configuration is required - Bratrax will handle the setup and management of your DuckDB instance.",
       default: false,
       "x-informational": true,
       "x-ui-only": true,

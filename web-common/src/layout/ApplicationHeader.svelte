@@ -56,7 +56,7 @@
   $: canvasQuery = useValidCanvases(instanceId);
   $: projectTitleQuery = useProjectTitle(instanceId);
 
-  $: projectTitle = $projectTitleQuery?.data ?? "Untitled Rill Project";
+  $: projectTitle = $projectTitleQuery?.data ?? "Untitled Bratrax Project";
 
   $: explores = $exploresQuery?.data ?? [];
   $: canvases = $canvasQuery?.data ?? [];

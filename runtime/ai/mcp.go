@@ -11,8 +11,8 @@ import (
 )
 
 const mcpInstructions = `
-# Rill MCP Server
-This server exposes APIs for querying **metrics views**, which represent Rill's metrics layer.
+# Bratrax MCP Server
+This server exposes APIs for querying **metrics views**, which represent Bratrax's metrics layer.
 
 ## Workflow Overview
 1. **List metrics views:** Use "list_metrics_views" to discover available metrics views in the project.
@@ -32,7 +32,7 @@ func (s *Session) MCPServer(ctx context.Context) *mcp.Server {
 	srv := mcp.NewServer(
 		&mcp.Implementation{
 			Name:    "rill",
-			Title:   "Rill MCP Server",
+			Title:   "Bratrax MCP Server",
 			Version: s.runner.Runtime.Version().String(),
 		},
 		&mcp.ServerOptions{

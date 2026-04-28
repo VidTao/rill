@@ -38,7 +38,7 @@ export function useProjectTitle(instanceId: string) {
             projectData?.display_name ||
               projectData?.title ||
               projectData?.name ||
-              "Untitled Rill Project",
+              "Untitled Bratrax Project",
           );
         },
       },

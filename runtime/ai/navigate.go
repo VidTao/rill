@@ -26,7 +26,7 @@ func (t *Navigate) Spec() *mcp.Tool {
 	return &mcp.Tool{
 		Name:        NavigateName,
 		Title:       "Navigate UI",
-		Description: "Navigate to a specific UI element in the Rill UI. Supported kinds: 'file', 'explore', 'canvas'.",
+		Description: "Navigate to a specific UI element in the Bratrax UI. Supported kinds: 'file', 'explore', 'canvas'.",
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Navigating...",
 			"openai/toolInvocation/invoked":  "Navigated",

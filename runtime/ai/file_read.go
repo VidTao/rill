@@ -28,7 +28,7 @@ func (t *ReadFile) Spec() *mcp.Tool {
 	return &mcp.Tool{
 		Name:        ReadFileName,
 		Title:       "Read file",
-		Description: "Reads the contents of a file in the Rill project",
+		Description: "Reads the contents of a file in the Bratrax project",
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Reading file...",
 			"openai/toolInvocation/invoked":  "Read file",

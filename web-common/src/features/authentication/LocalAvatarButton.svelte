@@ -124,7 +124,7 @@
         </DropdownMenu.Item>
       {:else if rillUser}
         <DropdownMenu.Item on:click={handlePylon}>
-          Contact Rill support
+          Contact Bratrax support
         </DropdownMenu.Item>
         <DropdownMenu.Separator />
         <DropdownMenu.Item href={logoutUrl} rel="external">

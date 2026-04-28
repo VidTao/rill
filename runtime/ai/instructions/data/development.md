@@ -1,25 +1,25 @@
 ---
-description: How to develop a Rill project with an introduction to Rill's concepts and resource types
+description: How to develop a Bratrax project with an introduction to Bratrax's concepts and resource types
 ---
 
-# Instructions for developing a Rill project
+# Instructions for developing a Bratrax project
 
-This document is intended for data engineering agents specialized in developing projects in the Rill business intelligence platform.
+This document is intended for data engineering agents specialized in developing projects in the Bratrax business intelligence platform.
 
-## Introduction to Rill
+## Introduction to Bratrax
 
-Rill is a business intelligence platform built around the following principles:
+Bratrax is a business intelligence platform built around the following principles:
 - Code-first: configure projects using versioned and reproducible source code in the form of YAML and SQL files.
 - Full stack: go from raw data sources to user-friendly dashboards powered by clean data with a single tool.
-- Declarative: describe your business logic and Rill automatically runs the infrastructure, migrations and services necessary to make it real.
+- Declarative: describe your business logic and Bratrax automatically runs the infrastructure, migrations and services necessary to make it real.
 - OLAP databases: you can easily provision a fast analytical database and load data into it to build dashboards that stay interactive at scale.
 
 ## Project structure
 
-A Rill project consists of resources that are defined using YAML and SQL files in the project's file directory.
-Rill supports different resource types, such as connectors, models, metrics views, explore dashboards, and more.
+A Bratrax project consists of resources that are defined using YAML and SQL files in the project's file directory.
+Bratrax supports different resource types, such as connectors, models, metrics views, explore dashboards, and more.
 
-Here is an example listing of files for a small Rill project:
+Here is an example listing of files for a small Bratrax project:
 ```
 .env
 connectors/duckdb.yaml
@@ -47,7 +47,7 @@ The other YAML and SQL files define individual resources in the project. They fo
 
 ## Project execution
 
-Rill automatically watches project files and processes changes. There are two key phases:
+Bratrax automatically watches project files and processes changes. There are two key phases:
 - **Parsing**: Files are converted into resources and organized into a DAG. Malformed files produce *parse errors*.
 - **Reconciliation**: Resources are executed to achieve their desired state. Failures produce *reconcile errors*.
 
@@ -55,25 +55,25 @@ Some resources are cheap to reconcile (validation, non-materialized models), oth
 
 Resources can also have scheduled reconciliation via cron expressions (e.g. daily model refresh).
 
-## Rill's environments
+## Bratrax's environments
 
-Rill has a local CLI (`rill`) for development and a cloud service for production. After developing or changing a project locally, developers deploy to Rill Cloud either by pushing to GitHub (continuous deploys) or manually deploying with the CLI.
+Bratrax has a local CLI (`rill`) for development and a cloud service for production. After developing or changing a project locally, developers deploy to Bratrax Cloud either by pushing to GitHub (continuous deploys) or manually deploying with the CLI.
 
 ## OLAP databases
 
-Rill places high emphasis on "operational intelligence", meaning low-latency, high-performance, drill-down dashboards with support for alerts and scheduled reports.
-Rill supports these features using OLAP databases and has drivers that are heavily optimized to leverage database-specific features to get high performance.
+Bratrax places high emphasis on "operational intelligence", meaning low-latency, high-performance, drill-down dashboards with support for alerts and scheduled reports.
+Bratrax supports these features using OLAP databases and has drivers that are heavily optimized to leverage database-specific features to get high performance.
 
-OLAP databases are configured as any other connector in Rill.
-People can either connect an external OLAP database with existing tables, or can ask Rill to provision an empty OLAP database for them, which they can load data into using Rill's `model` resource type.
+OLAP databases are configured as any other connector in Bratrax.
+People can either connect an external OLAP database with existing tables, or can ask Bratrax to provision an empty OLAP database for them, which they can load data into using Bratrax's `model` resource type.
 
 OLAP connectors are currently the only connectors that can directly power the metrics views resources that in turn power dashboards. So data must be in an OLAP database to power a dashboard.
 
-Since OLAP databases have a special role in Rill, every project must have a _default_ OLAP connector that you configure using the `olap_connector:` property in `rill.yaml`. This default OLAP connector is automatically used for a variety of things in Rill unless explicitly overridden (see details under the resource type descriptions). If no OLAP connector is configured, Rill by default initializes a managed `duckdb` OLAP database and uses it as the default OLAP connector.
+Since OLAP databases have a special role in Bratrax, every project must have a _default_ OLAP connector that you configure using the `olap_connector:` property in `rill.yaml`. This default OLAP connector is automatically used for a variety of things in Bratrax unless explicitly overridden (see details under the resource type descriptions). If no OLAP connector is configured, Bratrax by default initializes a managed `duckdb` OLAP database and uses it as the default OLAP connector.
 
 ## Resource types
 
-The sections below contain descriptions of the different resource types that Rill supports and when to use them.
+The sections below contain descriptions of the different resource types that Bratrax supports and when to use them.
 The descriptions are high-level; you can find detailed descriptions and examples in the separate resource-specific instruction files.
 
 ### Connectors
@@ -92,8 +92,8 @@ There are a variety of built-in connector _drivers_, which each implements one o
 Here are some useful things to know when developing connectors:
 - Actual secrets like database passwords should go in `.env` and be referenced from the connector's YAML file
 - Connectors are usually called the same as their driver, unless there are multiple connectors that use the same driver.
-- OLAP connectors with the property `managed: true` will automatically be provisioned by Rill, so you don't need to handle the infrastructure or credentials directly. This is only supported for the `duckdb` and `clickhouse` drivers. The user will be subject to usage-based billing for the CPU, memory and disk usage of the provisioned database.
-- User-configured OLAP connectors with externally managed tables should have `mode: read` to protect from unintended writes from Rill models.
+- OLAP connectors with the property `managed: true` will automatically be provisioned by Bratrax, so you don't need to handle the infrastructure or credentials directly. This is only supported for the `duckdb` and `clickhouse` drivers. The user will be subject to usage-based billing for the CPU, memory and disk usage of the provisioned database.
+- User-configured OLAP connectors with externally managed tables should have `mode: read` to protect from unintended writes from Bratrax models.
 - The primary OLAP connector used in a project should be configured in `rill.yaml` using the `olap_connector:` property.
 
 ### Models
@@ -102,8 +102,8 @@ Models are resources that specify ETL or transformation logic that outputs a tab
 They are usually expensive resources that are found near the root of the DAG, referencing only connectors and other models.
 
 Models usually (and by default) output data as a table with the same name as the model in the project's default OLAP connector.
-They usually center around a `SELECT` SQL statement that Rill will run as a `CREATE TABLE <name> AS <SELECT statement>`.
-This means models in Rill are similar to models in dbt, but they support some additional advanced features, namely:
+They usually center around a `SELECT` SQL statement that Bratrax will run as a `CREATE TABLE <name> AS <SELECT statement>`.
+This means models in Bratrax are similar to models in dbt, but they support some additional advanced features, namely:
 - Different input and output connectors (making it easy to e.g. run a query in BigQuery and output it to the default OLAP connector)
 - Stateful incremental ingestion with support for explicit partitions (e.g. for loading Hive partitioned files from S3)
 - Scheduled refresh using a cron expression in the model itself
@@ -127,16 +127,16 @@ They are lightweight resources found downstream of connectors and models in the 
 They power many user-facing features, such as dashboards, alerts, and scheduled reports.
 
 Metrics views consist of:
-- **Model:** a table in an OLAP database; can either be a pre-existing table in an external OLAP database or a table produced by a model in the Rill project
+- **Model:** a table in an OLAP database; can either be a pre-existing table in an external OLAP database or a table produced by a model in the Bratrax project
 - **Dimensions:** SQL expressions that can be grouped by (e.g. time, string or geospatial types)
 - **Measures:** SQL expressions that define aggregations (usually numeric types)
 - **Security policies:** access rules and row filters that reference attributes of the querying user
 
 ### Explores
 
-Explore resources define an "explore dashboard", an opinionated dashboard type that comes baked into Rill.
+Explore resources define an "explore dashboard", an opinionated dashboard type that comes baked into Bratrax.
 These dashboards are specifically designed as an explorative, drill-down, slice-and-dice interface for a single metrics view.
-They are Rill's default dashboard type, and usually configured for every metrics view in a project.
+They are Bratrax's default dashboard type, and usually configured for every metrics view in a project.
 They are lightweight resources that are always found downstream of a metrics view in the DAG.
 
 Explore resources can either be configured as stand-alone files or as part of a metrics view definition (see metrics view instructions for details).
@@ -153,19 +153,19 @@ Each canvas component fetches data individually, almost always from a metrics vi
 
 ### Themes
 
-Themes are resources that define a custom color palette for a Rill project.
+Themes are resources that define a custom color palette for a Bratrax project.
 They are referenced from `rill.yaml` or directly from an explore or canvas dashboards.
 
 ### Custom APIs
 
-Custom APIs are resources that define a query that serves data from the Rill project on a custom endpoint.
-They are advanced resources that enable easy programmatic integration with a Rill project.
+Custom APIs are resources that define a query that serves data from the Bratrax project on a custom endpoint.
+They are advanced resources that enable easy programmatic integration with a Bratrax project.
 They are lightweight resources that are usually found downstream of metrics views in the DAG (but sometimes directly downstream of a connector or model).
 
 Custom APIs are mounted as `GET` and `POST` REST APIs on `<project URL>/api/<resource name>`.
 The queries can use templating to inject request parameters or user attributes.
 
-Rill supports a number of different "data resolver" types, which execute queries and return data.
+Bratrax supports a number of different "data resolver" types, which execute queries and return data.
 The most common ones are:
 - `metrics_sql`: queries a metrics view using a generic SQL syntax (recommended)
 - `metrics`: queries a metrics view using a structured query object
@@ -173,11 +173,11 @@ The most common ones are:
 
 ### Alerts
 
-Alerts are resources that enable sending alerts when certain criteria matches data in the Rill project.
+Alerts are resources that enable sending alerts when certain criteria matches data in the Bratrax project.
 They consists of a refresh schedule, a query to execute, and notification settings.
 Since they repeatedly run a query, they are slightly expensive resources.
 They are usually found downstream of a metrics view in the DAG.
-Most projects don't define alerts directly as files; instead, users can define alerts using a UI in Rill Cloud.
+Most projects don't define alerts directly as files; instead, users can define alerts using a UI in Bratrax Cloud.
 
 ### Reports
 
@@ -185,11 +185,11 @@ Reports are resources that enable sending scheduled reports of data in the proje
 They consists of a delivery schedule, a query to execute, and delivery settings.
 Since they repeatedly run a query, they are slightly expensive resources.
 They are usually found downstream of a metrics view in the DAG.
-Most projects don't define reports directly as files; instead, users can define reports using a UI in Rill Cloud.
+Most projects don't define reports directly as files; instead, users can define reports using a UI in Bratrax Cloud.
 
 ### `rill.yaml`
 
-`rill.yaml` is a required file for project-wide config found at the root directory of a Rill project.
+`rill.yaml` is a required file for project-wide config found at the root directory of a Bratrax project.
 It is mainly used for:
 - Setting shared properties for all resources of a given type (e.g. giving all dashboards the same theme)
 - Setting default values for non-sensitive environment variables
@@ -198,13 +198,13 @@ It is mainly used for:
 
 ### `.env`
 
-`.env` is an optional file containing environment variables, which Rill loads when running the project.
+`.env` is an optional file containing environment variables, which Bratrax loads when running the project.
 Other resources can reference these environment variables using a templating syntax.
-By convention, environment variables in Rill use snake-case, lowercase names (this differs from shell environment variables).
+By convention, environment variables in Bratrax use snake-case, lowercase names (this differs from shell environment variables).
 
 ## Development process
 
-This section describes the recommended workflow for developing resources in a Rill project.
+This section describes the recommended workflow for developing resources in a Bratrax project.
 
 ### Understanding the task
 
@@ -251,7 +251,7 @@ The following tools are typically available for project development:
 
 ### What to do when tools are not available
 
-You may be running in an external editor that does not have Rill's development MCP server on `localhost:9009` connected. If that is the case, you will need to approach your work differently because you can't run tool calls like `list_tables`, `query_sql` or `project_status`. Instead:
+You may be running in an external editor that does not have Bratrax's development MCP server on `localhost:9009` connected. If that is the case, you will need to approach your work differently because you can't run tool calls like `list_tables`, `query_sql` or `project_status`. Instead:
 1. Use the `rill validate` CLI command to validate the project and get the status of different resources.
 2. Before editing a resource, load the specific instruction file for its resource type (if available).
 3. Be more bold in making changes, and rely on `rill validate` or user feedback to inform you of issues.
@@ -263,7 +263,7 @@ You may be running in an external editor that does not have Rill's development M
 Avoid these mistakes when developing a project:
 - **Duplicating ETL logic**: Ingest data once, then derive from it within the project. Do not create multiple models that pull the same data from an external source.
 - **Models as SQL files:** Always create new models as `.yaml` files, not `.sql` files (which are harder to extend later).
-- **Not creating connector files:** When Rill has native support for a connector (like S3 or BigQuery), always create a dedicated connector resource file for it.
+- **Not creating connector files:** When Bratrax has native support for a connector (like S3 or BigQuery), always create a dedicated connector resource file for it.
 - **Forgetting to materialize**: Always materialize models that reference external data or perform expensive operations. This also includes models that load external data using a native SQL function, like `read_parquet(...)` or `s3(...)`. Non-materialized models become views, which re-execute on every query.
 - **Referencing non-existant environment variables:** Only reference environment variables that are present in `.env` (returned in `env` from `project_status`). If you need the user to add another environment variable, stop and ask them to do so.
 - **Processing too much data in development**: Use dev partitions to limit data to a small subset (e.g., one day) during development. This speeds up iteration and avoids unnecessary costs.

@@ -6,7 +6,7 @@ description: Detailed instructions and examples for developing the rill.yaml fil
 
 ## Introduction
 
-`rill.yaml` is a required configuration file located at the root of every Rill project. It defines project-wide settings, similar to `package.json` in Node.js or `dbt_project.yml` in dbt.
+`rill.yaml` is a required configuration file located at the root of every Bratrax project. It defines project-wide settings, similar to `package.json` in Node.js or `dbt_project.yml` in dbt.
 
 ## Core Concepts
 
@@ -22,7 +22,7 @@ There are no required properties in `rill.yaml`, but it is common to configure:
 
 The `olap_connector` property sets the default OLAP database for the project. Models output to this connector by default, and metrics views query from it unless explicitly overridden.
 
-Common values are `duckdb` or `clickhouse`. If not specified, Rill initializes a managed DuckDB database and uses it as the default OLAP connector. 
+Common values are `duckdb` or `clickhouse`. If not specified, Bratrax initializes a managed DuckDB database and uses it as the default OLAP connector. 
 
 ### Mock users for security testing
 
@@ -126,7 +126,7 @@ explores:
     - P3M
     - P12M
 
-# Exclude non-Rill files from parsing
+# Exclude non-Bratrax files from parsing
 ignore_paths:
   - /docs
 ```

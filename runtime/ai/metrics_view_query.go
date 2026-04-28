@@ -48,7 +48,7 @@ Request:
 
 Response:
 - Returns aggregated data matching your query parameters
-- Includes 'open_url' field with a shareable link to view results in the Rill UI
+- Includes 'open_url' field with a shareable link to view results in the Bratrax UI
 - Always cite the source of quantitative claims by including 'open_url' as a markdown link
 - When presenting insights from multiple queries, cite each query's 'open_url' inline; when presenting multiple insights from the same query, cite once at the end
 

@@ -1,14 +1,14 @@
 ---
-description: Detailed instructions and examples for developing theme resources in Rill
+description: Detailed instructions and examples for developing theme resources in Bratrax
 ---
 
-# Instructions for developing a theme in Rill
+# Instructions for developing a theme in Bratrax
 
 ## Introduction
 
-Themes are resources that define custom color palettes for dashboards in a Rill project. They allow you to customize the visual appearance of explore and canvas dashboards to match your brand or design preferences.
+Themes are resources that define custom color palettes for dashboards in a Bratrax project. They allow you to customize the visual appearance of explore and canvas dashboards to match your brand or design preferences.
 
-Themes are lightweight resources with no reconciliation cost. When a theme file is saved, Rill validates it but performs no heavy operations. Themes are referenced from `rill.yaml` for project-wide styling or directly from individual explore or canvas dashboards.
+Themes are lightweight resources with no reconciliation cost. When a theme file is saved, Bratrax validates it but performs no heavy operations. Themes are referenced from `rill.yaml` for project-wide styling or directly from individual explore or canvas dashboards.
 
 ## Core Concepts
 
@@ -205,7 +205,7 @@ dark:
 
 ## Legacy Format
 
-Older Rill projects may use a simpler format with a top-level `colors:` block. This format is still supported but deprecated in favor of the `light:`/`dark:` structure:
+Older Bratrax projects may use a simpler format with a top-level `colors:` block. This format is still supported but deprecated in favor of the `light:`/`dark:` structure:
 
 ```yaml
 # Legacy format (deprecated)

@@ -21,7 +21,7 @@ var _ Tool[*DevelopFileArgs, *DevelopFileResult] = (*DevelopFile)(nil)
 
 type DevelopFileArgs struct {
 	Path   string `json:"path" jsonschema:"The path of a .yaml or .sql file to create, update or delete."`
-	Type   string `json:"type,omitempty" jsonschema:"Type of Rill file to develop (optional, but recommended if known). Options: rill.yaml, .env, connector, model, metrics_view, explore, canvas, theme, api, alert, report."`
+	Type   string `json:"type,omitempty" jsonschema:"Type of Bratrax file to develop (optional, but recommended if known). Options: rill.yaml, .env, connector, model, metrics_view, explore, canvas, theme, api, alert, report."`
 	Prompt string `json:"prompt" jsonschema:"A detailed description of how to develop the file. Include any relevant details assuming no prior context except the path's current content and status (if any)."`
 }
 
@@ -33,7 +33,7 @@ func (t *DevelopFile) Spec() *mcp.Tool {
 	return &mcp.Tool{
 		Name:        DevelopFileName,
 		Title:       "Develop file",
-		Description: "Developer agent that creates, edits or deletes a single Rill project file based on a prompt. It has no prior context from the conversation, but has deep knowledge of Rill project development and best practices.",
+		Description: "Developer agent that creates, edits or deletes a single Bratrax project file based on a prompt. It has no prior context from the conversation, but has deep knowledge of Bratrax project development and best practices.",
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Developing file...",
 			"openai/toolInvocation/invoked":  "Developed file",
@@ -153,7 +153,7 @@ func (t *DevelopFile) userPrompt(ctx context.Context, args *DevelopFileArgs) (st
 
 	// Generate the user prompt
 	return executeTemplate(`
-You should develop a Rill project file based on the following task description:
+You should develop a Bratrax project file based on the following task description:
 - Develop file at path: {{ .path }}
 {{ if .type }}- The file should be of type: {{ .type }}{{ end }}
 - Task description: {{ .prompt }}
