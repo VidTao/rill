@@ -221,3 +221,21 @@ export async function onboardDisconnect(
     },
   );
 }
+
+// -----------------------------------------------------------------------------
+// OAuth public-client-IDs config (BUG-01)
+//
+// These values are PUBLIC by OAuth design — they're in every redirect URL
+// during signup. Fetching them at runtime (instead of hardcoding in source)
+// lets us rotate the Facebook app or move to a staging env without rebuilding
+// the frontend.
+// -----------------------------------------------------------------------------
+
+export interface OAuthConfig {
+  fb_app_id: string;
+  google_client_id: string;
+}
+
+export function getOAuthConfig(): Promise<OAuthConfig> {
+  return apiFetch<OAuthConfig>("/bratrax/onboard/oauth-config");
+}

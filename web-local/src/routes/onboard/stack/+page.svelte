@@ -12,8 +12,13 @@
   } from "$lib/bratrax/onboarding/api";
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "../../connectors/AccountSelectionModal.svelte";
+  import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
 
-  const FB_APP_ID = "3518566538435783";
+  // Public OAuth client IDs — fetched from /onboard/oauth-config on mount.
+  // Empty until the fetch completes; OAuth-init click handlers guard against
+  // empty values to avoid calling SDKs with an empty appId / client_id.
+  let fbAppId = "";
+  let googleClientId = "";
 
   // ---------------------------------------------------------------------------
   // Platform definitions
@@ -312,7 +317,16 @@
       document.head.appendChild(script);
     }
 
-    // 5. Load Facebook SDK (Facebook Ads popup OAuth).
+    // 5. Fetch public OAuth client IDs (BUG-01: not hardcoded in source).
+    try {
+      const cfg = await getOAuthConfig();
+      fbAppId = cfg.fb_app_id;
+      googleClientId = cfg.google_client_id;
+    } catch {
+      // Non-fatal — connect-button handlers guard against empty values.
+    }
+
+    // 6. Load Facebook SDK (Facebook Ads popup OAuth).
     loadFacebookSdk();
   });
 
@@ -399,7 +413,7 @@
     }
     (window as any).fbAsyncInit = () => {
       (window as any).FB?.init({
-        appId: FB_APP_ID,
+        appId: fbAppId,
         cookie: true,
         xfbml: false,
         version: "v19.0",
@@ -417,6 +431,10 @@
 
   function handleFacebookConnect() {
     if (isConnected("facebook_ads")) return;
+    if (!fbAppId) {
+      error = "OAuth config still loading. Please try again in a moment.";
+      return;
+    }
     if (!fbSdkReady) {
       error = "Facebook SDK is still loading. Please try again in a moment.";
       return;
@@ -491,6 +509,10 @@
 
   async function handleGoogleAdsConnect() {
     if (isConnected("google_ads")) return;
+    if (!googleClientId) {
+      error = "OAuth config still loading. Please try again in a moment.";
+      return;
+    }
     error = "";
     loading = "google_ads";
 
@@ -501,7 +523,7 @@
       }
 
       const client = google.accounts.oauth2.initCodeClient({
-        client_id: "452833261444-1amauhc3bsundipofc2qvf3sonikknpa.apps.googleusercontent.com",
+        client_id: googleClientId,
         scope: "https://www.googleapis.com/auth/adwords",
         ux_mode: "popup",
         callback: async (response: { code?: string; error?: string }) => {
