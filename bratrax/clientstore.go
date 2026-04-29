@@ -72,12 +72,14 @@ func (s *ClientStore) GetDefault(ctx context.Context) (*Client, error) {
 
 // GetAnthropicKey returns the per-client Anthropic API key for BYOK chat.
 // Returns ("", nil) if the client has no key configured (chat will be disabled).
-// Returns ("", err) only on actual database errors. The clientDB argument
-// matches the rill_clients.client_id column (a.k.a. clickhouse_db).
+// Returns ("", err) only on actual database errors. The clientDB argument is
+// the rill_clients.clickhouse_db value (the per-client slug like "vyne") —
+// matches what InstanceRouterMiddleware passes to ensure(). NOTE: this is
+// distinct from rill_clients.client_id (which is a UUID).
 func (s *ClientStore) GetAnthropicKey(ctx context.Context, clientDB string) (string, error) {
 	var key sql.NullString
 	err := s.db.GetContext(ctx, &key,
-		`SELECT anthropic_api_key FROM rill_clients WHERE client_id = $1`,
+		`SELECT anthropic_api_key FROM rill_clients WHERE clickhouse_db = $1`,
 		clientDB,
 	)
 	if err != nil {
