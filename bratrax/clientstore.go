@@ -25,6 +25,7 @@ type ClientStoreInterface interface {
 	GetDefault(ctx context.Context) (*Client, error)
 	GetByUserID(ctx context.Context, userID int) (*Client, error)
 	GetAnthropicKey(ctx context.Context, clientDB string) (string, error)
+	GetByMCPToken(ctx context.Context, token string) (*Client, error)
 }
 
 // ClientStore provides read operations on rill_clients.
@@ -92,6 +93,30 @@ func (s *ClientStore) GetAnthropicKey(ctx context.Context, clientDB string) (str
 		return "", nil
 	}
 	return key.String, nil
+}
+
+// GetByMCPToken returns the client whose mcp_token matches the given opaque
+// token (used by the /bratrax/mcp endpoint to authenticate Claude Desktop and
+// resolve which per-client Rill instance to forward to). Returns (nil, nil) if
+// no client has that token. The token is exact-match — partial / prefix matches
+// are not allowed.
+func (s *ClientStore) GetByMCPToken(ctx context.Context, token string) (*Client, error) {
+	if token == "" {
+		return nil, nil
+	}
+	var c Client
+	err := s.db.GetContext(ctx, &c,
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, created_at
+		 FROM rill_clients WHERE mcp_token = $1`,
+		token,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("bratrax clientstore: query failed: %w", err)
+	}
+	return &c, nil
 }
 
 // GetByUserID returns the client linked to the given user via rill_users.client_id.

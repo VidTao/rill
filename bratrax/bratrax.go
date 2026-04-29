@@ -111,6 +111,11 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	// Health and proxy (existing routes)
 	observability.MuxHandle(mux, "/bratrax/health", observability.Middleware("bratrax", logger, healthHandler))
 
+	// /bratrax/mcp — public MCP endpoint for Claude Desktop. Auths an opaque
+	// per-client token and forwards into the runtime's existing per-instance
+	// MCP handler. Registered before the catch-all proxy so it takes precedence.
+	RegisterMCPHandler(mux, clientStore, authSvc, cfg.AudienceURL, logger)
+
 	// Middleware chain: observability → auth → proxy (catch-all)
 	proxyHandler := observability.Middleware("bratrax", logger, authMapper.Middleware(proxy))
 	observability.MuxHandle(mux, "/bratrax/", proxyHandler)

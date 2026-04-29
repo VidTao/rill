@@ -74,3 +74,11 @@ export interface AISettings {
   key_set: boolean;
   key_preview: string | null;
 }
+
+export interface MCPSettings {
+  token_set: boolean;
+  token: string | null;
+  mcp_url: string;
+  created_at: string | null;
+  claude_desktop_config: Record<string, unknown> | null;
+}

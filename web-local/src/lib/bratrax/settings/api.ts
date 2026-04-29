@@ -6,6 +6,7 @@ import type {
   BillingSummary,
   InvitationPreview,
   InviteResult,
+  MCPSettings,
   Role,
   TeamData,
 } from "./types";
@@ -107,6 +108,22 @@ export function updateAISettings(anthropic_api_key: string): Promise<AISettings>
 
 export function deleteAISettings(): Promise<AISettings> {
   return apiFetch<AISettings>("/bratrax/settings/ai", { method: "DELETE" });
+}
+
+// ----- MCP (Claude Desktop bridge) -------------------------------------------
+
+export function getMCPSettings(): Promise<MCPSettings> {
+  return apiFetch<MCPSettings>("/bratrax/settings/mcp");
+}
+
+export function regenerateMCPToken(): Promise<MCPSettings> {
+  return apiFetch<MCPSettings>("/bratrax/settings/mcp/regenerate", {
+    method: "POST",
+  });
+}
+
+export function deleteMCPToken(): Promise<MCPSettings> {
+  return apiFetch<MCPSettings>("/bratrax/settings/mcp", { method: "DELETE" });
 }
 
 // ----- Invitation acceptance (public, used by /accept-invite/[token]) --------

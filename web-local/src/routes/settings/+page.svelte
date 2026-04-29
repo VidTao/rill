@@ -12,24 +12,29 @@
     getAISettings,
     updateAISettings,
     deleteAISettings,
+    getMCPSettings,
+    regenerateMCPToken,
+    deleteMCPToken,
   } from "$lib/bratrax/settings/api";
   import type {
     AccountInfo,
     AISettings,
     BillingSummary,
+    MCPSettings,
     PendingInvite,
     Role,
     TeamData,
     TeamMember,
   } from "$lib/bratrax/settings/types";
 
-  type TabId = "account" | "team" | "billing" | "ai";
+  type TabId = "account" | "team" | "billing" | "ai" | "mcp";
 
   const TABS: { id: TabId; label: string }[] = [
     { id: "account", label: "Account" },
     { id: "team", label: "Team" },
     { id: "billing", label: "Billing" },
     { id: "ai", label: "AI" },
+    { id: "mcp", label: "MCP" },
   ];
 
   const INVITE_ROLE_OPTIONS: ("admin" | "viewer")[] = ["admin", "viewer"];
@@ -106,6 +111,17 @@
   let aiSaving = false;
   let aiRemoving = false;
   let aiConfirmRemoveOpen = false;
+
+  // ----- MCP state -----------------------------------------------------------
+  let mcp: MCPSettings | null = null;
+  let mcpError = "";
+  let mcpStatusMessage = "";
+  let mcpRegenerating = false;
+  let mcpDeleting = false;
+  let mcpConfigCopied = false;
+  let mcpTokenCopied = false;
+  let mcpConfirmRegenerateOpen = false;
+  let mcpConfirmRemoveOpen = false;
 
   // ---------------------------------------------------------------------------
   // Permission helpers (mirror server rules)
@@ -196,6 +212,78 @@
     } finally {
       aiRemoving = false;
       aiConfirmRemoveOpen = false;
+    }
+  }
+
+  // ---------- MCP -----------------------------------------------------------
+  async function loadMCP() {
+    mcpError = "";
+    try {
+      mcp = await getMCPSettings();
+    } catch (e: any) {
+      mcpError = e.message ?? "Failed to load MCP settings";
+    }
+  }
+
+  function requestRegenerateMCP() {
+    mcpConfirmRegenerateOpen = true;
+  }
+
+  async function confirmRegenerateMCP() {
+    mcpRegenerating = true;
+    mcpError = "";
+    mcpStatusMessage = "";
+    try {
+      mcp = await regenerateMCPToken();
+      mcpStatusMessage = "New token generated. Old token is no longer valid.";
+    } catch (e: any) {
+      mcpError = e.message ?? "Failed to regenerate token";
+    } finally {
+      mcpRegenerating = false;
+      mcpConfirmRegenerateOpen = false;
+    }
+  }
+
+  function requestRemoveMCP() {
+    mcpConfirmRemoveOpen = true;
+  }
+
+  async function confirmRemoveMCP() {
+    mcpDeleting = true;
+    mcpError = "";
+    mcpStatusMessage = "";
+    try {
+      mcp = await deleteMCPToken();
+      mcpStatusMessage = "Token revoked";
+    } catch (e: any) {
+      mcpError = e.message ?? "Failed to revoke token";
+    } finally {
+      mcpDeleting = false;
+      mcpConfirmRemoveOpen = false;
+    }
+  }
+
+  async function copyMCPConfig() {
+    if (!mcp?.claude_desktop_config) return;
+    try {
+      await navigator.clipboard.writeText(
+        JSON.stringify(mcp.claude_desktop_config, null, 2),
+      );
+      mcpConfigCopied = true;
+      setTimeout(() => (mcpConfigCopied = false), 2000);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function copyMCPToken() {
+    if (!mcp?.token) return;
+    try {
+      await navigator.clipboard.writeText(mcp.token);
+      mcpTokenCopied = true;
+      setTimeout(() => (mcpTokenCopied = false), 2000);
+    } catch {
+      // ignore
     }
   }
 
@@ -361,7 +449,7 @@
 
   // ---------------------------------------------------------------------------
   onMount(async () => {
-    await Promise.all([loadAccount(), loadTeam(), loadBilling(), loadAI()]);
+    await Promise.all([loadAccount(), loadTeam(), loadBilling(), loadAI(), loadMCP()]);
   });
 </script>
 
@@ -754,6 +842,147 @@
         <p class="font-mono text-xs text-bratrax-text-muted">Loading…</p>
       {/if}
     {/if}
+
+    <!-- MCP tab -->
+    {#if activeTab === "mcp"}
+      {#if mcpError && !mcp}
+        <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+          {mcpError}
+        </div>
+      {:else if mcp}
+        <div class="flex flex-col gap-4">
+          <div>
+            <h2 class="text-lg font-black text-bratrax-text-headline">
+              Connect Claude Desktop
+            </h2>
+            <p class="mt-2 text-sm font-light text-bratrax-text-body">
+              Paste the config below into Claude Desktop's
+              <code class="font-mono text-[11px] text-bratrax-acid">claude_desktop_config.json</code>
+              to query your Bratrax data with Claude. The token authenticates as your workspace
+              and gives Claude access to all 22 MCP tools (metrics queries, SQL, file operations,
+              workshop tools).
+            </p>
+            <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
+              On macOS the config file lives at
+              <code class="text-bratrax-text-body">~/Library/Application Support/Claude/claude_desktop_config.json</code>.
+              Restart Claude Desktop after pasting.
+            </p>
+          </div>
+
+          {#if mcp.token_set && mcp.claude_desktop_config}
+            <!-- Status row + revoke button -->
+            <div class="border border-bratrax-border bg-bratrax-bg p-4">
+              <div class="flex items-baseline justify-between">
+                <div>
+                  <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+                    Token status
+                  </div>
+                  <div class="mt-1 font-mono text-sm text-bratrax-text-headline">
+                    Active{mcp.created_at ? ` · created ${formatDate(mcp.created_at)}` : ""}
+                  </div>
+                </div>
+                <span class="border border-bratrax-acid/40 bg-bratrax-acid/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid flex-shrink-0">
+                  Connected
+                </span>
+              </div>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  on:click={requestRegenerateMCP}
+                  disabled={mcpRegenerating}
+                  class="border border-bratrax-border bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover disabled:opacity-50"
+                >
+                  {mcpRegenerating ? "Regenerating…" : "Regenerate token"}
+                </button>
+                <button
+                  type="button"
+                  on:click={requestRemoveMCP}
+                  disabled={mcpDeleting}
+                  class="border border-bratrax-tomato/40 bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10 disabled:opacity-50"
+                >
+                  {mcpDeleting ? "Revoking…" : "Revoke"}
+                </button>
+              </div>
+            </div>
+
+            <!-- Token (separately copyable) -->
+            <div>
+              <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+                Token
+              </label>
+              <div class="flex items-center gap-2">
+                <input
+                  type="text"
+                  readonly
+                  value={mcp.token}
+                  class="w-full border border-bratrax-border bg-bratrax-bg px-3 py-2 font-mono text-xs text-bratrax-text-body focus:border-bratrax-acid focus:outline-none"
+                  on:click={selectAllOnClick}
+                />
+                <button
+                  type="button"
+                  on:click={copyMCPToken}
+                  class="flex-shrink-0 border border-bratrax-border bg-bratrax-surface px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+                >
+                  {mcpTokenCopied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            <!-- Full config JSON (the canonical paste-into-Claude-Desktop blob) -->
+            <div>
+              <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+                claude_desktop_config.json
+              </label>
+              <pre class="border border-bratrax-border bg-bratrax-bg px-3 py-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body overflow-x-auto">{JSON.stringify(mcp.claude_desktop_config, null, 2)}</pre>
+              <div class="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  on:click={copyMCPConfig}
+                  class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
+                >
+                  {mcpConfigCopied ? "Copied!" : "Copy config"}
+                </button>
+                <p class="font-mono text-[10px] text-bratrax-text-muted">
+                  Anyone with this token can query your Bratrax data — keep it private.
+                </p>
+              </div>
+            </div>
+          {:else}
+            <div class="border border-bratrax-border bg-bratrax-bg p-4">
+              <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
+                Status
+              </div>
+              <p class="mt-2 font-mono text-xs text-bratrax-text-muted">
+                No token yet. Generate one to connect Claude Desktop.
+              </p>
+              <div class="mt-3">
+                <button
+                  type="button"
+                  on:click={requestRegenerateMCP}
+                  disabled={mcpRegenerating}
+                  class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+                >
+                  {mcpRegenerating ? "Generating…" : "Generate token"}
+                </button>
+              </div>
+            </div>
+          {/if}
+
+          {#if mcpError}
+            <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+              {mcpError}
+            </div>
+          {/if}
+          {#if mcpStatusMessage}
+            <div class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-acid">
+              {mcpStatusMessage}
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <p class="font-mono text-xs text-bratrax-text-muted">Loading…</p>
+      {/if}
+    {/if}
   </div>
 </div>
 
@@ -976,6 +1205,97 @@
           class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
         >
           Remove key
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+
+<!-- MCP regenerate confirmation modal -->
+{#if mcpConfirmRegenerateOpen}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    on:click={() => (mcpConfirmRegenerateOpen = false)}
+    on:keydown={(e) => e.key === "Escape" && (mcpConfirmRegenerateOpen = false)}
+    role="presentation"
+  >
+    <div
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        Confirm regenerate
+      </div>
+      <h2 class="text-lg font-black text-bratrax-text-headline">Generate a new MCP token?</h2>
+      <p class="mt-3 text-sm font-light text-bratrax-text-body">
+        The current token will stop working immediately. Any Claude Desktop instance still using
+        it will fail until you paste the new config.
+      </p>
+
+      <div class="mt-6 flex items-center justify-end gap-2">
+        <button
+          on:click={() => (mcpConfirmRegenerateOpen = false)}
+          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+        >
+          Cancel
+        </button>
+        <button
+          on:click={confirmRegenerateMCP}
+          class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
+        >
+          Regenerate
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- MCP revoke confirmation modal -->
+{#if mcpConfirmRemoveOpen}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    on:click={() => (mcpConfirmRemoveOpen = false)}
+    on:keydown={(e) => e.key === "Escape" && (mcpConfirmRemoveOpen = false)}
+    role="presentation"
+  >
+    <div
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-tomato"></div>
+
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80">
+        Confirm revoke
+      </div>
+      <h2 class="text-lg font-black text-bratrax-text-headline">Revoke MCP token?</h2>
+      <p class="mt-3 text-sm font-light text-bratrax-text-body">
+        Claude Desktop instances using this token will stop working immediately. You can generate
+        a new one any time.
+      </p>
+
+      <div class="mt-6 flex items-center justify-end gap-2">
+        <button
+          on:click={() => (mcpConfirmRemoveOpen = false)}
+          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+        >
+          Cancel
+        </button>
+        <button
+          on:click={confirmRemoveMCP}
+          class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
+        >
+          Revoke
         </button>
       </div>
     </div>
