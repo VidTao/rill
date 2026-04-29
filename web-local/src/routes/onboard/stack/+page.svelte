@@ -655,7 +655,8 @@
     activating = true;
 
     try {
-      // Record selections as stack_selections
+      // Store stack selections in sessionStorage for the business profile page
+      // to include when it triggers activation.
       const stackSelections: Record<string, string[]> = {
         connected: [...connectedPlatforms],
         subscriptions: [...selectedPlatforms].filter((p) =>
@@ -665,9 +666,12 @@
           ["shopify_only", "external_pages"].includes(p),
         ),
       };
+      sessionStorage.setItem("onboard_stack_selections", JSON.stringify(stackSelections));
 
-      await onboardActivate(clientId, stackSelections);
-      await goto("/onboard/loading");
+      // Proceed to business profile questionnaire.
+      // Activation (compile+deploy) is triggered from there after the user
+      // answers the business questions.
+      await goto("/onboard/business");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       activating = false;

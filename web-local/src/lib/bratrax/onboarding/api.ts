@@ -47,6 +47,8 @@ export function getOnboardResumeRoute(
       return "/onboard/shopify";
     case "platforms_connected":
       return "/onboard/stack";
+    case "business_profile":
+      return "/onboard/business";
     case "activating":
     case "compiling":
     case "deploying":
@@ -184,6 +186,25 @@ export async function onboardStatus(
 ): Promise<OnboardStatus> {
   return apiFetch<OnboardStatus>(
     `/bratrax/onboard/status?client_id=${encodeURIComponent(clientId)}`,
+  );
+}
+
+export async function onboardBusinessProfile(
+  clientId: string,
+  businessProfile: Record<string, string>,
+  stackSelections?: Record<string, unknown>,
+): Promise<OnboardActivateResult> {
+  return apiFetch<OnboardActivateResult>(
+    "/bratrax/onboard/business-profile",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        business_profile: businessProfile,
+        stack_selections: stackSelections ?? {},
+      }),
+    },
   );
 }
 
