@@ -26,6 +26,22 @@
   import QuickView from "@rilldata/web-common/features/resource-graph/quick-view/QuickView.svelte";
 
   export let hasUnsaved: boolean;
+  // Optional allowlist of top-level paths. When provided, only files whose path
+  // matches one of these prefixes (folder, e.g. "/dashboards/") or exact-equals
+  // one of them (top-level file, e.g. "/claude_system_prompt.txt") are shown.
+  // Used to give Bratrax `admin` role a filtered file tree without leaking
+  // role logic into web-common.
+  export let allowedTopLevelPaths: string[] | null = null;
+
+  function isAllowedPath(path: string | undefined): boolean {
+    if (!allowedTopLevelPaths) return true;
+    if (!path) return false;
+    return allowedTopLevelPaths.some((allowed) => {
+      if (path === allowed) return true;
+      const prefix = allowed.endsWith("/") ? allowed : allowed + "/";
+      return path.startsWith(prefix);
+    });
+  }
 
   $: ({ instanceId } = $runtime);
   $: getFileTree = createRuntimeServiceListFiles(instanceId, undefined, {
@@ -51,7 +67,9 @@
               ),
           )
           // Hide the `tmp` directory
-          .filter((file) => !file.path?.startsWith("/tmp"));
+          .filter((file) => !file.path?.startsWith("/tmp"))
+          // Apply role-based allowlist (no-op when allowedTopLevelPaths is null)
+          .filter((file) => isAllowedPath(file.path));
 
         return transformFileList(files);
       },

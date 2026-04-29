@@ -5,7 +5,7 @@ export interface BratraxUser {
   id: number;
   email: string;
   name: string;
-  role: "admin" | "viewer";
+  role: "super_admin" | "admin" | "viewer";
   project_id: string | null;
 }
 

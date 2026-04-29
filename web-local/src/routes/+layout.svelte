@@ -7,7 +7,6 @@
   import FileAndResourceWatcher from "@rilldata/web-common/features/entity-management/FileAndResourceWatcher.svelte";
   import { featureFlags } from "@rilldata/web-common/features/feature-flags";
   import { initPylonWidget } from "@rilldata/web-common/features/help/initPylonWidget";
-  import RemoteProjectManager from "@rilldata/web-common/features/project/RemoteProjectManager.svelte";
   import ApplicationHeader from "@rilldata/web-common/layout/ApplicationHeader.svelte";
   import BlockingOverlayContainer from "@rilldata/web-common/layout/BlockingOverlayContainer.svelte";
   import { overlay } from "@rilldata/web-common/layout/overlay-store";
@@ -33,8 +32,6 @@
   import { bratraxLogout } from "$lib/bratrax/auth";
 
   export let data: LayoutData;
-
-  const { deploy } = featureFlags;
 
   queryClient.getQueryCache().config.onError = (
     error: AxiosError,
@@ -88,6 +85,12 @@
   $: onWorkshopPage = $page.url.pathname.startsWith("/workshop");
   $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
   $: onSettingsPage = $page.url.pathname.startsWith("/settings");
+
+  // Role-based nav visibility. The DB-side enum is super_admin / admin / viewer.
+  $: role = $bratraxUser?.role ?? null;
+  $: isViewer = role === "viewer";
+  $: isSuper = role === "super_admin";
+  $: isAdminOrSuper = role === "admin" || isSuper;
 </script>
 
 <QueryClientProvider client={queryClient}>
@@ -101,47 +104,51 @@
           externalUser={$bratraxUser}
           onLogout={handleBratraxLogout}
         />
-        {#if $deploy && data.initialized}
-          <RemoteProjectManager />
+        {#if !isViewer}
+          <nav class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0">
+            <a
+              href="/developer"
+              class="bratrax-nav-link"
+              class:active={!onConnectorsPage && !onWorkshopPage && !onCostSettingsPage && !onSettingsPage}
+            >
+              Developer
+            </a>
+            {#if isAdminOrSuper}
+              <a
+                href="/connectors"
+                class="bratrax-nav-link"
+                class:active={onConnectorsPage}
+              >
+                Connectors
+              </a>
+            {/if}
+            {#if isSuper}
+              <a
+                href="/workshop"
+                class="bratrax-nav-link"
+                class:active={onWorkshopPage}
+              >
+                Workshop
+              </a>
+            {/if}
+            {#if isAdminOrSuper}
+              <a
+                href="/cost-settings"
+                class="bratrax-nav-link"
+                class:active={onCostSettingsPage}
+              >
+                Cost Settings
+              </a>
+              <a
+                href="/settings"
+                class="bratrax-nav-link"
+                class:active={onSettingsPage}
+              >
+                Settings
+              </a>
+            {/if}
+          </nav>
         {/if}
-
-        <nav class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0">
-          <a
-            href="/developer"
-            class="bratrax-nav-link"
-            class:active={!onConnectorsPage && !onWorkshopPage && !onCostSettingsPage && !onSettingsPage}
-          >
-            Developer
-          </a>
-          <a
-            href="/connectors"
-            class="bratrax-nav-link"
-            class:active={onConnectorsPage}
-          >
-            Connectors
-          </a>
-          <a
-            href="/workshop"
-            class="bratrax-nav-link"
-            class:active={onWorkshopPage}
-          >
-            Workshop
-          </a>
-          <a
-            href="/cost-settings"
-            class="bratrax-nav-link"
-            class:active={onCostSettingsPage}
-          >
-            Cost Settings
-          </a>
-          <a
-            href="/settings"
-            class="bratrax-nav-link"
-            class:active={onSettingsPage}
-          >
-            Settings
-          </a>
-        </nav>
       {/if}
 
       <slot />

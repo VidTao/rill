@@ -21,6 +21,12 @@
   import { DEFAULT_NAV_WIDTH, MAX_NAV_WIDTH, MIN_NAV_WIDTH } from "../config";
   import SurfaceControlButton from "./SurfaceControlButton.svelte";
 
+  // Optional allowlist of top-level paths. When provided, the file explorer
+  // filters to these prefixes/files only AND the AddAssetButton + Data Explorer
+  // (ConnectorExplorer) sections are hidden. Used to give Bratrax `admin` role
+  // a restricted file tree without leaking role logic into web-common.
+  export let allowedTopLevelPaths: string[] | null = null;
+
   const DEFAULT_PERCENTAGE = 0.4;
 
   let width = DEFAULT_NAV_WIDTH;
@@ -88,16 +94,18 @@
     side="right"
   />
   <div class="inner" style:width="{width}px">
-    <div class="p-2 w-full pr-10">
-      <AddAssetButton />
-    </div>
+    {#if !allowedTopLevelPaths}
+      <div class="p-2 w-full pr-10">
+        <AddAssetButton />
+      </div>
+    {/if}
     <div class="scroll-container">
       <div class="nav-wrapper" bind:contentRect>
         <section class="size-full overflow-y-auto pb-4">
-          <FileExplorer hasUnsaved={unsavedFileCount > 0} />
+          <FileExplorer hasUnsaved={unsavedFileCount > 0} {allowedTopLevelPaths} />
         </section>
 
-        {#if navWrapperHeight}
+        {#if navWrapperHeight && !allowedTopLevelPaths}
           <section class="connector-section">
             {#if showConnectors}
               <Resizer

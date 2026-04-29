@@ -13,7 +13,6 @@
     useValidCanvases,
     useValidExplores,
   } from "@rilldata/web-common/features/dashboards/selectors.js";
-  import DeployProjectCTA from "@rilldata/web-common/features/dashboards/workspace/DeployProjectCTA.svelte";
   import ExplorePreviewCTAs from "@rilldata/web-common/features/explores/ExplorePreviewCTAs.svelte";
   import { featureFlags } from "@rilldata/web-common/features/feature-flags.ts";
   import { useProjectTitle } from "@rilldata/web-common/features/project/selectors";
@@ -25,7 +24,7 @@
   import Tag from "../components/tag/Tag.svelte";
   import { fileArtifacts } from "../features/entity-management/file-artifacts";
 
-  const { deploy, developerChat, stickyDashboardState } = featureFlags;
+  const { developerChat, stickyDashboardState } = featureFlags;
 
   export let mode: string;
   export let externalUser: { email: string; name: string; role?: string } | null = null;
@@ -33,11 +32,13 @@
 
   // If externalUser has a role, show a friendly role label instead of the dev/preview mode.
   $: roleLabel =
-    externalUser?.role === "admin"
-      ? "Administrator"
-      : externalUser?.role === "viewer"
-        ? "Viewer"
-        : null;
+    externalUser?.role === "super_admin"
+      ? "Super Admin"
+      : externalUser?.role === "admin"
+        ? "Administrator"
+        : externalUser?.role === "viewer"
+          ? "Viewer"
+          : null;
 
   $: ({ instanceId } = $runtime);
 
@@ -49,7 +50,6 @@
   $: ({ unsavedFiles } = fileArtifacts);
   $: ({ size: unsavedFileCount } = $unsavedFiles);
   $: onDeployPage = isDeployPage($page);
-  $: showDeployCTA = $deploy && !onDeployPage;
   $: showDeveloperChat = $developerChat && !onDeployPage;
 
   $: exploresQuery = useValidExplores(instanceId);
@@ -60,10 +60,6 @@
 
   $: explores = $exploresQuery?.data ?? [];
   $: canvases = $canvasQuery?.data ?? [];
-
-  $: defaultDashboard = explores[0] ?? canvases[0] ?? null;
-
-  $: hasValidDashboard = Boolean(defaultDashboard);
 
   $: dashboardOptions = {
     options: getBreadcrumbOptions(explores, canvases),
@@ -148,9 +144,6 @@
       {/if}
     {:else if showDeveloperChat}
       <ChatToggle />
-    {/if}
-    {#if showDeployCTA}
-      <DeployProjectCTA {hasValidDashboard} />
     {/if}
     <LocalAvatarButton {externalUser} {onLogout} />
   </div>
