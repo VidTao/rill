@@ -53,6 +53,14 @@ func NewAuthMapper(userStore UserStoreInterface, clientStore ClientStoreInterfac
 // Middleware wraps an http.Handler with JWT authentication and header injection.
 func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Public paths bypass JWT auth entirely. The accept-invite flow uses
+		// the invitation token as the auth credential — invitee has no JWT yet.
+		if strings.HasPrefix(r.URL.Path, "/bratrax/invitations/") {
+			stripBratraxHeaders(r.Header)
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// 1. Extract cookie
 		cookie, err := r.Cookie(bratraxCookieName)
 		if err != nil {
@@ -111,7 +119,7 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		isOnboardRoute := strings.HasPrefix(r.URL.Path, "/bratrax/onboard/") ||
 			strings.HasPrefix(r.URL.Path, "/onboard/") ||
 			strings.HasPrefix(r.URL.Path, "/bratrax/connectors/")
-		if user.Role != "admin" && user.Role != "viewer" {
+		if user.Role != "super_admin" && user.Role != "admin" && user.Role != "viewer" {
 			writeJSONError(w, http.StatusForbidden, fmt.Sprintf("unsupported role: %s", user.Role))
 			return
 		}

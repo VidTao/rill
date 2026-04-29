@@ -243,7 +243,7 @@ func (s *AuthService) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-	if caller.Role != "admin" {
+	if caller.Role != "admin" && caller.Role != "super_admin" {
 		writeJSONError(w, http.StatusForbidden, "admin access required")
 		return
 	}
@@ -279,6 +279,7 @@ func (s *AuthService) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if req.Role == "" {
 		req.Role = "viewer"
 	}
+	// super_admin can only be minted at signup, not via admin-create.
 	if req.Role != "admin" && req.Role != "viewer" {
 		writeJSONError(w, http.StatusBadRequest, "role must be 'admin' or 'viewer'")
 		return
@@ -300,7 +301,7 @@ func (s *AuthService) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 // HandleSignup handles POST /bratrax/auth/signup.
 // Public endpoint (no authentication required) for Lite self-serve signup.
-// Creates user with admin role and sets JWT cookie in one step.
+// Creates user with super_admin role (org owner) and sets JWT cookie in one step.
 func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -334,7 +335,7 @@ func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.store.CreateUser(r.Context(), req.Email, req.Password, req.CompanyName, "admin", nil)
+	user, err := s.store.CreateUser(r.Context(), req.Email, req.Password, req.CompanyName, "super_admin", nil)
 	if err != nil {
 		s.logger.Error("signup: create user failed", zap.Error(err))
 		writeJSONError(w, http.StatusConflict, "email already registered")
@@ -410,7 +411,7 @@ func (s *AuthService) issueToken(user *User) (string, error) {
 		"email": user.Email,
 		"name":  user.Name,
 		"role":  user.Role,
-		"admin": user.Role == "admin",
+		"admin": user.Role == "admin" || user.Role == "super_admin",
 	}
 	if user.ProjectID != nil {
 		attrs["project_id"] = *user.ProjectID
@@ -428,7 +429,7 @@ func (s *AuthService) issueToken(user *User) (string, error) {
 // permissionsForRole maps a role string to Rill permissions.
 func permissionsForRole(role string) []runtime.Permission {
 	switch role {
-	case "admin":
+	case "super_admin", "admin":
 		return runtime.AllPermissions
 	case "viewer":
 		return []runtime.Permission{
