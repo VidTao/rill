@@ -15,7 +15,8 @@ import (
 // CLI's local app) can register additional middleware (such as the instance router)
 // against the same AuthMapper used by the /bratrax/* proxy.
 type Handlers struct {
-	AuthMapper *AuthMapper
+	AuthMapper  *AuthMapper
+	ClientStore *ClientStore
 }
 
 // RegisterHandlers registers Bratrax proxy routes on the given ServeMux.
@@ -125,5 +126,8 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 		zap.String("users_dsn", redactedDSN),
 	)
 
-	return &Handlers{AuthMapper: authMapper}, nil
+	return &Handlers{
+		AuthMapper:  authMapper,
+		ClientStore: clientStore,
+	}, nil
 }

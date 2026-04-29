@@ -2,6 +2,7 @@ import { get } from "svelte/store";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
 import type {
   AccountInfo,
+  AISettings,
   BillingSummary,
   InvitationPreview,
   InviteResult,
@@ -88,6 +89,24 @@ export function revokeInvitation(token: string): Promise<{ revoked: string }> {
 
 export function getBilling(): Promise<BillingSummary> {
   return apiFetch<BillingSummary>("/bratrax/settings/billing");
+}
+
+// ----- AI (BYOK) -------------------------------------------------------------
+
+export function getAISettings(): Promise<AISettings> {
+  return apiFetch<AISettings>("/bratrax/settings/ai");
+}
+
+export function updateAISettings(anthropic_api_key: string): Promise<AISettings> {
+  return apiFetch<AISettings>("/bratrax/settings/ai", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ anthropic_api_key }),
+  });
+}
+
+export function deleteAISettings(): Promise<AISettings> {
+  return apiFetch<AISettings>("/bratrax/settings/ai", { method: "DELETE" });
 }
 
 // ----- Invitation acceptance (public, used by /accept-invite/[token]) --------

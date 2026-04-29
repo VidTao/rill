@@ -534,6 +534,15 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 				return
 			}
 			bratraxHandlers = h
+
+			// Internal endpoints — Flask uses these to notify the runtime when
+			// per-client config changes (e.g. BYOK Anthropic key updates).
+			// Auth via BRATRAX_INTERNAL_SECRET shared secret.
+			if a.MultiTenant {
+				bratrax.RegisterInternalHandlers(mux, func(clientDB string) error {
+					return a.RefreshInstanceForClient(ctx, clientDB)
+				}, a.BaseLogger)
+			}
 		}, enableUI)
 		if err != nil {
 			return err
@@ -544,8 +553,18 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 		// based on the bratrax_auth JWT cookie.
 		serveHandler := runtimeHandler
 		if a.MultiTenant && bratraxHandlers != nil {
+			cs := bratraxHandlers.ClientStore
 			ensure := func(clientDB string) (string, error) {
-				return a.EnsureInstanceForClient(ctx, clientDB)
+				// Look up the per-client Anthropic key (BYOK). Empty if unset —
+				// instance still starts; chat fails at Open time and the frontend
+				// shows an "add your key" CTA.
+				key, lookupErr := cs.GetAnthropicKey(ctx, clientDB)
+				if lookupErr != nil {
+					a.BaseLogger.Warn("anthropic key lookup failed; continuing without",
+						zap.String("clientDB", clientDB), zap.Error(lookupErr))
+					key = ""
+				}
+				return a.EnsureInstanceForClient(ctx, clientDB, key)
 			}
 			serveHandler = bratrax.InstanceRouterMiddleware(runtimeHandler, bratraxHandlers.AuthMapper, ensure, a.BaseLogger)
 			a.Logger.Info("Multi-tenant: instance router middleware installed")
@@ -672,7 +691,12 @@ func IsProjectInit(projectPath string) bool {
 // The instance ID equals clientDB. The project is loaded from {ProjectsDir}/{clientDB}/rill.
 // Safe to call concurrently. Returns the instance ID once ready.
 // Returns bratrax.ErrProjectNotProvisioned if the project directory is missing.
-func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB string) (string, error) {
+//
+// anthropicAPIKey is the per-client BYOK key for Claude chat. If empty, the
+// instance is still created but the claude AI connector will fail at Open time
+// (driver requires api_key); the frontend pre-checks /settings/ai and renders
+// an "add your key" CTA so users don't hit that error path.
+func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAPIKey string) (string, error) {
 	if !a.MultiTenant {
 		// In single-tenant mode every request goes to the default instance.
 		return DefaultInstanceID, nil
@@ -731,15 +755,18 @@ func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB string) (str
 	}
 	catalogConnector := &runtimev1.Connector{Type: "sqlite", Name: "catalog", Config: catalogConfig}
 
-	// Admin AI connector (shared across instances)
+	// Per-client Claude AI connector — BYOK. The client's Anthropic API key is
+	// looked up from rill_clients.anthropic_api_key by the caller and passed in.
+	// If empty, we still register the connector so the rest of the instance starts
+	// cleanly; the Claude driver will refuse Open at chat time (the frontend
+	// pre-checks GET /settings/ai and shows an "add your key" CTA before then).
 	aiConfig, err := structpb.NewStruct(map[string]any{
-		"admin_url":    a.ch.AdminURL(),
-		"access_token": a.ch.AdminToken(),
+		"api_key": anthropicAPIKey,
 	})
 	if err != nil {
 		return "", err
 	}
-	aiConnector := &runtimev1.Connector{Type: "admin", Name: "admin", Config: aiConfig}
+	aiConnector := &runtimev1.Connector{Type: "claude", Name: "claude", Config: aiConfig}
 
 	connectors := []*runtimev1.Connector{olapConnector, repoConnector, catalogConnector, aiConnector}
 	vars := map[string]string{
@@ -767,4 +794,39 @@ func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB string) (str
 	a.instances[clientDB] = inst
 	a.Logger.Infof("Multi-tenant: created Rill instance %q from %s", clientDB, projectPath)
 	return clientDB, nil
+}
+
+// RefreshInstanceForClient evicts the cached instance for clientDB and tears it
+// down on the runtime. The next request that hits InstanceRouterMiddleware will
+// trigger EnsureInstanceForClient again, which re-reads per-client config (e.g.
+// the BYOK Anthropic key) from rill_clients. Used by Flask after /settings/ai
+// updates so the new key takes effect without restarting the rill process.
+//
+// No-op (returns nil) in single-tenant mode or if the instance isn't cached.
+func (a *App) RefreshInstanceForClient(ctx context.Context, clientDB string) error {
+	if !a.MultiTenant {
+		return nil
+	}
+	if clientDB == "" {
+		return fmt.Errorf("RefreshInstanceForClient: empty clientDB")
+	}
+
+	a.instMu.Lock()
+	_, cached := a.instances[clientDB]
+	delete(a.instances, clientDB)
+	a.instMu.Unlock()
+
+	if !cached {
+		// Nothing to tear down — next ensure will create fresh from current config.
+		return nil
+	}
+
+	if err := a.Runtime.DeleteInstance(ctx, clientDB); err != nil {
+		// Re-add to the cache so we don't end up in a half-evicted state on the
+		// in-memory map while the runtime still holds the instance.
+		a.Logger.Warnf("RefreshInstanceForClient: DeleteInstance failed for %q: %v", clientDB, err)
+		return fmt.Errorf("delete instance %q: %w", clientDB, err)
+	}
+	a.Logger.Infof("Multi-tenant: evicted Rill instance %q (will be recreated on next request)", clientDB)
+	return nil
 }

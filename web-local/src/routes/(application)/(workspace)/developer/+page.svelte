@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { GeneratingMessage } from "@rilldata/web-common/components/generating-message";
   import { generatingCanvas } from "@rilldata/web-common/features/canvas/ai-generation/generateCanvas";
-  import DeveloperChat from "@rilldata/web-common/features/chat/DeveloperChat.svelte";
+  import BratraxChatGate from "$lib/bratrax/BratraxChatGate.svelte";
   import OnboardingWorkspace from "@rilldata/web-common/features/onboarding/OnboardingWorkspace.svelte";
   import { generatingSampleData } from "@rilldata/web-common/features/sample-data/generate-sample-data.ts";
   import ProjectCards from "@rilldata/web-common/features/welcome/ProjectCards.svelte";
@@ -106,7 +106,7 @@
         </div>
       {/if}
     </div>
-    <DeveloperChat />
+    <BratraxChatGate />
   </div>
 {/if}
 

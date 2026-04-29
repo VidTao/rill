@@ -24,6 +24,7 @@ type ClientStoreInterface interface {
 	GetByRillProjectID(ctx context.Context, projectID string) (*Client, error)
 	GetDefault(ctx context.Context) (*Client, error)
 	GetByUserID(ctx context.Context, userID int) (*Client, error)
+	GetAnthropicKey(ctx context.Context, clientDB string) (string, error)
 }
 
 // ClientStore provides read operations on rill_clients.
@@ -67,6 +68,28 @@ func (s *ClientStore) GetDefault(ctx context.Context) (*Client, error) {
 		return nil, fmt.Errorf("bratrax clientstore: query failed: %w", err)
 	}
 	return &c, nil
+}
+
+// GetAnthropicKey returns the per-client Anthropic API key for BYOK chat.
+// Returns ("", nil) if the client has no key configured (chat will be disabled).
+// Returns ("", err) only on actual database errors. The clientDB argument
+// matches the rill_clients.client_id column (a.k.a. clickhouse_db).
+func (s *ClientStore) GetAnthropicKey(ctx context.Context, clientDB string) (string, error) {
+	var key sql.NullString
+	err := s.db.GetContext(ctx, &key,
+		`SELECT anthropic_api_key FROM rill_clients WHERE client_id = $1`,
+		clientDB,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("bratrax clientstore: query failed: %w", err)
+	}
+	if !key.Valid {
+		return "", nil
+	}
+	return key.String, nil
 }
 
 // GetByUserID returns the client linked to the given user via rill_users.client_id.

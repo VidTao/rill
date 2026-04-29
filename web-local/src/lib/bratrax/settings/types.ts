@@ -69,3 +69,8 @@ export interface InvitationPreview {
   expired: boolean;
   accepted: boolean;
 }
+
+export interface AISettings {
+  key_set: boolean;
+  key_preview: string | null;
+}

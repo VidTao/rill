@@ -9,9 +9,13 @@
     removeMember,
     revokeInvitation,
     getBilling,
+    getAISettings,
+    updateAISettings,
+    deleteAISettings,
   } from "$lib/bratrax/settings/api";
   import type {
     AccountInfo,
+    AISettings,
     BillingSummary,
     PendingInvite,
     Role,
@@ -19,12 +23,13 @@
     TeamMember,
   } from "$lib/bratrax/settings/types";
 
-  type TabId = "account" | "team" | "billing";
+  type TabId = "account" | "team" | "billing" | "ai";
 
   const TABS: { id: TabId; label: string }[] = [
     { id: "account", label: "Account" },
     { id: "team", label: "Team" },
     { id: "billing", label: "Billing" },
+    { id: "ai", label: "AI" },
   ];
 
   const INVITE_ROLE_OPTIONS: ("admin" | "viewer")[] = ["admin", "viewer"];
@@ -93,6 +98,15 @@
   let billing: BillingSummary | null = null;
   let billingError = "";
 
+  // ----- AI state ------------------------------------------------------------
+  let ai: AISettings | null = null;
+  let aiError = "";
+  let aiSavedMessage = "";
+  let aiKeyInput = "";
+  let aiSaving = false;
+  let aiRemoving = false;
+  let aiConfirmRemoveOpen = false;
+
   // ---------------------------------------------------------------------------
   // Permission helpers (mirror server rules)
   // ---------------------------------------------------------------------------
@@ -137,6 +151,51 @@
       billing = await getBilling();
     } catch (e: any) {
       billingError = e.message ?? "Failed to load billing";
+    }
+  }
+
+  async function loadAI() {
+    aiError = "";
+    try {
+      ai = await getAISettings();
+    } catch (e: any) {
+      aiError = e.message ?? "Failed to load AI settings";
+    }
+  }
+
+  async function saveAIKey() {
+    const key = aiKeyInput.trim();
+    if (!key) return;
+    aiSaving = true;
+    aiError = "";
+    aiSavedMessage = "";
+    try {
+      ai = await updateAISettings(key);
+      aiKeyInput = "";
+      aiSavedMessage = "Saved and verified with Anthropic";
+    } catch (e: any) {
+      aiError = e.message ?? "Failed to save key";
+    } finally {
+      aiSaving = false;
+    }
+  }
+
+  function requestRemoveAIKey() {
+    aiConfirmRemoveOpen = true;
+  }
+
+  async function confirmRemoveAIKey() {
+    aiRemoving = true;
+    aiError = "";
+    aiSavedMessage = "";
+    try {
+      ai = await deleteAISettings();
+      aiSavedMessage = "Key removed";
+    } catch (e: any) {
+      aiError = e.message ?? "Failed to remove key";
+    } finally {
+      aiRemoving = false;
+      aiConfirmRemoveOpen = false;
     }
   }
 
@@ -302,7 +361,7 @@
 
   // ---------------------------------------------------------------------------
   onMount(async () => {
-    await Promise.all([loadAccount(), loadTeam(), loadBilling()]);
+    await Promise.all([loadAccount(), loadTeam(), loadBilling(), loadAI()]);
   });
 </script>
 
@@ -592,6 +651,109 @@
         <p class="font-mono text-xs text-bratrax-text-muted">Loading…</p>
       {/if}
     {/if}
+
+    <!-- AI tab -->
+    {#if activeTab === "ai"}
+      {#if aiError && !ai}
+        <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+          {aiError}
+        </div>
+      {:else if ai}
+        <div class="flex flex-col gap-4">
+          <div>
+            <h2 class="text-lg font-black text-bratrax-text-headline">
+              Anthropic API key
+            </h2>
+            <p class="mt-2 text-sm font-light text-bratrax-text-body">
+              Bratrax routes Claude chat through your own Anthropic account. Paste an API key
+              from
+              <a
+                href="https://console.anthropic.com/settings/keys"
+                target="_blank"
+                rel="noopener"
+                class="text-bratrax-acid hover:underline"
+              >console.anthropic.com</a>.
+              We verify it works before saving.
+            </p>
+          </div>
+
+          {#if ai.key_set}
+            <div class="border border-bratrax-border bg-bratrax-bg p-4">
+              <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+                Current key
+              </div>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <span class="font-mono text-sm text-bratrax-text-headline truncate">
+                  {ai.key_preview}
+                </span>
+                <span class="border border-bratrax-acid/40 bg-bratrax-acid/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid flex-shrink-0">
+                  Active
+                </span>
+              </div>
+              <div class="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  on:click={requestRemoveAIKey}
+                  disabled={aiRemoving}
+                  class="border border-bratrax-tomato/40 bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10 disabled:opacity-50"
+                >
+                  {aiRemoving ? "Removing…" : "Remove key"}
+                </button>
+              </div>
+            </div>
+          {:else}
+            <div class="border border-bratrax-border bg-bratrax-bg p-4">
+              <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
+                Status
+              </div>
+              <p class="mt-2 font-mono text-xs text-bratrax-text-muted">
+                No key configured. Claude chat is disabled until you add one.
+              </p>
+            </div>
+          {/if}
+
+          <div>
+            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              {ai.key_set ? "Replace key" : "Add key"}
+            </label>
+            <div class="flex items-center gap-2">
+              <input
+                type="password"
+                bind:value={aiKeyInput}
+                placeholder="sk-ant-..."
+                autocomplete="off"
+                spellcheck="false"
+                class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 font-mono text-xs text-bratrax-text-body placeholder-bratrax-text-muted/50 focus:border-bratrax-acid focus:outline-none"
+              />
+              <button
+                type="button"
+                on:click={saveAIKey}
+                disabled={aiSaving || !aiKeyInput.trim()}
+                class="flex-shrink-0 bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+              >
+                {aiSaving ? "Verifying…" : "Save"}
+              </button>
+            </div>
+            <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
+              We send a single test request to Anthropic to confirm the key works before saving.
+            </p>
+          </div>
+
+          {#if aiError}
+            <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+              {aiError}
+            </div>
+          {/if}
+          {#if aiSavedMessage}
+            <div class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-acid">
+              {aiSavedMessage}
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <p class="font-mono text-xs text-bratrax-text-muted">Loading…</p>
+      {/if}
+    {/if}
   </div>
 </div>
 
@@ -769,6 +931,51 @@
           class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
         >
           Remove
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+
+<!-- AI key remove confirmation modal -->
+{#if aiConfirmRemoveOpen}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    on:click={() => (aiConfirmRemoveOpen = false)}
+    on:keydown={(e) => e.key === "Escape" && (aiConfirmRemoveOpen = false)}
+    role="presentation"
+  >
+    <div
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-tomato"></div>
+
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80">
+        Confirm remove
+      </div>
+      <h2 class="text-lg font-black text-bratrax-text-headline">Remove your Anthropic API key?</h2>
+      <p class="mt-3 text-sm font-light text-bratrax-text-body">
+        Claude chat will be disabled for everyone in your workspace until a new key is added.
+      </p>
+
+      <div class="mt-6 flex items-center justify-end gap-2">
+        <button
+          on:click={() => (aiConfirmRemoveOpen = false)}
+          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+        >
+          Cancel
+        </button>
+        <button
+          on:click={confirmRemoveAIKey}
+          class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
+        >
+          Remove key
         </button>
       </div>
     </div>
