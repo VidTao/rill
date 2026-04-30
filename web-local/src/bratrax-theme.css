@@ -178,8 +178,9 @@
   --popover-foreground:  #0A0A0A;
   --popover-footer:      var(--color-surface);
 
-  /* Tooltips match the chart-card surface — visually cohesive, not inverted. */
-  --tooltip: var(--color-elevated);
+  /* Tooltips use the recessed surface (--color-surface) to match the small
+     summary cards in canvas dashboards — visually cohesive, not inverted. */
+  --tooltip: var(--color-surface);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -270,8 +271,9 @@
   --popover-foreground:  var(--color-text);
   --popover-footer:      var(--color-surface);
 
-  /* Tooltips match the chart-card surface — visually cohesive, not inverted. */
-  --tooltip: var(--color-elevated);
+  /* Tooltips use the recessed surface (--color-surface) to match the small
+     summary cards in canvas dashboards — visually cohesive, not inverted. */
+  --tooltip: var(--color-surface);
 
   --editor-selection: #D4FF0033;
   --line-highlight:   #1E1E1E;
