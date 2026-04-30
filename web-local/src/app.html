@@ -56,6 +56,36 @@
     <meta content="width=device-width, initial-scale=1" name="viewport" />
     <meta name="theme-color" content="#0A0A0A" />
 
+    <!--
+      Theme — set the `.dark` class on <html> synchronously BEFORE paint so
+      users never see a flash of the wrong theme. Mirrors the init logic of
+      web-common/src/features/themes/theme-control.ts (Rill's themeControl
+      singleton). Reads localStorage["rill:theme"]; defaults to dark. Both
+      this script and themeControl write to the same key so they stay in sync.
+    -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem("rill:theme");
+          // Match themeControl's default-dark behavior: light only when
+          // explicitly set to "light" or "system" + light OS preference.
+          var dark = true;
+          if (pref === "light") {
+            dark = false;
+          } else if (
+            pref === "system" &&
+            window.matchMedia &&
+            !window.matchMedia("(prefers-color-scheme: dark)").matches
+          ) {
+            dark = false;
+          }
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {
+          // localStorage unavailable — leave default (light) until JS boots.
+        }
+      })();
+    </script>
+
     <title>Bratrax — D2C Attribution Analytics for the AI Era</title>
     <meta name="description" content="Attribution analytics for D2C brands. Flat pricing that doesn't scale with revenue, data you own and can export, and an open layer for your own AI." />
 

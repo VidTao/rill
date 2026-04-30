@@ -24,6 +24,16 @@
     filters?.time_filters || filters?.dimension_filters,
   );
 
+  // Bratrax v1.3: a title with nothing else (no description, no tooltip, no
+  // filters) sits directly on the page canvas — the card wrapper adds visual
+  // noise without grouping anything. Anything more than just-a-title still
+  // renders in the bg-surface-card container.
+  $: titleOnly =
+    Boolean(title) &&
+    !description &&
+    !showDescriptionAsTooltip &&
+    !atleastOneFilter;
+
   onMount(() => {
     resizeObserver = new ResizeObserver(([entry]) => {
       wide = entry.contentRect.width >= WIDTH_THRESHOLD;
@@ -36,7 +46,9 @@
   });
 </script>
 
-{#if title || description}
+{#if titleOnly}
+  <h1 class:faint class="title px-4 pt-2 pb-1 w-full">{title}</h1>
+{:else if title || description}
   <div
     bind:this={container}
     class="component-header-container w-full h-fit flex flex-col bg-surface-card px-4 pt-2 pb-1 items-start {wide

@@ -182,26 +182,34 @@
     overscroll-behavior: none;
   }
 
-  /* Bratrax navigation tabs — Space Mono, uppercase, acid green active */
+  /* Bratrax navigation tabs — Space Mono, uppercase, theme-aware via tokens.
+     The 3-state ladder (idle / hover / active) uses --color-* tokens that
+     auto-flip with the .dark class on <html>. Active state shows the acid border. */
   .bratrax-nav-link {
     font-family: "Space Mono", "JetBrains Mono", monospace;
     font-size: 0.875rem; /* 14px */
     font-weight: 700;
     letter-spacing: 2px;
     text-transform: uppercase;
-    color: #858585 !important;
+    color: var(--color-text-muted) !important;
     text-decoration: none;
-    padding: 10px 0;
+    padding: 10px 12px;
     border-bottom: 2px solid transparent;
-    transition: color 0.2s, border-color 0.2s;
+    transition: color 0.2s, border-color 0.2s, background-color 0.2s;
   }
 
   .bratrax-nav-link:hover {
-    color: #E8E4DC !important;
+    color: var(--color-text) !important;
+    background: var(--color-acid-dim);
   }
 
   .bratrax-nav-link.active {
-    color: #D4FF00 !important;
-    border-bottom-color: #D4FF00;
+    color: var(--color-text) !important;
+    background: var(--color-acid-mid);
+    border-bottom-color: var(--color-acid);
+  }
+
+  :global(.dark) .bratrax-nav-link.active {
+    color: var(--color-acid) !important;
   }
 </style>

@@ -125,7 +125,7 @@
 
 {#if $spec}
   <ThemeProvider theme={effectiveTheme}>
-    <div class="size-full flex flex-col">
+    <div class="bratrax-chart-card size-full flex flex-col">
       {#if chartTitle}
         <div class="flex items-center justify-between px-4 py-2">
           <div
@@ -180,6 +180,16 @@
 {/if}
 
 <style lang="postcss">
+  /* Bratrax v1.3 brief Task 9: every chart sits on a solid surface so high-luminance
+     brand colors (acid, mint, cyan, lavender) read crisp against the page canvas.
+     `bg-surface-card` flips with theme: white in light, near-black in dark.
+     `border` uses --color-border-strong via the design-system token. */
+  .bratrax-chart-card {
+    background: var(--surface-card);
+    border: 0.5px solid var(--color-border, var(--border));
+    padding: 0.5rem;
+  }
+
   .title {
     font-size: 15px;
     line-height: 26px;

@@ -49,13 +49,15 @@
     @apply flex flex-col h-full w-56 border-r border-bratrax-border bg-bratrax-surface py-3 px-2 overflow-y-auto flex-none;
   }
 
+  /* "DASHBOARDS" caps label — uses the design-system .section-header pattern.
+     Idle = AA-passing dark olive on cream / 70% acid on dark (theme-aware). */
   .nav-header {
     font-family: "Space Mono", monospace;
     font-size: 0.875rem; /* 14px */
     font-weight: 700;
     letter-spacing: 2px;
     text-transform: uppercase;
-    color: rgba(212, 255, 0, 0.7);
+    color: var(--color-acid-text);
     padding: 0 8px 4px;
   }
 
@@ -66,22 +68,34 @@
     margin: 0;
   }
 
+  /* 3-state nav-item ladder — theme-aware via design-system tokens. */
   .nav-link {
     @apply block px-2 py-1.5 text-sm;
-    color: #B0B0B0;
+    color: var(--color-text);
     text-decoration: none;
-    transition: all 0.15s;
+    border-left: 2px solid transparent;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
   }
 
   .nav-link:hover {
-    background-color: #1E1E1E;
-    color: #E8E4DC;
+    background-color: var(--color-acid-dim);
+    color: var(--color-text);
   }
 
   .nav-link.active {
-    background-color: rgba(212, 255, 0, 0.08);
-    color: #D4FF00;
-    border-left: 2px solid #D4FF00;
+    background-color: var(--color-acid-mid);
+    border-left: 2px solid var(--color-acid);
+    color: var(--color-text);
     font-weight: 500;
+  }
+
+  :global(.dark) .nav-link {
+    color: var(--color-text-secondary);
+  }
+  :global(.dark) .nav-link:hover {
+    color: var(--color-text);
+  }
+  :global(.dark) .nav-link.active {
+    color: var(--color-acid);
   }
 </style>
