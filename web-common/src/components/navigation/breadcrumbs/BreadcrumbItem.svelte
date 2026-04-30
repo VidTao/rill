@@ -78,9 +78,14 @@
         <span>{selected?.label}</span>
       </a>
       {#if selected?.pill}
-        <Chip type="dimension" label={selected.pill} readOnly compact>
-          <svelte:fragment slot="body">{selected.pill}</svelte:fragment>
-        </Chip>
+        <span
+          class="breadcrumb-chip"
+          class:breadcrumb-chip-active={isCurrentPage}
+        >
+          <Chip type="dimension" label={selected.pill} readOnly compact>
+            <svelte:fragment slot="body">{selected.pill}</svelte:fragment>
+          </Chip>
+        </span>
       {/if}
     {/if}
     {#if options.size > 1}

@@ -40,21 +40,23 @@
 </script>
 
 <Tooltip distance={8} location="left">
-  <Button
-    label="Preview"
-    type="secondary"
-    preload={false}
-    compact
-    {loading}
-    {href}
-    {disabled}
-    onClick={viewDashboard}
-  >
-    <div class="flex gap-x-1 items-center">
-      <Play size="14px" />
-      Preview
-    </div>
-  </Button>
+  <span class="bratrax-preview-button">
+    <Button
+      label="Preview"
+      type="secondary"
+      preload={false}
+      compact
+      {loading}
+      {href}
+      {disabled}
+      onClick={viewDashboard}
+    >
+      <div class="flex gap-x-1 items-center">
+        <Play size="14px" />
+        Preview
+      </div>
+    </Button>
+  </span>
   <TooltipContent slot="tooltip-content">
     {#if reconciling}
       Dashboard preview available after reconciliation

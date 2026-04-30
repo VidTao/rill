@@ -41,7 +41,7 @@ function formatTimeHeader(
         TIME_GRAIN[interval].formatDate,
       )
     : Time.toString();
-  return `<h2>${formattedTime}</h2>`;
+  return `<div class="tooltip-date-header">${formattedTime}</div>`;
 }
 
 function generateStackedAreaContent(

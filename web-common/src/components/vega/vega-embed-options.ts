@@ -112,12 +112,12 @@ export function getTooltipFormatter(colorMapping: ColorMapping) {
 
     const rows: string[] = [];
 
-    // Header row (if any)
-    if (headerValue) {
-      rows.push(
-        `<tr><td colspan="10" style="text-align: left; font-weight: 600; padding-bottom: 4px;">${headerValue}</td></tr>`,
-      );
-    }
+    // Header row (if any) — rendered as a separate div above the table so the
+    // Bratrax tooltip styling can apply Space Mono caps + bottom-border separator
+    // independently of the data rows. Lives in vega.css as .tooltip-date-header.
+    const headerHtml = headerValue
+      ? `<div class="tooltip-date-header">${headerValue}</div>`
+      : "";
 
     // Helper: key color SVG (if present)
     const keyColorSvg = (color?: string) =>
@@ -159,6 +159,6 @@ export function getTooltipFormatter(colorMapping: ColorMapping) {
       }
     }
 
-    return `<table><tbody>${rows.join("")}</tbody></table>`;
+    return `${headerHtml}<table><tbody>${rows.join("")}</tbody></table>`;
   };
 }

@@ -5,26 +5,42 @@
 
 #vg-tooltip-element,
 #rill-vg-tooltip {
-  @apply absolute p-3 rounded-lg pointer-events-none;
-  @apply ui-copy-number;
+  @apply absolute pointer-events-none;
+  position: absolute;
+  padding: 12px 14px 10px;
   border: 0 !important;
   background: var(--tooltip) !important;
   color: var(--fg-inverse) !important;
+  font-family: "Outfit", system-ui, sans-serif;
 
-  font-family: "Inter";
-  border-radius: 5px;
+  /* 4px acid green top accent bar — same treatment as cards. */
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--color-acid, #D4FF00);
+    pointer-events: none;
+  }
 
+  /* Date header — Space Mono caps with bottom-border separator.
+     Light: dark olive. Dark: full acid. */
+  & .tooltip-date-header,
   & h2 {
-    @apply text-sm font-semibold mb-2;
-    color: color-mix(
-      in oklab,
-      var(--fg-inverse) 90%,
-      transparent 30%
-    ) !important;
+    font-family: "Space Mono", "JetBrains Mono", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    color: var(--color-acid-text, #4A6800);
+    border-bottom: 0.5px solid var(--color-border, rgba(0, 0, 0, 0.08));
   }
 
   & table {
-    @apply border-spacing-0;
     border-collapse: separate;
     border-spacing: 0;
     display: table;
@@ -45,18 +61,23 @@
     padding-right: 0;
   }
 
+  /* Row label cell — Outfit 12px. */
   & table tr td.key {
-    @apply text-left font-normal text-xs;
+    font-family: "Outfit", sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    text-align: left;
     padding-right: 12px;
-    color: color-mix(
-      in oklab,
-      var(--fg-inverse) 70%,
-      transparent 30%
-    ) !important;
+    color: var(--color-text-secondary) !important;
   }
 
+  /* Row value cell — Space Mono 12px right-aligned. */
   & table tr td.value {
-    @apply text-right font-semibold text-xs;
+    font-family: "Space Mono", "JetBrains Mono", monospace;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: right;
+    color: var(--color-text) !important;
     display: table-cell !important;
     max-width: none !important;
     max-height: none !important;
@@ -70,14 +91,34 @@
     visibility: hidden;
   }
 
+  /* Color marker — circle dot (8px) per series. */
   & table tr .key-color {
-    @apply w-3 h-3 min-w-3 min-h-3 rounded-full;
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    min-height: 8px;
     display: inline-block;
     vertical-align: middle;
-    margin-right: 4px;
+    margin-right: 6px;
+    border-radius: 50% !important;
   }
 }
 
-#vg-tooltip-element table tr:first-child td {
-  font-size: 14px;
+/* Dark theme: brighter date header + value text, darker separator. */
+:root.dark #vg-tooltip-element .tooltip-date-header,
+:root.dark #vg-tooltip-element h2,
+:root.dark #rill-vg-tooltip .tooltip-date-header,
+:root.dark #rill-vg-tooltip h2 {
+  color: var(--color-acid, #D4FF00);
+  border-bottom-color: #3A3A3A;
+}
+
+:root.dark #vg-tooltip-element table tr td.key,
+:root.dark #rill-vg-tooltip table tr td.key {
+  color: #B0B0B0 !important;
+}
+
+:root.dark #vg-tooltip-element table tr td.value,
+:root.dark #rill-vg-tooltip table tr td.value {
+  color: #FAFAF5 !important;
 }
