@@ -12,6 +12,7 @@
   } from "$lib/bratrax/onboarding/api";
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "../../connectors/AccountSelectionModal.svelte";
+  import TrackingTemplateConfirmModal from "../../connectors/TrackingTemplateConfirmModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount.
@@ -230,6 +231,24 @@
   let googleManagerMap: Record<string, string> = {};
   let tiktokState = "";
   let klaviyoState = "";
+
+  // Google Ads tracking_url_template confirmation modal — wedged between
+  // /onboard/google/connect and /onboard/activate so each leaf customer gets
+  // the canonical Bratrax tracking template before activation.
+  let showTrackingTemplateModal = false;
+  let trackingTemplateLoading = false;
+  let trackingTemplateProposed = "";
+  let trackingTemplateConflicts: Array<{
+    customer_id: string;
+    descriptive_name: string;
+    current: string;
+  }> = [];
+  let trackingTemplateAllLeafIds: string[] = [];
+  let trackingTemplateUnaffectedIds: string[] = [];
+  type TrackingTemplateChoice = "replace" | "skip" | "cancel";
+  let trackingTemplateResolve:
+    | ((choice: TrackingTemplateChoice) => void)
+    | null = null;
 
   // True when this page was hit purely as the OAuth-callback dispatcher for a
   // flow initiated elsewhere (e.g. /connectors). The "Build your stack" UI is
@@ -566,6 +585,135 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Google Ads tracking_url_template flow
+  // ---------------------------------------------------------------------------
+  // Per-account metadata that does NOT cascade from MCC managers to children;
+  // each leaf customer needs the template set individually for Bratrax
+  // attribution to work. Run after /onboard/google/connect succeeds and before
+  // the user advances to /onboard/business → /onboard/activate.
+  async function runGoogleTrackingTemplateFlow(customerIds: string[]): Promise<void> {
+    if (!customerIds.length) return;
+    const host = get(runtime).host;
+
+    const previewRes = await fetch(
+      `${host}/bratrax/onboard/google/preview-tracking-templates`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code: googleAuthCode, customer_ids: customerIds }),
+      },
+    );
+    if (!previewRes.ok) {
+      // Best-effort: surface in console but don't block onboarding.
+      console.warn("Tracking-template preview failed", previewRes.status);
+      return;
+    }
+
+    interface PreviewItem {
+      customer_id: string;
+      descriptive_name: string;
+      is_manager: boolean;
+      current: string;
+      proposed: string;
+      needs_confirm: boolean;
+      error?: string;
+    }
+    const previewBody = (await previewRes.json()) as { data?: PreviewItem[] };
+    const items: PreviewItem[] = previewBody.data || [];
+
+    const allLeafIds = items
+      .filter((i) => !i.is_manager && !i.error)
+      .map((i) => i.customer_id);
+    const conflictItems = items.filter((i) => i.needs_confirm);
+    const conflictIds = new Set(conflictItems.map((c) => c.customer_id));
+    const unaffectedIds = allLeafIds.filter((id) => !conflictIds.has(id));
+
+    if (conflictItems.length === 0) {
+      // No conflicts — silently apply for everyone (sets where empty,
+      // skips on the server where already_set, skips MCCs).
+      await applyTrackingTemplates(allLeafIds, false);
+      return;
+    }
+
+    // Show modal and wait for user choice.
+    trackingTemplateProposed = items[0]?.proposed || "";
+    trackingTemplateConflicts = conflictItems.map((c) => ({
+      customer_id: c.customer_id,
+      descriptive_name: c.descriptive_name,
+      current: c.current,
+    }));
+    trackingTemplateAllLeafIds = allLeafIds;
+    trackingTemplateUnaffectedIds = unaffectedIds;
+    showTrackingTemplateModal = true;
+
+    const choice: TrackingTemplateChoice = await new Promise((resolve) => {
+      trackingTemplateResolve = resolve;
+    });
+    trackingTemplateResolve = null;
+
+    if (choice === "cancel") {
+      showTrackingTemplateModal = false;
+      throw new Error("Tracking template setup cancelled");
+    }
+
+    trackingTemplateLoading = true;
+    try {
+      if (choice === "replace") {
+        await applyTrackingTemplates(trackingTemplateAllLeafIds, true);
+      } else {
+        // skip: only apply to accounts that don't have a conflicting current
+        // template. The conflicted accounts will not get Bratrax attribution
+        // until their template is set manually in Google Ads UI.
+        await applyTrackingTemplates(trackingTemplateUnaffectedIds, false);
+      }
+    } finally {
+      trackingTemplateLoading = false;
+      showTrackingTemplateModal = false;
+    }
+  }
+
+  async function applyTrackingTemplates(
+    customerIds: string[],
+    forceReplace: boolean,
+  ): Promise<void> {
+    if (!customerIds.length) return;
+    const host = get(runtime).host;
+    const res = await fetch(
+      `${host}/bratrax/onboard/google/apply-tracking-templates`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          code: googleAuthCode,
+          client_id: clientId,
+          customer_ids: customerIds,
+          force_replace: forceReplace,
+        }),
+      },
+    );
+    if (res.status === 409) {
+      // Defensive: shouldn't fire when preview was honored, but possible if
+      // a customer's template changed between preview and apply.
+      const body = await res.json().catch(() => ({}));
+      console.warn("Tracking-template apply returned 409", body);
+      throw new Error("Tracking template conflict");
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        ((body as Record<string, unknown>).error as string) ||
+          "Failed to apply tracking templates",
+      );
+    }
+  }
+
+  function handleTrackingTemplateChoice(choice: TrackingTemplateChoice) {
+    if (trackingTemplateResolve) trackingTemplateResolve(choice);
+  }
+
   async function handleAccountSelection(selected: AdAccountInfo[]) {
     accountModalLoading = true;
     try {
@@ -628,6 +776,19 @@
       }
 
       showAccountModal = false;
+
+      // Google Ads only: ensure each connected leaf customer has the canonical
+      // Bratrax tracking_url_template (and the user has confirmed if their
+      // existing template would be overwritten). Best-effort — failures here
+      // surface as a warning but do not unwind the connection.
+      if (connectedKey === "google_ads") {
+        try {
+          const customerIds = selected.map((a) => a.accountId);
+          await runGoogleTrackingTemplateFlow(customerIds);
+        } catch (e) {
+          console.warn("Tracking template flow:", e);
+        }
+      }
 
       if (isTikTok) {
         sessionStorage.removeItem("tiktok_ads_oauth_state");
@@ -812,4 +973,14 @@
   accounts={accountModalAccounts}
   onSubmit={handleAccountSelection}
   onClose={() => { showAccountModal = false; }}
+/>
+
+<TrackingTemplateConfirmModal
+  open={showTrackingTemplateModal}
+  loading={trackingTemplateLoading}
+  proposed={trackingTemplateProposed}
+  conflicts={trackingTemplateConflicts}
+  onReplaceAll={() => handleTrackingTemplateChoice("replace")}
+  onSkip={() => handleTrackingTemplateChoice("skip")}
+  onCancel={() => handleTrackingTemplateChoice("cancel")}
 />
