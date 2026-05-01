@@ -13,7 +13,23 @@
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "../../connectors/AccountSelectionModal.svelte";
   import TrackingTemplateConfirmModal from "../../connectors/TrackingTemplateConfirmModal.svelte";
+  import FbUrlTagsConfirmModal from "../../connectors/FbUrlTagsConfirmModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
+
+  // ---------------------------------------------------------------------------
+  // Onboarding-time tracking-template flows (paused — pending team alignment)
+  // ---------------------------------------------------------------------------
+  // When true, the corresponding flow runs after a successful platform
+  // connect: previews existing tracking templates / url_tags and (with user
+  // confirmation if needed) writes the canonical Bratrax value to every
+  // selected leaf customer (Google) or campaign (Facebook).
+  //
+  // Both default to false — the connection itself completes normally; only
+  // the post-connect template-write step is skipped. Backend endpoints,
+  // audit table, modal components, and helper functions stay in place; flip
+  // a flag to true once aligned with the team.
+  const ENABLE_GOOGLE_TRACKING_TEMPLATES = false;
+  const ENABLE_FB_URL_TAGS = false;
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount.
   // Empty until the fetch completes; OAuth-init click handlers guard against
@@ -248,6 +264,26 @@
   type TrackingTemplateChoice = "replace" | "skip" | "cancel";
   let trackingTemplateResolve:
     | ((choice: TrackingTemplateChoice) => void)
+    | null = null;
+
+  // Facebook url_tags confirmation modal — wedged between
+  // /onboard/facebook/connect and /onboard/activate.
+  interface FbAccountPreview {
+    act_id: string;
+    account_name: string;
+    total_campaigns: number;
+    with_url_tags: number;
+    conflicting: Array<{ campaign_id: string; name: string; current: string }>;
+    conflicting_count: number;
+  }
+  let showFbUrlTagsModal = false;
+  let fbUrlTagsLoading = false;
+  let fbUrlTagsProposed = "";
+  let fbUrlTagsAccounts: FbAccountPreview[] = [];
+  let fbUrlTagsAdAccountIds: string[] = [];
+  type FbUrlTagsChoice = "replace" | "empty_only" | "cancel";
+  let fbUrlTagsResolve:
+    | ((choice: FbUrlTagsChoice) => void)
     | null = null;
 
   // True when this page was hit purely as the OAuth-callback dispatcher for a
@@ -714,6 +750,131 @@
     if (trackingTemplateResolve) trackingTemplateResolve(choice);
   }
 
+  // ---------------------------------------------------------------------------
+  // Facebook url_tags flow
+  // ---------------------------------------------------------------------------
+  // Per-campaign metadata; FB does NOT cascade url_tags from MCC/business
+  // managers, and new campaigns post-onboarding start empty (the daily sweep
+  // DAG is the long-term backstop). Run after /onboard/facebook/connect to
+  // set the canonical Bratrax template on every existing ACTIVE/PAUSED
+  // campaign on the selected ad accounts.
+  async function runFacebookUrlTagsFlow(adAccountIds: string[]): Promise<void> {
+    if (!adAccountIds.length || !clientId) return;
+    const host = get(runtime).host;
+
+    const previewRes = await fetch(
+      `${host}/bratrax/onboard/facebook/preview-url-tags`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          client_id: clientId,
+          ad_account_ids: adAccountIds,
+        }),
+      },
+    );
+    if (!previewRes.ok) {
+      console.warn("FB url_tags preview failed", previewRes.status);
+      return;
+    }
+
+    interface FbPreviewItem {
+      act_id: string;
+      account_name: string;
+      total_campaigns: number;
+      with_url_tags: number;
+      conflicting: Array<{ campaign_id: string; name: string; current: string }>;
+      conflicting_count: number;
+      needs_confirm: boolean;
+      error?: string;
+    }
+    const previewBody = (await previewRes.json()) as {
+      proposed?: string;
+      data?: FbPreviewItem[];
+    };
+    const items: FbPreviewItem[] = (previewBody.data || []).filter(
+      (i) => !i.error,
+    );
+
+    const anyConflicts = items.some((i) => i.needs_confirm);
+    if (!anyConflicts) {
+      // Clean state — silently apply (sets where empty, skips where matches).
+      await applyFacebookUrlTags(adAccountIds, false);
+      return;
+    }
+
+    fbUrlTagsProposed = previewBody.proposed || "";
+    fbUrlTagsAccounts = items.map((i) => ({
+      act_id: i.act_id,
+      account_name: i.account_name,
+      total_campaigns: i.total_campaigns,
+      with_url_tags: i.with_url_tags,
+      conflicting: i.conflicting,
+      conflicting_count: i.conflicting_count,
+    }));
+    fbUrlTagsAdAccountIds = adAccountIds;
+    showFbUrlTagsModal = true;
+
+    const choice: FbUrlTagsChoice = await new Promise((resolve) => {
+      fbUrlTagsResolve = resolve;
+    });
+    fbUrlTagsResolve = null;
+
+    if (choice === "cancel") {
+      showFbUrlTagsModal = false;
+      throw new Error("Facebook url_tags setup cancelled");
+    }
+
+    fbUrlTagsLoading = true;
+    try {
+      // "Replace all" → force_replace=true; "Apply only to empty" →
+      // force_replace=false (existing url_tags on conflicting campaigns are
+      // left untouched server-side).
+      await applyFacebookUrlTags(fbUrlTagsAdAccountIds, choice === "replace");
+    } finally {
+      fbUrlTagsLoading = false;
+      showFbUrlTagsModal = false;
+    }
+  }
+
+  async function applyFacebookUrlTags(
+    adAccountIds: string[],
+    forceReplace: boolean,
+  ): Promise<void> {
+    if (!adAccountIds.length || !clientId) return;
+    const host = get(runtime).host;
+    const res = await fetch(
+      `${host}/bratrax/onboard/facebook/apply-url-tags`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          client_id: clientId,
+          ad_account_ids: adAccountIds,
+          force_replace: forceReplace,
+        }),
+      },
+    );
+    if (res.status === 409) {
+      const body = await res.json().catch(() => ({}));
+      console.warn("FB url_tags apply returned 409", body);
+      throw new Error("Facebook url_tags conflict");
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        ((body as Record<string, unknown>).error as string) ||
+          "Failed to apply Facebook url_tags",
+      );
+    }
+  }
+
+  function handleFbUrlTagsChoice(choice: FbUrlTagsChoice) {
+    if (fbUrlTagsResolve) fbUrlTagsResolve(choice);
+  }
+
   async function handleAccountSelection(selected: AdAccountInfo[]) {
     accountModalLoading = true;
     try {
@@ -779,14 +940,25 @@
 
       // Google Ads only: ensure each connected leaf customer has the canonical
       // Bratrax tracking_url_template (and the user has confirmed if their
-      // existing template would be overwritten). Best-effort — failures here
-      // surface as a warning but do not unwind the connection.
-      if (connectedKey === "google_ads") {
+      // existing template would be overwritten). Gated behind
+      // ENABLE_GOOGLE_TRACKING_TEMPLATES — flip to true to activate.
+      if (ENABLE_GOOGLE_TRACKING_TEMPLATES && connectedKey === "google_ads") {
         try {
           const customerIds = selected.map((a) => a.accountId);
           await runGoogleTrackingTemplateFlow(customerIds);
         } catch (e) {
           console.warn("Tracking template flow:", e);
+        }
+      }
+
+      // Facebook Ads: set url_tags on every ACTIVE/PAUSED campaign across the
+      // selected accounts. Gated behind ENABLE_FB_URL_TAGS.
+      if (ENABLE_FB_URL_TAGS && connectedKey === "facebook_ads") {
+        try {
+          const adAccountIds = selected.map((a) => a.accountId);
+          await runFacebookUrlTagsFlow(adAccountIds);
+        } catch (e) {
+          console.warn("FB url_tags flow:", e);
         }
       }
 
@@ -884,7 +1056,7 @@
         ONBOARDING
       </div>
       <h1 class="text-2xl font-black text-bratrax-text-headline">
-        Build your <span class="font-serif italic text-bratrax-acid">stack</span>
+        Build your stack
       </h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
         Connect the tools you use. We'll set up your analytics automatically.
@@ -983,4 +1155,14 @@
   onReplaceAll={() => handleTrackingTemplateChoice("replace")}
   onSkip={() => handleTrackingTemplateChoice("skip")}
   onCancel={() => handleTrackingTemplateChoice("cancel")}
+/>
+
+<FbUrlTagsConfirmModal
+  open={showFbUrlTagsModal}
+  loading={fbUrlTagsLoading}
+  proposed={fbUrlTagsProposed}
+  accounts={fbUrlTagsAccounts}
+  onReplaceAll={() => handleFbUrlTagsChoice("replace")}
+  onApplyEmptyOnly={() => handleFbUrlTagsChoice("empty_only")}
+  onCancel={() => handleFbUrlTagsChoice("cancel")}
 />
