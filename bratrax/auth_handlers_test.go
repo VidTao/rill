@@ -90,6 +90,17 @@ func (m *mockUserStore) LinkUserToClient(_ context.Context, userID int, clientID
 	return nil
 }
 
+func (m *mockUserStore) SetLastClientID(_ context.Context, userID int, clientID string) error {
+	for i := range m.users {
+		if m.users[i].ID == userID {
+			cid := clientID
+			m.users[i].LastClientID = &cid
+			return nil
+		}
+	}
+	return nil
+}
+
 const (
 	testIssuerURL    = "http://localhost:9009/bratrax"
 	testAudienceURL  = "http://localhost:9009"

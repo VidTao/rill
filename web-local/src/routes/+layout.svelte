@@ -30,6 +30,7 @@
   import "../bratrax-theme.css";
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
+  import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
 
   export let data: LayoutData;
 
@@ -85,6 +86,7 @@
   $: onWorkshopPage = $page.url.pathname.startsWith("/workshop");
   $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
   $: onSettingsPage = $page.url.pathname.startsWith("/settings");
+  $: onSuperadminsPage = $page.url.pathname.startsWith("/superadmins");
 
   // Role-based nav visibility. The DB-side enum is super_admin / admin / viewer.
   $: role = $bratraxUser?.role ?? null;
@@ -103,13 +105,19 @@
           {mode}
           externalUser={$bratraxUser}
           onLogout={handleBratraxLogout}
-        />
+        >
+          <svelte:fragment slot="header-extras">
+            {#if isSuper}
+              <ClientSwitcher />
+            {/if}
+          </svelte:fragment>
+        </ApplicationHeader>
         {#if !isViewer}
           <nav class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0">
             <a
               href="/developer"
               class="bratrax-nav-link"
-              class:active={!onConnectorsPage && !onWorkshopPage && !onCostSettingsPage && !onSettingsPage}
+              class:active={!onConnectorsPage && !onWorkshopPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage}
             >
               Developer
             </a>
@@ -145,6 +153,15 @@
                 class:active={onSettingsPage}
               >
                 Settings
+              </a>
+            {/if}
+            {#if isSuper}
+              <a
+                href="/superadmins"
+                class="bratrax-nav-link"
+                class:active={onSuperadminsPage}
+              >
+                Superadmins
               </a>
             {/if}
           </nav>

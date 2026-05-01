@@ -1,6 +1,7 @@
 package bratrax
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,6 +16,12 @@ import (
 // The token also contains an "attr" field (set by AuthService.issueToken),
 // but the middleware re-fetches user data from the store for freshness.
 type bratraxClaims = jwt.RegisteredClaims
+
+// activeClientCookieName carries the currently-selected client_id for
+// cross-client super_admins. Set by /bratrax/auth/switch-client (and by
+// the middleware on first request, falling back to last_client_id then
+// to the first client in the list). Empty / missing for non-super_admins.
+const activeClientCookieName = "bratrax_active_client"
 
 // headersToStrip lists request headers that the middleware must remove
 // before forwarding, to prevent spoofing from untrusted clients.
@@ -113,7 +120,9 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 4. Resolve client via rill_users.client_id FK (admin & viewer alike).
+		// 4. Resolve active client.
+		//    - admin/viewer: rill_users.client_id FK (one user → one client)
+		//    - super_admin: bratrax_active_client cookie → last_client_id → first-in-list
 		//    Users without a linked client are allowed through for onboarding routes
 		//    (their client is created by /onboard/start).
 		isOnboardRoute := strings.HasPrefix(r.URL.Path, "/bratrax/onboard/") ||
@@ -123,7 +132,7 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			writeJSONError(w, http.StatusForbidden, fmt.Sprintf("unsupported role: %s", user.Role))
 			return
 		}
-		client, err := a.clientStore.GetByUserID(r.Context(), user.ID)
+		client, cookieToSet, err := a.resolveActiveClient(r.Context(), user, r)
 		if err != nil {
 			a.logger.Error("client lookup failed", zap.Error(err))
 			writeJSONError(w, http.StatusInternalServerError, "internal error")
@@ -132,6 +141,20 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		if client == nil && !isOnboardRoute {
 			writeJSONError(w, http.StatusForbidden, "no client provisioned for this user")
 			return
+		}
+
+		// If the super_admin path picked an active client different from what
+		// the cookie already had (or there was no cookie), set it now so the
+		// next request short-circuits straight to the cookie value.
+		if cookieToSet != "" {
+			http.SetCookie(w, &http.Cookie{
+				Name:     activeClientCookieName,
+				Value:    cookieToSet,
+				Path:     "/",
+				MaxAge:   int(bratraxTokenTTL.Seconds()),
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+			})
 		}
 
 		// 5. Strip any incoming identity headers to prevent spoofing
@@ -192,11 +215,64 @@ func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, e
 	if user == nil {
 		return nil, nil, nil
 	}
-	client, err := a.clientStore.GetByUserID(r.Context(), user.ID)
+	client, _, err := a.resolveActiveClient(r.Context(), user, r)
 	if err != nil {
 		return user, nil, fmt.Errorf("client lookup: %w", err)
 	}
 	return user, client, nil
+}
+
+// resolveActiveClient picks the client to use for this request.
+//
+//   - admin/viewer: looks up rill_users.client_id (existing FK behavior).
+//   - super_admin: reads the bratrax_active_client cookie; if missing or
+//     stale, falls back to user.last_client_id, then to the first client
+//     by company_name. The second return value is the cookie value the
+//     caller should set if non-empty (used by the middleware to refresh
+//     the cookie on first super_admin request after login).
+//
+// Returns (nil, "", nil) if no client could be resolved (e.g. mid-onboarding,
+// or zero clients in the system). The caller decides whether that's an error.
+func (a *AuthMapper) resolveActiveClient(ctx context.Context, user *User, r *http.Request) (*Client, string, error) {
+	if user.Role != "super_admin" {
+		client, err := a.clientStore.GetByUserID(ctx, user.ID)
+		return client, "", err
+	}
+
+	// 1. Cookie — the freshest signal.
+	if cookie, cookieErr := r.Cookie(activeClientCookieName); cookieErr == nil && cookie.Value != "" {
+		client, err := a.clientStore.GetByClientID(ctx, cookie.Value)
+		if err != nil {
+			return nil, "", err
+		}
+		if client != nil {
+			return client, "", nil
+		}
+		// Cookie referenced a deleted client — fall through to other fallbacks.
+	}
+
+	// 2. last_client_id — where this super_admin was last active.
+	if user.LastClientID != nil && *user.LastClientID != "" {
+		client, err := a.clientStore.GetByClientID(ctx, *user.LastClientID)
+		if err != nil {
+			return nil, "", err
+		}
+		if client != nil {
+			return client, client.ClientID, nil
+		}
+	}
+
+	// 3. First client alphabetically. Deterministic; the dropdown shows the
+	//    same order so the default lines up with what the user sees.
+	all, err := a.clientStore.ListAll(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	if len(all) == 0 {
+		return nil, "", nil
+	}
+	first := all[0]
+	return &first, first.ClientID, nil
 }
 
 // stripBratraxHeaders removes all Bratrax identity headers from a request

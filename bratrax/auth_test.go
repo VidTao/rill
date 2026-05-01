@@ -63,6 +63,33 @@ func (m *mockClientStore) GetByUserID(_ context.Context, userID int) (*Client, e
 	return c, nil
 }
 
+func (m *mockClientStore) GetAnthropicKey(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *mockClientStore) GetByMCPToken(_ context.Context, _ string) (*Client, error) {
+	return nil, nil
+}
+
+func (m *mockClientStore) GetByClientID(_ context.Context, clientID string) (*Client, error) {
+	for _, c := range m.userMap {
+		if c.ClientID == clientID {
+			return c, nil
+		}
+	}
+	if m.defaultClient != nil && m.defaultClient.ClientID == clientID {
+		return m.defaultClient, nil
+	}
+	return nil, nil
+}
+
+func (m *mockClientStore) ListAll(_ context.Context) ([]Client, error) {
+	if m.defaultClient == nil {
+		return nil, nil
+	}
+	return []Client{*m.defaultClient}, nil
+}
+
 // setupAuthMapper creates an AuthMapper with mock stores and a real JWT issuer.
 func setupAuthMapper(t *testing.T) (*AuthMapper, *AuthService, *mockUserStore, *mockClientStore) {
 	t.Helper()

@@ -66,3 +66,47 @@ export async function bratraxGetMe(
   const data: { user: BratraxUser } = await res.json();
   return data.user;
 }
+
+// ---------------------------------------------------------------------------
+// Cross-client super_admin helpers (client switcher dropdown).
+// listClients + switchClient back the dropdown in ApplicationHeader; the
+// switch endpoint sets the bratrax_active_client cookie and persists
+// last_client_id so the next login lands on the same client.
+// ---------------------------------------------------------------------------
+
+export interface BratraxClientSummary {
+  client_id: string;
+  company_name: string;
+}
+
+export interface BratraxClientList {
+  clients: BratraxClientSummary[];
+  active_client_id: string;
+}
+
+export async function bratraxListClients(): Promise<BratraxClientList> {
+  const res = await fetch(`${getBaseUrl()}/bratrax/auth/clients`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `List clients failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function bratraxSwitchClient(
+  clientId: string,
+): Promise<{ client_id: string; company_name: string; clickhouse_db: string }> {
+  const res = await fetch(`${getBaseUrl()}/bratrax/auth/switch-client`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ client_id: clientId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Switch client failed (${res.status})`);
+  }
+  return res.json();
+}

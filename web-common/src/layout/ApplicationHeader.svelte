@@ -148,6 +148,7 @@
         <CanvasPreviewCTAs canvasName={dashboardName} />
       {/if}
     {:else if showDeveloperChat}
+      <slot name="header-extras" />
       <button
         type="button"
         on:click={() =>

@@ -22,6 +22,10 @@ type User struct {
 	Role         string    `db:"role"          json:"role"`
 	ProjectID    *string   `db:"project_id"    json:"project_id"`
 	ClientID     *string   `db:"client_id"     json:"client_id,omitempty"`
+	// LastClientID is the most recent client a super_admin was active on. Used
+	// as a fallback when the bratrax_active_client cookie is missing/invalid
+	// (e.g. fresh login). NULL for new super_admins until their first switch.
+	LastClientID *string   `db:"last_client_id" json:"last_client_id,omitempty"`
 	CreatedAt    time.Time `db:"created_at"    json:"created_at"`
 	UpdatedAt    time.Time `db:"updated_at"    json:"updated_at"`
 }
@@ -33,6 +37,7 @@ type UserStoreInterface interface {
 	CreateUser(ctx context.Context, email, password, name, role string, projectID *string) (*User, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	LinkUserToClient(ctx context.Context, userID int, clientID string) error
+	SetLastClientID(ctx context.Context, userID int, clientID string) error
 }
 
 // UserStore provides CRUD operations on rill_users.
@@ -68,7 +73,7 @@ func (s *UserStore) Close() error {
 func (s *UserStore) Authenticate(ctx context.Context, email, password string) (*User, error) {
 	var u User
 	err := s.db.GetContext(ctx, &u,
-		"SELECT id, email, password_hash, name, role, project_id, client_id, created_at, updated_at FROM rill_users WHERE email = $1",
+		"SELECT id, email, password_hash, name, role, project_id, client_id, last_client_id, created_at, updated_at FROM rill_users WHERE email = $1",
 		email,
 	)
 	if err != nil {
@@ -89,7 +94,7 @@ func (s *UserStore) Authenticate(ctx context.Context, email, password string) (*
 func (s *UserStore) GetByID(ctx context.Context, id int) (*User, error) {
 	var u User
 	err := s.db.GetContext(ctx, &u,
-		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, created_at, updated_at FROM rill_users WHERE id = $1",
+		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, created_at, updated_at FROM rill_users WHERE id = $1",
 		id,
 	)
 	if err != nil {
@@ -118,7 +123,7 @@ func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role 
 	err = s.db.QueryRowxContext(ctx,
 		`INSERT INTO rill_users (email, password_hash, name, role, project_id)
 		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, email, '' AS password_hash, name, role, project_id, client_id, created_at, updated_at`,
+		 RETURNING id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, created_at, updated_at`,
 		email, string(hash), name, role, projectID,
 	).StructScan(&u)
 	if err != nil {
@@ -132,7 +137,7 @@ func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role 
 func (s *UserStore) ListUsers(ctx context.Context) ([]User, error) {
 	var users []User
 	err := s.db.SelectContext(ctx, &users,
-		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, created_at, updated_at FROM rill_users ORDER BY id",
+		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, created_at, updated_at FROM rill_users ORDER BY id",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bratrax userstore: query failed: %w", err)
@@ -149,6 +154,20 @@ func (s *UserStore) LinkUserToClient(ctx context.Context, userID int, clientID s
 	)
 	if err != nil {
 		return fmt.Errorf("bratrax userstore: link user to client failed: %w", err)
+	}
+	return nil
+}
+
+// SetLastClientID records the last client a super_admin was active on so the
+// next login lands them back on it. Also written when a super_admin switches
+// clients via /bratrax/auth/switch-client.
+func (s *UserStore) SetLastClientID(ctx context.Context, userID int, clientID string) error {
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE rill_users SET last_client_id = $1, updated_at = NOW() WHERE id = $2",
+		clientID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("bratrax userstore: set last client id failed: %w", err)
 	}
 	return nil
 }

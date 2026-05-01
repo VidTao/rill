@@ -23,14 +23,16 @@ type Handlers struct {
 // It wires up: observability → auth → reverse proxy, plus auth endpoints.
 //
 // Routes:
-//   - POST /bratrax/auth/login    — email+password login
-//   - POST /bratrax/auth/logout   — clear auth cookie
-//   - GET  /bratrax/auth/me       — current user info
-//   - POST /bratrax/auth/signup   — self-serve signup (public, creates user + sets JWT)
-//   - POST /bratrax/auth/users    — create user (admin only)
+//   - POST /bratrax/auth/login            — email+password login
+//   - POST /bratrax/auth/logout           — clear auth cookie
+//   - GET  /bratrax/auth/me               — current user info
+//   - POST /bratrax/auth/signup           — self-serve signup (public, creates user + sets JWT)
+//   - POST /bratrax/auth/users            — create user (admin only)
+//   - GET  /bratrax/auth/clients          — list every client (super_admin only)
+//   - POST /bratrax/auth/switch-client    — set active client cookie (super_admin only)
 //   - GET  /bratrax/.well-known/jwks.json — public JWKS
-//   - GET  /bratrax/health        — local health check
-//   - /bratrax/                    — catch-all proxy to Flask API
+//   - GET  /bratrax/health                — local health check
+//   - /bratrax/                            — catch-all proxy to Flask API
 //
 // Returns the constructed Handlers so the caller can install additional middleware.
 func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error) {
@@ -79,6 +81,14 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleCreateUser)))
 	observability.MuxHandle(mux, "POST /bratrax/auth/signup",
 		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleSignup)))
+
+	// Super_admin client-switcher endpoints. Both auth themselves via the
+	// JWT cookie + role check; not behind the AuthMapper proxy middleware.
+	switchSvc := NewClientSwitchService(authMapper, store, clientStore, logger, cfg.SecureCookie)
+	observability.MuxHandle(mux, "GET /bratrax/auth/clients",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(switchSvc.HandleListClients)))
+	observability.MuxHandle(mux, "POST /bratrax/auth/switch-client",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(switchSvc.HandleSwitchClient)))
 
 	// JWKS endpoint for token validation
 	observability.MuxHandle(mux, "GET /bratrax/.well-known/jwks.json",

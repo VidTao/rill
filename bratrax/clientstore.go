@@ -26,6 +26,8 @@ type ClientStoreInterface interface {
 	GetByUserID(ctx context.Context, userID int) (*Client, error)
 	GetAnthropicKey(ctx context.Context, clientDB string) (string, error)
 	GetByMCPToken(ctx context.Context, token string) (*Client, error)
+	GetByClientID(ctx context.Context, clientID string) (*Client, error)
+	ListAll(ctx context.Context) ([]Client, error)
 }
 
 // ClientStore provides read operations on rill_clients.
@@ -123,6 +125,10 @@ func (s *ClientStore) GetByMCPToken(ctx context.Context, token string) (*Client,
 // This is a proper FK lookup replacing the legacy 1:1 user.id == organization_id mapping.
 // One client can have many users (future multi-user tenancy); a user has at most one client.
 // Returns (nil, nil) if the user has no client or the user does not exist.
+//
+// Note: super_admin users have client_id=NULL; this returns nil for them. Use
+// GetByClientID after resolving the super_admin's active client (cookie /
+// last_client_id / first-client) instead.
 func (s *ClientStore) GetByUserID(ctx context.Context, userID int) (*Client, error) {
 	var c Client
 	err := s.db.GetContext(ctx, &c,
@@ -139,4 +145,43 @@ func (s *ClientStore) GetByUserID(ctx context.Context, userID int) (*Client, err
 		return nil, fmt.Errorf("bratrax clientstore: query failed: %w", err)
 	}
 	return &c, nil
+}
+
+// GetByClientID returns the client with the given client_id (UUID). Returns
+// (nil, nil) if no such client exists. Used for super_admin client resolution
+// (active-client cookie validation, switch-client endpoint, last_client_id
+// fallback).
+func (s *ClientStore) GetByClientID(ctx context.Context, clientID string) (*Client, error) {
+	if clientID == "" {
+		return nil, nil
+	}
+	var c Client
+	err := s.db.GetContext(ctx, &c,
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, created_at
+		 FROM rill_clients WHERE client_id = $1`,
+		clientID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("bratrax clientstore: query failed: %w", err)
+	}
+	return &c, nil
+}
+
+// ListAll returns every client in the system, ordered by company_name (the
+// dropdown order shown to super_admins). Used by the /bratrax/auth/clients
+// endpoint that powers the super_admin client switcher.
+func (s *ClientStore) ListAll(ctx context.Context) ([]Client, error) {
+	var out []Client
+	err := s.db.SelectContext(ctx, &out,
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, created_at
+		 FROM rill_clients
+		 ORDER BY company_name ASC, created_at ASC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("bratrax clientstore: list all failed: %w", err)
+	}
+	return out, nil
 }
