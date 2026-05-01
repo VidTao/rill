@@ -59,7 +59,7 @@
         02 — WORKSHOP
       </div>
       <h1 class="text-3xl font-black tracking-tight text-bratrax-text-headline">
-        Client <span class="font-serif italic text-bratrax-acid">Models</span>
+        Client Models
       </h1>
       <p class="mt-2 text-[15px] font-light text-bratrax-text-body">
         Manage client data models — edit, compile, and&nbsp;deploy

@@ -268,26 +268,25 @@
     </div>
   {/if}
 
-  <!-- Tabs -->
-  <div class="mb-6 flex border-b border-bratrax-border">
-    {#each tabs as tab}
-      <button
-        class="px-5 py-3 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors"
-        class:border-b-2={activeTab === tab.id}
-        class:border-bratrax-acid={activeTab === tab.id}
-        class:text-bratrax-text-headline={activeTab === tab.id}
-        class:text-bratrax-text-muted={activeTab !== tab.id}
-        on:click={() => {
-          activeTab = tab.id;
-        }}
-      >
-        {tab.label}
-      </button>
-    {/each}
-  </div>
+  <!-- White card wrapper with 4px acid top bar -->
+  <div class="cost-card">
+    <!-- Sub-tabs as highlighter pills (Round 3 §3) -->
+    <div class="cost-subtab-bar">
+      {#each tabs as tab}
+        <button
+          class="cost-subtab"
+          class:active={activeTab === tab.id}
+          on:click={() => {
+            activeTab = tab.id;
+          }}
+        >
+          {tab.label}
+        </button>
+      {/each}
+    </div>
 
   {#if loading}
-    <div class="flex items-center gap-2 py-12 text-bratrax-text-muted">
+    <div class="flex items-center gap-2 px-6 py-12 text-bratrax-text-muted">
       <svg
         class="h-4 w-4 animate-spin"
         viewBox="0 0 24 24"
@@ -300,6 +299,7 @@
       <span class="font-mono text-xs">Loading cost settings...</span>
     </div>
   {:else}
+    <div class="cost-card-body">
     <!-- ================================================================ -->
     <!-- TAB: COGS -->
     <!-- ================================================================ -->
@@ -429,14 +429,14 @@
             </p>
             <div class="flex justify-end gap-2">
               <button
-                class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-acid"
+                class="btn-bratrax btn-neutral btn-compact"
                 on:click={() => {
                   showCogsModal = false;
                   cogsMode = "per_product";
                 }}>Cancel</button
               >
               <button
-                class="bg-bratrax-acid px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
+                class="btn-bratrax btn-primary btn-compact"
                 disabled={saving}
                 on:click={handleSaveCogsSettings}>Save</button
               >
@@ -528,7 +528,7 @@
                   </td>
                   <td class="px-3 py-2 text-right">
                     <button
-                      class="bg-bratrax-acid px-3 py-1 font-mono text-[10px] font-bold uppercase text-bratrax-bg hover:opacity-90"
+                      class="btn-bratrax btn-primary btn-compact"
                       disabled={saving}
                       on:click={handleSaveGateway}>Save</button
                     >
@@ -542,7 +542,7 @@
                   </td>
                   <td class="px-3 py-2 text-right">
                     <button
-                      class="border border-bratrax-border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-text-muted hover:border-bratrax-acid hover:text-bratrax-acid"
+                      class="btn-bratrax btn-neutral btn-compact"
                       on:click={() => startEditGateway(gw)}>Edit</button
                     >
                   </td>
@@ -563,72 +563,103 @@
       <!-- TAB: CUSTOM EXPENSES -->
       <!-- ================================================================ -->
     {:else if activeTab === "expenses"}
-      <div class="space-y-4">
-        <!-- Actions bar -->
-        <div class="flex items-center justify-end gap-3">
-          <button
-            class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-acid hover:text-bratrax-acid"
-            on:click={() => {
-              resetExpenseForm();
-              expenseForm.expense_type = "fixed";
-              showExpenseModal = true;
-            }}>Add Fixed Expense</button
-          >
-          <button
-            class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-acid hover:text-bratrax-acid"
-            on:click={() => {
-              resetExpenseForm();
-              expenseForm.expense_type = "variable";
-              showExpenseModal = true;
-            }}>Add Variable Expense</button
-          >
-        </div>
-
-        <!-- Expense rules list -->
-        {#each expenseRules as rule (rule.entity_id)}
-          <div
-            class="flex items-center justify-between border border-bratrax-border p-4"
-            class:opacity-50={!rule.data.is_active}
-          >
-            <div>
-              <div class="font-medium text-bratrax-text-headline">
-                {rule.data.title || "Untitled"}
-              </div>
-              <div class="mt-1 text-xs text-bratrax-text-muted">
-                {#if rule.data.expense_type === "fixed"}
-                  ${rule.data.fixed_amount}/{rule.data.period}
-                {:else}
-                  {rule.data.variable_percentage}% of {rule.data.variable_metric}
-                {/if}
-                &middot; {rule.data.category}
-                {#if rule.data.is_ad_spend}
-                  &middot; Included in ad spend
-                {/if}
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                class="font-mono text-[10px] uppercase text-bratrax-text-muted hover:text-bratrax-acid"
-                on:click={() => handleToggleExpense(rule)}
-              >
-                {rule.data.is_active ? "Pause" : "Resume"}
-              </button>
-              <button
-                class="font-mono text-[10px] uppercase text-bratrax-text-muted hover:text-bratrax-tomato"
-                on:click={() => handleDeleteExpense(rule.entity_id)}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        {/each}
-
-        {#if expenseRules.length === 0}
-          <p class="py-8 text-center text-sm text-bratrax-text-muted">
-            No custom expenses configured. Add fixed or variable expenses to calculate accurate profit.
+      {#if expenseRules.length === 0}
+        <!-- Structured empty state (Round 3 §3) -->
+        <div class="cost-empty-state">
+          <div class="cost-empty-icon" aria-hidden="true"></div>
+          <div class="cost-empty-headline">No custom expenses yet</div>
+          <p class="cost-empty-text">
+            Add fixed or variable expenses so we can calculate accurate profit, MER, and blended ROAS for your store.
           </p>
-        {/if}
-      </div>
+          <div class="cost-empty-actions">
+            <button
+              class="btn-bratrax btn-primary"
+              on:click={() => {
+                resetExpenseForm();
+                expenseForm.expense_type = "fixed";
+                showExpenseModal = true;
+              }}
+            >
+              + Add fixed expense
+            </button>
+            <button
+              class="btn-bratrax btn-neutral"
+              on:click={() => {
+                resetExpenseForm();
+                expenseForm.expense_type = "variable";
+                showExpenseModal = true;
+              }}
+            >
+              + Add variable expense
+            </button>
+          </div>
+        </div>
+      {:else}
+        <div class="space-y-4 px-6 py-6">
+          <!-- Actions bar -->
+          <div class="flex items-center justify-end gap-3">
+            <button
+              class="btn-bratrax btn-primary btn-compact"
+              on:click={() => {
+                resetExpenseForm();
+                expenseForm.expense_type = "fixed";
+                showExpenseModal = true;
+              }}
+            >
+              + Add fixed expense
+            </button>
+            <button
+              class="btn-bratrax btn-neutral btn-compact"
+              on:click={() => {
+                resetExpenseForm();
+                expenseForm.expense_type = "variable";
+                showExpenseModal = true;
+              }}
+            >
+              + Add variable expense
+            </button>
+          </div>
+
+          <!-- Expense rules list -->
+          {#each expenseRules as rule (rule.entity_id)}
+            <div
+              class="flex items-center justify-between border border-bratrax-border p-4"
+              class:opacity-50={!rule.data.is_active}
+            >
+              <div>
+                <div class="font-medium text-bratrax-text-headline">
+                  {rule.data.title || "Untitled"}
+                </div>
+                <div class="mt-1 text-xs text-bratrax-text-muted">
+                  {#if rule.data.expense_type === "fixed"}
+                    ${rule.data.fixed_amount}/{rule.data.period}
+                  {:else}
+                    {rule.data.variable_percentage}% of {rule.data.variable_metric}
+                  {/if}
+                  &middot; {rule.data.category}
+                  {#if rule.data.is_ad_spend}
+                    &middot; Included in ad spend
+                  {/if}
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  class="font-mono text-[10px] uppercase text-bratrax-text-muted hover:text-bratrax-acid"
+                  on:click={() => handleToggleExpense(rule)}
+                >
+                  {rule.data.is_active ? "Pause" : "Resume"}
+                </button>
+                <button
+                  class="font-mono text-[10px] uppercase text-bratrax-text-muted hover:text-bratrax-tomato"
+                  on:click={() => handleDeleteExpense(rule.entity_id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
 
       <!-- Expense modal -->
       {#if showExpenseModal}
@@ -744,13 +775,13 @@
 
             <div class="mt-6 flex justify-end gap-2">
               <button
-                class="border border-bratrax-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-acid"
+                class="btn-bratrax btn-neutral btn-compact"
                 on:click={() => {
                   showExpenseModal = false;
                 }}>Cancel</button
               >
               <button
-                class="bg-bratrax-acid px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
+                class="btn-bratrax btn-primary btn-compact"
                 disabled={saving || !expenseForm.title}
                 on:click={handleCreateExpense}>Save</button
               >
@@ -759,6 +790,123 @@
         </div>
       {/if}
     {/if}
+    </div>
   {/if}
+  </div>
 </div>
 </div>
+
+<style lang="postcss">
+  /* Round 3 §3 — page wraps content in a white card with the 4px acid bar.
+     Outer page bg + title block sit on the cream canvas. */
+  .cost-card {
+    position: relative;
+    background: var(--color-elevated);
+    border: 0.5px solid var(--color-border);
+  }
+  .cost-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: var(--color-acid);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .cost-card-body {
+    padding: 24px;
+  }
+  /* Empty state owns its own padding (full-bleed center column). */
+  .cost-card-body :global(.cost-empty-state) {
+    padding: 64px 32px;
+  }
+  /* Custom-expenses populated state — already has px-6/py-6 from inline class;
+     cancel the card-body double-padding for that branch. */
+  .cost-card-body :global(.space-y-4.px-6.py-6) {
+    padding: 0;
+  }
+
+  /* Sub-tab row inside the card. Inactive = dark olive caps; active = solid
+     acid pill with black text. Hover (when not active) underlines with acid. */
+  .cost-subtab-bar {
+    display: flex;
+    align-items: center;
+    padding: 22px 24px 14px;
+    border-bottom: 0.5px solid rgba(0, 0, 0, 0.06);
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .cost-subtab {
+    font-family: "Space Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    color: var(--color-acid-text);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .cost-subtab:hover:not(.active) {
+    color: var(--color-text);
+    border-bottom: 2px solid var(--color-acid);
+    padding-bottom: 4px;
+  }
+  .cost-subtab.active {
+    background: var(--color-acid);
+    color: #0A0A0A;
+  }
+
+  /* Structured empty state for Custom Expenses tab. */
+  .cost-empty-state {
+    padding: 64px 32px;
+    text-align: center;
+  }
+  .cost-empty-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 20px;
+    border: 1.5px dashed rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .cost-empty-icon::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 2px;
+    background: var(--color-acid-text);
+  }
+  .cost-empty-icon::after {
+    content: "";
+    position: absolute;
+    width: 2px;
+    height: 18px;
+    background: var(--color-acid-text);
+  }
+  .cost-empty-headline {
+    font-family: "Outfit", sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 8px;
+  }
+  .cost-empty-text {
+    font-family: "Outfit", sans-serif;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    max-width: 380px;
+    margin: 0 auto 24px;
+    line-height: 1.6;
+  }
+  .cost-empty-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+</style>

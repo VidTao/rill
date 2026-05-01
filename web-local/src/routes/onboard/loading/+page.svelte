@@ -300,7 +300,7 @@
         INITIALIZING
       </div>
       <h1 class="text-2xl font-black text-bratrax-text-headline">
-        Setting up your <span class="font-serif italic text-bratrax-acid">analytics</span>
+        Setting up your analytics
       </h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
         This usually takes a few minutes. You can close this tab and come back

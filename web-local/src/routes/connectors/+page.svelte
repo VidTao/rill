@@ -452,18 +452,11 @@
   });
 </script>
 
-<div class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12">
-  <div class="relative w-full max-w-2xl border border-bratrax-border bg-bratrax-surface p-8">
-    <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
-
-    <div class="mb-6">
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
-        CONNECTORS
-      </div>
-      <h1 class="text-2xl font-black text-bratrax-text-headline">
-        Manage your <span class="font-serif italic text-bratrax-acid">connections</span>
-      </h1>
-      <p class="mt-2 text-sm font-light text-bratrax-text-body">
+<div class="connectors-canvas">
+  <div class="connectors-inner">
+    <div class="mb-7">
+      <h1 class="connectors-title">Manage your connections</h1>
+      <p class="connectors-subhead">
         Connect, view, or disconnect your data sources. Changes apply immediately.
       </p>
     </div>
@@ -474,39 +467,32 @@
       </div>
     {/if}
 
-    <div class="flex flex-col gap-3">
+    <div class="connector-list-card">
       {#each platforms as platform}
-        <div class="flex items-center justify-between gap-4 border border-bratrax-border bg-bratrax-bg px-4 py-3">
-          <div class="flex items-center gap-3 min-w-0">
-            <span class="h-3 w-3 flex-shrink-0" style="background-color: {platform.color}"></span>
-            <span class="font-mono text-xs font-bold uppercase tracking-wider text-bratrax-text-headline truncate">
-              {platform.name}
-            </span>
-            {#if isConnected(platform.id)}
-              <span class="flex items-center gap-1 border border-bratrax-acid/50 bg-bratrax-acid/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid">
-                <span class="h-1.5 w-1.5 rounded-full bg-bratrax-acid"></span>
-                Connected
-              </span>
+        {@const connected = isConnected(platform.id)}
+        <div class="connector-row" class:row-disconnected={!connected}>
+          <span class="connector-icon" style="background-color: {platform.color}"></span>
+          <div class="connector-mid">
+            <span class="connector-name">{platform.name}</span>
+            {#if connected}
+              <span class="connector-pill">Connected</span>
             {:else}
-              <span class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">
-                Not connected
-              </span>
+              <span class="connector-status-muted">Not connected</span>
             {/if}
           </div>
-
-          <div class="flex items-center gap-2 flex-shrink-0">
-            {#if isConnected(platform.id)}
+          <div class="connector-actions">
+            {#if connected}
               <button
                 on:click={() => handleView(platform)}
                 disabled={loading === platform.id}
-                class="border border-bratrax-border bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover disabled:opacity-50"
+                class="btn-bratrax btn-neutral btn-compact"
               >
                 View accounts
               </button>
               <button
                 on:click={() => requestDisconnect(platform)}
                 disabled={loading === platform.id}
-                class="border border-bratrax-tomato/40 bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10 disabled:opacity-50"
+                class="btn-bratrax btn-destructive btn-compact"
               >
                 {loading === platform.id ? "Disconnecting…" : "Disconnect"}
               </button>
@@ -514,9 +500,9 @@
               <button
                 on:click={() => handleCardConnect(platform)}
                 disabled={loading === platform.id}
-                class="bg-bratrax-acid px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+                class="btn-bratrax btn-primary btn-compact"
               >
-                {loading === platform.id ? "Connecting…" : "Connect"}
+                {loading === platform.id ? "Connecting…" : "Connect →"}
               </button>
             {/if}
           </div>
@@ -655,13 +641,13 @@
       <div class="mt-6 flex items-center justify-end gap-2">
         <button
           on:click={() => (showConfirmModal = false)}
-          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+          class="btn-bratrax btn-neutral btn-compact"
         >
           Cancel
         </button>
         <button
           on:click={confirmDisconnect}
-          class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
+          class="btn-bratrax btn-destructive btn-compact"
         >
           Disconnect
         </button>
@@ -669,3 +655,116 @@
     </div>
   </div>
 {/if}
+
+<style lang="postcss">
+  /* Round 3 §2 layout — page sits on the cream canvas, content centered. */
+  .connectors-canvas {
+    @apply h-full w-full overflow-y-auto py-12 px-6;
+    background: var(--color-bg);
+  }
+  .connectors-inner {
+    @apply mx-auto w-full max-w-3xl;
+  }
+  .connectors-title {
+    font-family: "Outfit", sans-serif;
+    font-size: 30px;
+    font-weight: 900;
+    color: var(--color-text);
+    letter-spacing: -0.3px;
+    line-height: 1.15;
+    margin-bottom: 10px;
+  }
+  .connectors-subhead {
+    font-family: "Outfit", sans-serif;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+
+  /* Single white card with 4px acid top accent. */
+  .connector-list-card {
+    position: relative;
+    background: var(--color-elevated);
+    border: 0.5px solid var(--color-border);
+  }
+  .connector-list-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: var(--color-acid);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Each row sits directly on the white card; rows separated by hairlines —
+     no sub-cream surface between rows. Disconnected rows get a soft warm tint
+     so the eye lands on the action item. */
+  .connector-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    border-bottom: 0.5px solid rgba(0, 0, 0, 0.06);
+  }
+  .connector-row:first-of-type {
+    padding-top: 22px;
+  }
+  .connector-row:last-child {
+    border-bottom: none;
+  }
+  .row-disconnected {
+    background: rgba(255, 196, 117, 0.05);
+  }
+
+  .connector-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: block;
+  }
+
+  .connector-mid {
+    @apply min-w-0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .connector-name {
+    font-family: "Space Mono", monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--color-text);
+  }
+
+  .connector-pill {
+    font-family: "Space Mono", monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--color-acid);
+    color: #0A0A0A;
+  }
+
+  .connector-status-muted {
+    font-family: "Space Mono", monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .connector-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>

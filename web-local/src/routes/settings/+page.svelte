@@ -462,7 +462,7 @@
         SETTINGS
       </div>
       <h1 class="text-2xl font-black text-bratrax-text-headline">
-        Manage your <span class="font-serif italic text-bratrax-acid">workspace</span>
+        Manage your workspace
       </h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
         Team, billing, and account preferences.

@@ -58,7 +58,7 @@
         </svg>
       </div>
       <h1 class="text-2xl font-black text-bratrax-text-headline">
-        Connect <span class="font-serif italic text-bratrax-acid">Shopify</span>
+        Connect Shopify
       </h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
         Connect your store to start pulling orders, products, and customers.

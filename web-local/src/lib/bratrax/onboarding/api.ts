@@ -46,7 +46,7 @@ export function getOnboardResumeRoute(
     case "created":
       return "/onboard/shopify";
     case "platforms_connected":
-      return "/onboard/stack";
+      return "/onboard";
     case "business_profile":
       return "/onboard/business";
     case "activating":

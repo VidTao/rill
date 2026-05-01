@@ -97,7 +97,7 @@
         You're invited
       </div>
       <h1 class="text-xl font-black text-bratrax-text-headline">
-        Join <span class="font-serif italic text-bratrax-acid">{invite.company_name}</span>
+        Join {invite.company_name}
       </h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
         Joining as <strong>{roleLabel(invite.role)}</strong>{invite.inviter_name ? `, invited by ${invite.inviter_name}` : ""}.

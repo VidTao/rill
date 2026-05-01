@@ -716,6 +716,98 @@ button[role="switch"][data-state="checked"] > span {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   11j. ACID-BUTTON TEXT LOCK (brief Round 3 §1 — anti-pattern fix)
+   "Beige text on acid" bug: many CTAs across the app pair
+   bg-bratrax-acid with text-bratrax-bg, which renders as cream
+   #F5F2EB on acid green — fails contrast and looks broken.
+   Lock every acid-bg button to #0A0A0A black text app-wide so
+   the bug can't reappear.
+   ═══════════════════════════════════════════════════════════ */
+
+button.bg-bratrax-acid,
+a.bg-bratrax-acid,
+.bg-bratrax-acid {
+  color: #0A0A0A !important;
+}
+
+/* The acid CTA's icons (e.g. Lucide Play) inherit currentColor — make sure
+   they also flip to black, not the cream that text-bratrax-bg pulls in. */
+button.bg-bratrax-acid svg,
+a.bg-bratrax-acid svg,
+.bg-bratrax-acid svg {
+  color: #0A0A0A !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   11k. SANCTIONED BUTTON UTILITIES (brief Round 3 §1)
+   Three (well, four including primary) shared classes that any
+   route-level button can consume. Page redesigns reach for these
+   instead of hand-rolling Tailwind ladders.
+   ═══════════════════════════════════════════════════════════ */
+
+.btn-bratrax {
+  font-family: "Space Mono", "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 11px 18px;
+  border: 1px solid;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 120ms ease, color 120ms ease,
+              border-color 120ms ease, opacity 120ms ease;
+}
+.btn-bratrax.btn-compact {
+  padding: 9px 14px;
+}
+.btn-bratrax:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary CTA — solid acid + black text. Same in both themes. */
+.btn-bratrax.btn-primary {
+  background-color: var(--color-acid) !important;
+  color: #0A0A0A !important;
+  border-color: var(--color-acid) !important;
+}
+.btn-bratrax.btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+/* Destructive — 1.5px red border, red text, transparent bg. Always. */
+.btn-bratrax.btn-destructive {
+  background-color: transparent !important;
+  border: 1.5px solid #FF3B30 !important;
+  color: #FF3B30 !important;
+}
+.btn-bratrax.btn-destructive:hover:not(:disabled) {
+  background-color: #FF3B30 !important;
+  color: #FFFFFF !important;
+}
+
+/* Neutral / secondary — neutral border + dark text. */
+.btn-bratrax.btn-neutral {
+  background-color: transparent !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+  color: #1A1A18 !important;
+}
+.btn-bratrax.btn-neutral:hover:not(:disabled) {
+  border-color: #1A1A18 !important;
+}
+:root.dark .btn-bratrax.btn-neutral {
+  border-color: #3A3A3A !important;
+  color: #E8E4DC !important;
+}
+:root.dark .btn-bratrax.btn-neutral:hover:not(:disabled) {
+  border-color: #E8E4DC !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
    11c. CHART TYPOGRAPHY (v1.3 brief Task 10)
    Vega-Lite renders charts as SVG text inside <g class="role-axis"> /
    <g class="role-legend"> / <g class="role-title"> groups. We target
