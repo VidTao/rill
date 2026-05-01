@@ -807,6 +807,22 @@ a.bg-bratrax-acid svg,
   border-color: #E8E4DC !important;
 }
 
+/* Highlighter status pill — Owner, Active, Connected, etc.
+   Matches the "Connected" pill on the Connectors page so every state
+   indicator across the app reads the same way. Same in both themes. */
+.bratrax-status-pill {
+  font-family: "Space Mono", "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  background: var(--color-acid);
+  color: #0A0A0A;
+  display: inline-block;
+  white-space: nowrap;
+}
+
 /* ═══════════════════════════════════════════════════════════
    11c. CHART TYPOGRAPHY (v1.3 brief Task 10)
    Vega-Lite renders charts as SVG text inside <g class="role-axis"> /

@@ -580,7 +580,7 @@
             </div>
 
             {#if m.role === "super_admin"}
-              <span class="border border-bratrax-acid/40 bg-bratrax-acid/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid">
+              <span class="bratrax-status-pill">
                 {roleLabel(m.role)}
               </span>
             {:else if canEditMember(m)}
@@ -602,7 +602,7 @@
               <button
                 type="button"
                 on:click={() => requestRemove(m)}
-                class="border border-bratrax-tomato/40 bg-bratrax-surface px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10"
+                class="btn-bratrax btn-destructive btn-compact"
               >
                 Remove
               </button>
@@ -627,7 +627,7 @@
               <button
                 type="button"
                 on:click={() => copyPendingUrl(p)}
-                class="border border-bratrax-border bg-bratrax-surface px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-text-body hover:bg-bratrax-hover"
+                class="btn-bratrax btn-neutral btn-compact"
               >
                 Copy link
               </button>
@@ -635,7 +635,7 @@
                 <button
                   type="button"
                   on:click={() => revokePending(p)}
-                  class="border border-bratrax-tomato/40 bg-bratrax-surface px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10"
+                  class="btn-bratrax btn-destructive btn-compact"
                 >
                   Revoke
                 </button>
@@ -664,7 +664,7 @@
                   {billing.plan} <span class="font-mono text-sm font-normal text-bratrax-text-muted">— {formatPrice(billing.price_cents, billing.currency)}/{billing.interval}</span>
                 </div>
               </div>
-              <span class="border border-bratrax-acid/40 bg-bratrax-acid/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid">
+              <span class="bratrax-status-pill">
                 {billing.status}
               </span>
             </div>
@@ -774,7 +774,7 @@
                 <span class="font-mono text-sm text-bratrax-text-headline truncate">
                   {ai.key_preview}
                 </span>
-                <span class="border border-bratrax-acid/40 bg-bratrax-acid/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid flex-shrink-0">
+                <span class="bratrax-status-pill flex-shrink-0">
                   Active
                 </span>
               </div>
@@ -783,7 +783,7 @@
                   type="button"
                   on:click={requestRemoveAIKey}
                   disabled={aiRemoving}
-                  class="border border-bratrax-tomato/40 bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10 disabled:opacity-50"
+                  class="btn-bratrax btn-destructive btn-compact"
                 >
                   {aiRemoving ? "Removing…" : "Remove key"}
                 </button>
@@ -881,7 +881,7 @@
                     Active{mcp.created_at ? ` · created ${formatDate(mcp.created_at)}` : ""}
                   </div>
                 </div>
-                <span class="border border-bratrax-acid/40 bg-bratrax-acid/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid flex-shrink-0">
+                <span class="bratrax-status-pill flex-shrink-0">
                   Connected
                 </span>
               </div>
@@ -890,7 +890,7 @@
                   type="button"
                   on:click={requestRegenerateMCP}
                   disabled={mcpRegenerating}
-                  class="border border-bratrax-border bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover disabled:opacity-50"
+                  class="btn-bratrax btn-neutral btn-compact"
                 >
                   {mcpRegenerating ? "Regenerating…" : "Regenerate token"}
                 </button>
@@ -898,7 +898,7 @@
                   type="button"
                   on:click={requestRemoveMCP}
                   disabled={mcpDeleting}
-                  class="border border-bratrax-tomato/40 bg-bratrax-surface px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/10 disabled:opacity-50"
+                  class="btn-bratrax btn-destructive btn-compact"
                 >
                   {mcpDeleting ? "Revoking…" : "Revoke"}
                 </button>
@@ -960,7 +960,7 @@
                   type="button"
                   on:click={requestRegenerateMCP}
                   disabled={mcpRegenerating}
-                  class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+                  class="btn-bratrax btn-primary btn-compact"
                 >
                   {mcpRegenerating ? "Generating…" : "Generate token"}
                 </button>
@@ -1151,13 +1151,13 @@
       <div class="mt-6 flex items-center justify-end gap-2">
         <button
           on:click={() => (confirmRemoveOpen = false)}
-          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+          class="btn-bratrax btn-neutral btn-compact"
         >
           Cancel
         </button>
         <button
           on:click={confirmRemove}
-          class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
+          class="btn-bratrax btn-destructive btn-compact"
         >
           Remove
         </button>
@@ -1196,13 +1196,13 @@
       <div class="mt-6 flex items-center justify-end gap-2">
         <button
           on:click={() => (aiConfirmRemoveOpen = false)}
-          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+          class="btn-bratrax btn-neutral btn-compact"
         >
           Cancel
         </button>
         <button
           on:click={confirmRemoveAIKey}
-          class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
+          class="btn-bratrax btn-destructive btn-compact"
         >
           Remove key
         </button>
@@ -1242,13 +1242,13 @@
       <div class="mt-6 flex items-center justify-end gap-2">
         <button
           on:click={() => (mcpConfirmRegenerateOpen = false)}
-          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+          class="btn-bratrax btn-neutral btn-compact"
         >
           Cancel
         </button>
         <button
           on:click={confirmRegenerateMCP}
-          class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
+          class="btn-bratrax btn-primary btn-compact"
         >
           Regenerate
         </button>
@@ -1287,13 +1287,13 @@
       <div class="mt-6 flex items-center justify-end gap-2">
         <button
           on:click={() => (mcpConfirmRemoveOpen = false)}
-          class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+          class="btn-bratrax btn-neutral btn-compact"
         >
           Cancel
         </button>
         <button
           on:click={confirmRemoveMCP}
-          class="border border-bratrax-tomato/60 bg-bratrax-tomato/10 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-tomato hover:bg-bratrax-tomato/20"
+          class="btn-bratrax btn-destructive btn-compact"
         >
           Revoke
         </button>
