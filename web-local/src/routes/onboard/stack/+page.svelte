@@ -28,7 +28,7 @@
   // the post-connect template-write step is skipped. Backend endpoints,
   // audit table, modal components, and helper functions stay in place; flip
   // a flag to true once aligned with the team.
-  const ENABLE_GOOGLE_TRACKING_TEMPLATES = false;
+  const ENABLE_GOOGLE_TRACKING_TEMPLATES = true;
   const ENABLE_FB_URL_TAGS = false;
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount.
