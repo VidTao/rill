@@ -111,22 +111,37 @@
   // Extraction tap details
   // ---------------------------------------------------------------------------
   interface TapProgress {
-    name: string;
-    rows: number;
-    status: string;
+    label: string;
+    ready: boolean;
+    failed: boolean;
+  }
+
+  // Pretty-print "shopify/2qbgfb-3y.myshopify.com" -> "Shopify (2qbgfb-3y)".
+  // Falls back to the raw key if it doesn't match the source/account pattern.
+  function formatTapLabel(key: string): string {
+    const slash = key.indexOf("/");
+    if (slash === -1) {
+      return key.replace("tap-", "").replace(/_/g, " ");
+    }
+    const source = key.slice(0, slash);
+    const account = key.slice(slash + 1);
+    const sourceLabel = source.replace(/_/g, " ");
+    // Trim "myshopify.com" suffix etc. so the account is short and readable.
+    const accountShort = account.replace(/\.myshopify\.com$/i, "").slice(0, 24);
+    return accountShort ? `${sourceLabel} (${accountShort})` : sourceLabel;
   }
 
   function getTapDetails(s: OnboardStatus): TapProgress[] {
     const ext = s.extraction_status || {};
     const taps = (ext as Record<string, unknown>).taps;
     if (!taps || typeof taps !== "object") return [];
-    return Object.entries(taps as Record<string, { rows?: number; status?: string }>).map(
-      ([name, info]) => ({
-        name: name.replace("tap-", "").replace(/_/g, " "),
-        rows: info?.rows ?? 0,
-        status: info?.status ?? "pending",
-      }),
-    );
+    return Object.entries(
+      taps as Record<string, { ready?: boolean; status?: string }>,
+    ).map(([name, info]) => ({
+      label: formatTapLabel(name),
+      ready: info?.ready === true,
+      failed: info?.status === "failed",
+    }));
   }
 
   // ---------------------------------------------------------------------------
@@ -360,13 +375,14 @@
         <div class="flex flex-col gap-1.5">
           {#each getTapDetails(status) as tap}
             <div class="flex items-center justify-between text-xs">
-              <span class="capitalize text-bratrax-text-body">{tap.name}</span>
-              <span class="font-mono text-bratrax-text-primary">
-                {tap.rows.toLocaleString()} rows
-                {#if tap.status === "running"}
-                  <span class="text-bratrax-acid">syncing</span>
-                {:else if tap.status === "done"}
-                  <span class="text-bratrax-acid">done</span>
+              <span class="capitalize text-bratrax-text-body">{tap.label}</span>
+              <span class="font-mono">
+                {#if tap.failed}
+                  <span class="text-red-500" title="Extract reported an error">✗ error</span>
+                {:else if tap.ready}
+                  <span class="text-bratrax-acid">✓ ready</span>
+                {:else}
+                  <span class="text-bratrax-text-body/60">loading…</span>
                 {/if}
               </span>
             </div>
