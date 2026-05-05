@@ -42,6 +42,19 @@
       {/each}
     </ul>
   {/if}
+
+  <div class="nav-header help-header">Help</div>
+  <ul class="nav-list">
+    <li>
+      <a
+        href="/help"
+        class="nav-link"
+        class:active={currentPath === "/help" || currentPath.startsWith("/help/")}
+      >
+        Help &amp; guides
+      </a>
+    </li>
+  </ul>
 </nav>
 
 <style lang="postcss">
@@ -59,6 +72,10 @@
     text-transform: uppercase;
     color: var(--color-acid-text);
     padding: 0 8px 4px;
+  }
+
+  .help-header {
+    margin-top: 1rem;
   }
 
   .nav-list {

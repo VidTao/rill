@@ -87,6 +87,7 @@
   $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
   $: onSettingsPage = $page.url.pathname.startsWith("/settings");
   $: onSuperadminsPage = $page.url.pathname.startsWith("/superadmins");
+  $: onHelpPage = $page.url.pathname.startsWith("/help");
 
   // Role-based nav visibility. The DB-side enum is super_admin / admin / viewer.
   $: role = $bratraxUser?.role ?? null;
@@ -117,7 +118,7 @@
             <a
               href="/developer"
               class="bratrax-nav-link"
-              class:active={!onConnectorsPage && !onWorkshopPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage}
+              class:active={!onConnectorsPage && !onWorkshopPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage && !onHelpPage}
             >
               Developer
             </a>
@@ -182,6 +183,13 @@
                 Superadmins
               </a>
             {/if}
+            <a
+              href="/help"
+              class="bratrax-nav-link"
+              class:active={onHelpPage}
+            >
+              Help
+            </a>
           </nav>
         {/if}
       {/if}
