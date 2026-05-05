@@ -83,7 +83,6 @@
   $: mode = route.id?.includes("(viz)") ? "Preview" : "Developer";
 
   $: onConnectorsPage = $page.url.pathname.startsWith("/connectors");
-  $: onWorkshopPage = $page.url.pathname.startsWith("/workshop");
   $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
   $: onSettingsPage = $page.url.pathname.startsWith("/settings");
   $: onSuperadminsPage = $page.url.pathname.startsWith("/superadmins");
@@ -118,7 +117,7 @@
             <a
               href="/developer"
               class="bratrax-nav-link"
-              class:active={!onConnectorsPage && !onWorkshopPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage && !onHelpPage}
+              class:active={!onConnectorsPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage && !onHelpPage}
             >
               Developer
             </a>
@@ -131,33 +130,6 @@
                 Connectors
               </a>
             {/if}
-            <!--
-              Workshop tab — disabled for everyone (E19 / 2026-05-04). The tab
-              stays visible as a placeholder; clicks are inert; direct /workshop
-              URL navigation is blocked by routes/workshop/+layout.ts.
-
-              To restore: uncomment the role-gated block below + delete this
-              disabled <span> + delete the redirect in workshop/+layout.ts.
-            -->
-            <!--
-            {#if isSuper}
-              <a
-                href="/workshop"
-                class="bratrax-nav-link"
-                class:active={onWorkshopPage}
-              >
-                Workshop
-              </a>
-            {/if}
-            -->
-            <span
-              class="bratrax-nav-link disabled"
-              aria-disabled="true"
-              tabindex="-1"
-              title="Coming soon"
-            >
-              Workshop
-            </span>
             {#if isAdminOrSuper}
               <a
                 href="/cost-settings"
@@ -254,19 +226,5 @@
 
   :global(.dark) .bratrax-nav-link.active {
     color: var(--color-acid) !important;
-  }
-
-  /* Disabled tab variant — used for Workshop until we ship it. Visually
-     muted, no hover/active feedback, clicks/keyboard interaction inert. */
-  .bratrax-nav-link.disabled {
-    color: var(--color-text-muted) !important;
-    opacity: 0.5;
-    cursor: not-allowed;
-    pointer-events: none;
-    user-select: none;
-  }
-  .bratrax-nav-link.disabled:hover {
-    background: transparent;
-    color: var(--color-text-muted) !important;
   }
 </style>

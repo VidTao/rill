@@ -4,7 +4,7 @@
   import { customYAMLwithJSONandSQL } from "@rilldata/web-common/components/editor/presets/yamlWithJsonAndSql";
   import { GeneratingMessage } from "@rilldata/web-common/components/generating-message";
   import { generatingCanvas } from "@rilldata/web-common/features/canvas/ai-generation/generateCanvas";
-  import DeveloperChat from "@rilldata/web-common/features/chat/DeveloperChat.svelte";
+  import BratraxChatGate from "$lib/bratrax/BratraxChatGate.svelte";
   import Markdown from "@rilldata/web-common/components/markdown/Markdown.svelte";
   import Editor from "@rilldata/web-common/features/editor/Editor.svelte";
   import FileWorkspaceHeader from "@rilldata/web-common/features/editor/FileWorkspaceHeader.svelte";
@@ -131,5 +131,5 @@
       </WorkspaceContainer>
     {/if}
   </div>
-  <DeveloperChat />
+  <BratraxChatGate />
 </div>

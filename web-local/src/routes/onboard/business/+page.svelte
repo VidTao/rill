@@ -69,7 +69,7 @@
   }
 </script>
 
-<div class="flex min-h-screen items-start justify-center bg-bratrax-bg pt-16">
+<div class="flex h-full items-start justify-center overflow-y-auto bg-bratrax-bg pt-16 pb-16">
   <div class="w-full max-w-2xl px-6">
     <!-- Header -->
     <div class="mb-8">

@@ -19,11 +19,7 @@
   import { useProjectTitle } from "@rilldata/web-common/features/project/selectors";
   import { isDeployPage } from "@rilldata/web-common/layout/navigation/route-utils";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
-  import { get } from "svelte/store";
-  import { parseDocument } from "yaml";
-  import InputWithConfirm from "../components/forms/InputWithConfirm.svelte";
   import Tag from "../components/tag/Tag.svelte";
-  import { fileArtifacts } from "../features/entity-management/file-artifacts";
 
   const { developerChat, stickyDashboardState } = featureFlags;
 
@@ -47,9 +43,6 @@
     params: { name: dashboardName },
     route,
   } = $page);
-
-  $: ({ unsavedFiles } = fileArtifacts);
-  $: ({ size: unsavedFileCount } = $unsavedFiles);
 
   // Bratrax theme toggle — sun/moon button left of the AI/ChatToggle.
   // themeControl.preference is the persisted preference store (light/dark/system).
@@ -84,26 +77,6 @@
   ];
 
   $: currentPath = [projectTitle, dashboardName?.toLowerCase()];
-
-  async function submitTitleChange(editedTitle: string) {
-    const artifact = fileArtifacts.getFileArtifact("/rill.yaml");
-
-    let content = get(artifact.editorContent);
-
-    if (!content) {
-      await artifact.fetchContent();
-      content = get(artifact.remoteContent);
-      if (!content) {
-        return;
-      }
-    }
-    const parsed = parseDocument(content);
-
-    parsed.set("display_name", editedTitle);
-
-    artifact.updateEditorContent(parsed.toString(), true);
-    await artifact.saveLocalContent();
-  }
 </script>
 
 <header class:border-b={!onDeployPage} class="bg-surface-base">
@@ -128,15 +101,7 @@
         <Breadcrumbs {pathParts} {currentPath} />
       {/if}
     {:else if mode === "Developer"}
-      <InputWithConfirm
-        size="md"
-        bumpDown
-        type="Project"
-        textClass="font-medium"
-        value={projectTitle}
-        onConfirm={submitTitleChange}
-        showIndicator={unsavedFileCount > 0}
-      />
+      <span class="font-medium">{projectTitle}</span>
     {/if}
   {/if}
 
