@@ -27,6 +27,7 @@ export interface OnboardMeResult {
   client_id: string | null;
   company_name: string;
   clickhouse_db: string;
+  shopify_embed_enabled: boolean;
   step: string;
   connected_platforms: PlatformConnection[];
   stack_selections: Record<string, unknown>;
@@ -45,6 +46,8 @@ export function getOnboardResumeRoute(
   switch (step) {
     case "created":
       return "/onboard/shopify";
+    case "embed_pending":
+      return "/onboard/embed";
     case "platforms_connected":
       return "/onboard";
     case "business_profile":
@@ -219,6 +222,35 @@ export async function onboardDisconnect(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ client_id: clientId, platform }),
     },
+  );
+}
+
+export interface EmbedStatusResult {
+  enabled: boolean;
+  shop: string | null;
+  reason?:
+    | "enabled"
+    | "not_present"
+    | "no_active_theme"
+    | "no_settings_data"
+    | "invalid_settings_json"
+    | "auth_error"
+    | "api_error"
+    | "no_credentials";
+  debug?: Record<string, unknown>;
+}
+
+/**
+ * Poll the Shopify Asset API (server-side) to check whether the merchant
+ * has toggled on the Bratrax Theme App Embed. On detection, the backend
+ * flips rill_clients.shopify_embed_enabled and advances the step machine
+ * from 'embed_pending' to 'platforms_connected'.
+ */
+export async function verifyEmbedStatus(
+  clientId: string,
+): Promise<EmbedStatusResult> {
+  return apiFetch<EmbedStatusResult>(
+    `/bratrax/onboard/embed-status?client_id=${encodeURIComponent(clientId)}`,
   );
 }
 

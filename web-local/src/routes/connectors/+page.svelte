@@ -8,6 +8,7 @@
     onboardDisconnect,
     connectedFromStackSelections,
     getOAuthConfig,
+    verifyEmbedStatus,
   } from "$lib/bratrax/onboarding/api";
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "./AccountSelectionModal.svelte";
@@ -82,6 +83,21 @@
   let fbSdkReady = false;
   let googleManagerMap: Record<string, string> = {};
 
+  // Shopify App Embed (B13/C19) banner state. Surfaces when Shopify is
+  // connected but the merchant hasn't toggled the Theme App Embed on yet —
+  // covers customers who onboarded before B13 shipped and never saw the
+  // /onboard/embed step.
+  let shopifyEmbedEnabled = true;
+  let shopifyShopDomain = "";
+  let embedRecheckBusy = false;
+  let embedRecheckMessage = "";
+
+  $: showShopifyEmbedBanner =
+    connectedPlatforms.has("shopify") && !shopifyEmbedEnabled;
+  $: themeEditorUrl = shopifyShopDomain
+    ? `https://${shopifyShopDomain}/admin/themes/current/editor?context=apps`
+    : "";
+
   // ---------------------------------------------------------------------------
   // Status
   // ---------------------------------------------------------------------------
@@ -90,6 +106,11 @@
     if (!me?.client_id) return;
     clientId = me.client_id;
     stackSelections = me.stack_selections || {};
+    shopifyEmbedEnabled = !!me.shopify_embed_enabled;
+
+    const creds = (stackSelections as Record<string, unknown>)
+      ?.shopify_credentials as { shop?: string } | undefined;
+    shopifyShopDomain = creds?.shop ?? "";
 
     const next = new Set<string>();
     const dates: Record<string, string> = {};
@@ -102,6 +123,50 @@
     for (const p of connectedFromStackSelections(stackSelections)) next.add(p);
     connectedPlatforms = next;
     connectedAt = dates;
+  }
+
+  function explainEmbedReason(reason: string | undefined): string {
+    switch (reason) {
+      case "not_present":
+        return "Not detected yet — make sure you toggled Bratrax on and clicked Save in the Theme Editor.";
+      case "auth_error":
+        return "Shopify rejected the read request. Disconnect and reconnect Shopify so we can request the new theme-read permission.";
+      case "no_active_theme":
+        return "Couldn't find an active theme on this store. Publish a theme and try again.";
+      case "no_settings_data":
+        return "This theme isn't an Online Store 2.0 theme — App embeds aren't supported on legacy themes. Switch to or duplicate into a 2.0 theme.";
+      case "invalid_settings_json":
+        return "Shopify returned a settings file we couldn't parse. Try saving the theme again.";
+      case "api_error":
+        return "Shopify Asset API call failed. Try again in a moment.";
+      case "no_credentials":
+        return "Shopify isn't connected for this client.";
+      default:
+        return "Couldn't verify the embed. Try again.";
+    }
+  }
+
+  async function recheckShopifyEmbed() {
+    if (!clientId || embedRecheckBusy) return;
+    embedRecheckBusy = true;
+    embedRecheckMessage = "";
+    try {
+      const res = await verifyEmbedStatus(clientId);
+      if (res.enabled) {
+        shopifyEmbedEnabled = true;
+        embedRecheckMessage = "";
+      } else {
+        embedRecheckMessage = explainEmbedReason(res.reason);
+        if (res.debug) {
+          // eslint-disable-next-line no-console
+          console.log("[bratrax embed-status]", res);
+        }
+      }
+    } catch (e) {
+      embedRecheckMessage = e instanceof Error ? e.message : String(e);
+    } finally {
+      embedRecheckBusy = false;
+    }
   }
 
   $: isConnected = (id: string): boolean => connectedPlatforms.has(id);
@@ -464,6 +529,48 @@
     {#if error}
       <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
         {error}
+      </div>
+    {/if}
+
+    {#if showShopifyEmbedBanner}
+      <div class="mb-4 border border-bratrax-acid/40 bg-bratrax-acid/10 px-4 py-3">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1">
+            <p class="mb-1 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-acid">
+              Action required
+            </p>
+            <p class="text-sm text-bratrax-text-body">
+              Enable the Bratrax tracker in your Shopify Theme Editor so we
+              can capture email signups and on-site events. Takes about 30
+              seconds.
+            </p>
+            {#if embedRecheckMessage}
+              <p class="mt-2 font-mono text-[11px] text-bratrax-text-muted">
+                {embedRecheckMessage}
+              </p>
+            {/if}
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            {#if themeEditorUrl}
+              <a
+                href={themeEditorUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-bg transition-opacity hover:opacity-90"
+              >
+                Open Theme Editor →
+              </a>
+            {/if}
+            <button
+              type="button"
+              on:click={recheckShopifyEmbed}
+              disabled={embedRecheckBusy}
+              class="border border-bratrax-border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted transition-colors hover:border-bratrax-acid hover:text-bratrax-acid disabled:opacity-40"
+            >
+              {embedRecheckBusy ? "Checking…" : "Re-check"}
+            </button>
+          </div>
+        </div>
       </div>
     {/if}
 
