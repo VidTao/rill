@@ -13,12 +13,39 @@
       const res = await fetch(url, { cache: "no-cache" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw = await res.text();
-      // Make links inside the srcdoc iframe navigate the top-level browser
-      // window instead of staying trapped inside the iframe.
-      html = raw.replace(
-        /<head(\s[^>]*)?>/i,
-        (match) => `${match}<base target="_top">`,
-      );
+
+      // Rewrite link behavior for srcdoc iframe rendering:
+      //   1. <base target="_top"> — absolute / external links escape the
+      //      iframe and navigate the parent window (e.g. /signup, https://...).
+      //   2. <a href="#..."> hash anchors are handled by an injected click
+      //      listener that calls scrollIntoView and prevents the default
+      //      navigation. We can't use target="_self" here because srcdoc
+      //      iframes treat about:srcdoc#xyz as a URL change and re-render
+      //      the entire iframe (looks like a page reload). The click
+      //      interceptor avoids that by never letting navigation happen.
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(raw, "text/html");
+
+      const base = doc.createElement("base");
+      base.setAttribute("target", "_top");
+      doc.head?.prepend(base);
+
+      const tocScript = doc.createElement("script");
+      tocScript.textContent = `
+        document.addEventListener("click", function (e) {
+          var a = e.target && e.target.closest && e.target.closest('a[href^="#"]');
+          if (!a) return;
+          var id = a.getAttribute("href").slice(1);
+          if (!id) return;
+          var target = document.getElementById(id);
+          if (!target) return;
+          e.preventDefault();
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      `;
+      doc.body?.appendChild(tocScript);
+
+      html = "<!DOCTYPE html>" + doc.documentElement.outerHTML;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
