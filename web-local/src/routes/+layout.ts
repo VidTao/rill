@@ -32,7 +32,8 @@ export async function load({ url, depends, untrack, fetch }) {
     url.pathname.startsWith("/signup") ||
     url.pathname.startsWith("/accept-invite") ||
     url.pathname.startsWith("/privacy-policy") ||
-    url.pathname.startsWith("/terms-of-service");
+    url.pathname.startsWith("/terms-of-service") ||
+    url.pathname.startsWith("/vs/");
 
   if (isPublicRoute) {
     return { initialized: false };
