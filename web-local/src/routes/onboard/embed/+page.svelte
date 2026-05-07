@@ -33,8 +33,10 @@
           pollHandle = null;
         }
         // Backend has already advanced step → platforms_connected.
-        // From here, return user to /onboard so they can connect ad platforms.
-        await goto("/onboard");
+        // Send the user to the Build Your Stack screen so they can connect
+        // ad platforms next. /onboard alone has no +page.svelte and would
+        // dead-end; /onboard/stack is the canonical stack-building screen.
+        await goto("/onboard/stack");
         return true;
       }
     } catch (e) {

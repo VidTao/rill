@@ -49,7 +49,7 @@ export function getOnboardResumeRoute(
     case "embed_pending":
       return "/onboard/embed";
     case "platforms_connected":
-      return "/onboard";
+      return "/onboard/stack";
     case "business_profile":
       return "/onboard/business";
     case "activating":
