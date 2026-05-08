@@ -137,6 +137,10 @@ export interface InvitationAcceptResult {
   kind: "team" | "superadmin" | "signup";
   email: string;
   company_name: string | null;
+  // Only meaningful for kind='signup'. Frontend forwards to onboardStart so
+  // the new client row gets is_paid_subscriber=true at create time when
+  // the inviting super_admin marked the invite as inceptly (no payment).
+  requires_payment: boolean | null;
 }
 
 export function acceptInvitation(
