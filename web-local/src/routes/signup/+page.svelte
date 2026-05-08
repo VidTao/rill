@@ -7,7 +7,11 @@
     requestAccess,
   } from "$lib/bratrax/auth";
   import { bratraxUser } from "$lib/bratrax/auth-store";
-  import { onboardStart } from "$lib/bratrax/onboarding/api";
+  import {
+    onboardStart,
+    checkCompanyAvailable,
+    type CompanyCheckResult,
+  } from "$lib/bratrax/onboarding/api";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 
   let email = "";
@@ -22,6 +26,49 @@
   // on slow networks then yank it.
   let configLoaded = false;
   let inviteOnly = true;
+
+  // Company-name uniqueness check (run on blur of the company input).
+  let companyCheckBusy = false;
+  let companyCheckError = "";
+  let companyChecked = false;
+
+  function describeCompanyCheck(reason: CompanyCheckResult["reason"]): string {
+    switch (reason) {
+      case "ok":
+      case "empty":
+        return "";
+      case "taken":
+        return "That company name is already in use. Try another.";
+      case "invalid":
+        return "Use letters or numbers — that doesn't produce a valid name.";
+      case "error":
+      default:
+        return "Couldn't check that name right now. Try again.";
+    }
+  }
+
+  async function runCompanyCheck() {
+    const value = companyName.trim();
+    if (!value) return;
+    companyCheckBusy = true;
+    try {
+      const res = await checkCompanyAvailable(value);
+      companyCheckError = describeCompanyCheck(res.reason);
+      companyChecked = res.available;
+    } catch {
+      companyCheckError = "Couldn't check that name right now. Try again.";
+      companyChecked = false;
+    } finally {
+      companyCheckBusy = false;
+    }
+  }
+
+  function onCompanyInput() {
+    // The user is editing — discard the previous check result so the
+    // submit gate re-engages until they blur and we re-check.
+    companyCheckError = "";
+    companyChecked = false;
+  }
 
   // Request Access modal state.
   let requestOpen = false;
@@ -168,10 +215,17 @@
             id="company"
             type="text"
             bind:value={companyName}
+            on:input={onCompanyInput}
+            on:blur={runCompanyCheck}
             required
             class="signup-input border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
             placeholder="Your brand name"
           />
+          {#if companyCheckBusy}
+            <p class="font-mono text-[10px] text-bratrax-text-muted">Checking availability…</p>
+          {:else if companyCheckError}
+            <p class="font-mono text-[10px] text-bratrax-tomato">{companyCheckError}</p>
+          {/if}
         </div>
 
         <div class="flex flex-col gap-1">
@@ -207,7 +261,7 @@
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || companyCheckBusy || !companyChecked || !!companyCheckError}
           class="mt-2 w-full bg-bratrax-acid px-4 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
         >
           {loading ? "SETTING UP..." : "GET STARTED →"}

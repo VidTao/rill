@@ -64,8 +64,12 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		// the invitation token as the auth credential — invitee has no JWT yet.
 		// /bratrax/access-requests/ is the public submit-an-email-to-request
 		// endpoint, also pre-authentication by design.
+		// /bratrax/onboard/check-company is a single public route inside the
+		// otherwise-gated /bratrax/onboard/* namespace — exact-match (not a
+		// prefix) so we don't accidentally expose adjacent onboard routes.
 		if strings.HasPrefix(r.URL.Path, "/bratrax/invitations/") ||
-			strings.HasPrefix(r.URL.Path, "/bratrax/access-requests") {
+			strings.HasPrefix(r.URL.Path, "/bratrax/access-requests") ||
+			r.URL.Path == "/bratrax/onboard/check-company" {
 			stripBratraxHeaders(r.Header)
 			next.ServeHTTP(w, r)
 			return

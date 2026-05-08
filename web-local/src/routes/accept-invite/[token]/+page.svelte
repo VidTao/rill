@@ -6,7 +6,11 @@
   import type { InvitationPreview } from "$lib/bratrax/settings/types";
   import { bratraxLogin } from "$lib/bratrax/auth";
   import { bratraxUser } from "$lib/bratrax/auth-store";
-  import { onboardStart } from "$lib/bratrax/onboarding/api";
+  import {
+    onboardStart,
+    checkCompanyAvailable,
+    type CompanyCheckResult,
+  } from "$lib/bratrax/onboarding/api";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 
   let invite: InvitationPreview | null = null;
@@ -30,7 +34,52 @@
     !invite.accepted &&
     password.length >= 8 &&
     passwordsMatch &&
-    (!isSignup || companyName.trim().length > 0);
+    (!isSignup ||
+      (companyName.trim().length > 0 &&
+        companyChecked &&
+        !companyCheckError &&
+        !companyCheckBusy));
+
+  // Company-name uniqueness check (signup-kind invites only).
+  let companyCheckBusy = false;
+  let companyCheckError = "";
+  let companyChecked = false;
+
+  function describeCompanyCheck(reason: CompanyCheckResult["reason"]): string {
+    switch (reason) {
+      case "ok":
+      case "empty":
+        return "";
+      case "taken":
+        return "That company name is already in use. Try another.";
+      case "invalid":
+        return "Use letters or numbers — that doesn't produce a valid name.";
+      case "error":
+      default:
+        return "Couldn't check that name right now. Try again.";
+    }
+  }
+
+  async function runCompanyCheck() {
+    const value = companyName.trim();
+    if (!value) return;
+    companyCheckBusy = true;
+    try {
+      const res = await checkCompanyAvailable(value);
+      companyCheckError = describeCompanyCheck(res.reason);
+      companyChecked = res.available;
+    } catch {
+      companyCheckError = "Couldn't check that name right now. Try again.";
+      companyChecked = false;
+    } finally {
+      companyCheckBusy = false;
+    }
+  }
+
+  function onCompanyInput() {
+    companyCheckError = "";
+    companyChecked = false;
+  }
 
   onMount(async () => {
     try {
@@ -177,10 +226,17 @@
             <input
               type="text"
               bind:value={companyName}
+              on:input={onCompanyInput}
+              on:blur={runCompanyCheck}
               placeholder="Your brand name"
               required
               class="w-full border border-bratrax-border bg-bratrax-bg px-3 py-2 text-sm text-bratrax-text-body placeholder-bratrax-text-muted/50 focus:border-bratrax-acid focus:outline-none"
             />
+            {#if companyCheckBusy}
+              <p class="mt-1 font-mono text-[10px] text-bratrax-text-muted">Checking availability…</p>
+            {:else if companyCheckError}
+              <p class="mt-1 font-mono text-[10px] text-bratrax-tomato">{companyCheckError}</p>
+            {/if}
           </div>
         {/if}
         <div>

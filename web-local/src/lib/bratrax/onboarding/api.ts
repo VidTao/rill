@@ -152,6 +152,25 @@ export async function onboardStart(
   });
 }
 
+// Public, unauthenticated. Called on blur of the company-name input on
+// /signup and /accept-invite (kind='signup'). Tells the frontend whether
+// the slug derived from the user's company name collides with an existing
+// rill_clients row, before the user submits and discovers the collision
+// the hard way during onboard_start.
+export interface CompanyCheckResult {
+  available: boolean;
+  reason: "ok" | "taken" | "invalid" | "empty" | "error";
+  normalized: string;
+}
+
+export async function checkCompanyAvailable(
+  name: string,
+): Promise<CompanyCheckResult> {
+  return apiFetch<CompanyCheckResult>(
+    `/bratrax/onboard/check-company?name=${encodeURIComponent(name)}`,
+  );
+}
+
 export async function onboardConnect(
   clientId: string,
   platform: string,
