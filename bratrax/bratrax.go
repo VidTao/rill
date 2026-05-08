@@ -48,7 +48,7 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	}
 
 	// Auth service (persistent JWT issuer)
-	authSvc, err := NewAuthService(store, logger, cfg.IssuerURL, cfg.AudienceURL, cfg.SecureCookie)
+	authSvc, err := NewAuthService(store, logger, cfg.IssuerURL, cfg.AudienceURL, cfg.SecureCookie, cfg.OnlyInvitationLink)
 	if err != nil {
 		store.Close()
 		return nil, fmt.Errorf("bratrax: failed to create auth service: %w", err)
@@ -81,6 +81,10 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleCreateUser)))
 	observability.MuxHandle(mux, "POST /bratrax/auth/signup",
 		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleSignup)))
+	// Public config endpoint — read by the /signup page on mount to decide
+	// whether to render the form or the invite-only message. Public on purpose.
+	observability.MuxHandle(mux, "GET /bratrax/auth/config",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleAuthConfig)))
 
 	// Super_admin client-switcher endpoints. Both auth themselves via the
 	// JWT cookie + role check; not behind the AuthMapper proxy middleware.

@@ -110,7 +110,7 @@ const (
 func setupAuthService(t *testing.T) (*AuthService, *mockUserStore) {
 	t.Helper()
 	store := newMockStore()
-	svc, err := NewAuthService(store, zap.NewNop(), testIssuerURL, testAudienceURL, testSecureCookie)
+	svc, err := NewAuthService(store, zap.NewNop(), testIssuerURL, testAudienceURL, testSecureCookie, false)
 	require.NoError(t, err)
 	return svc, store
 }

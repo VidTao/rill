@@ -55,6 +55,47 @@ export async function bratraxLogout(): Promise<void> {
   });
 }
 
+export interface BratraxAuthConfig {
+  invite_only: boolean;
+}
+
+// Public, unauthenticated. Used by /signup to decide whether to render the
+// form or the invite-only message. Falls back to invite_only=false on any
+// error so a transient failure doesn't lock new users out.
+export async function getAuthConfig(
+  fetchFn: typeof fetch = fetch,
+): Promise<BratraxAuthConfig> {
+  try {
+    const res = await fetchFn(`${getBaseUrl()}/bratrax/auth/config`);
+    if (!res.ok) return { invite_only: false };
+    return await res.json();
+  } catch {
+    return { invite_only: false };
+  }
+}
+
+// Public, unauthenticated. Submits an access request from the /signup
+// invite-only screen. Always returns a known status string — the backend
+// deliberately returns 2xx in all "already known" cases so the UI shows the
+// same friendly message and doesn't leak which emails are already in the
+// system.
+export interface AccessRequestResult {
+  status: "pending" | "already_pending" | "already_approved" | "already_user";
+}
+
+export async function requestAccess(email: string): Promise<AccessRequestResult> {
+  const res = await fetch(`${getBaseUrl()}/bratrax/access-requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function bratraxGetMe(
   fetchFn: typeof fetch = fetch,
 ): Promise<BratraxUser | null> {

@@ -63,7 +63,12 @@ export interface BillingSummary {
 
 export interface InvitationPreview {
   email: string;
-  role: Exclude<Role, "super_admin">;
+  role: Role;
+  // kind distinguishes the three flavors of invitation:
+  //   team       — joining an existing client as admin/viewer
+  //   superadmin — cross-client super_admin (client_id=NULL)
+  //   signup     — pre-authorized public signup; creates a brand-new client
+  kind: "team" | "superadmin" | "signup";
   company_name: string;
   inviter_name: string;
   expired: boolean;

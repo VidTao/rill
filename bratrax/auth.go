@@ -62,7 +62,10 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Public paths bypass JWT auth entirely. The accept-invite flow uses
 		// the invitation token as the auth credential — invitee has no JWT yet.
-		if strings.HasPrefix(r.URL.Path, "/bratrax/invitations/") {
+		// /bratrax/access-requests/ is the public submit-an-email-to-request
+		// endpoint, also pre-authentication by design.
+		if strings.HasPrefix(r.URL.Path, "/bratrax/invitations/") ||
+			strings.HasPrefix(r.URL.Path, "/bratrax/access-requests") {
 			stripBratraxHeaders(r.Header)
 			next.ServeHTTP(w, r)
 			return

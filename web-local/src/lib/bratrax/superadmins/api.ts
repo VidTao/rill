@@ -87,3 +87,82 @@ export function revokeSuperadminInvitation(
     method: "DELETE",
   });
 }
+
+// ---------------------------------------------------------------------------
+// Customer signup invitations (kind='signup')
+//
+// Used when ONLY_INVITATION_LINK=true gates public signup. A super_admin
+// generates a single-use link that lets the recipient set a password +
+// company name and proceed through onboarding.
+// ---------------------------------------------------------------------------
+
+export interface SignupPendingInvite {
+  token: string;
+  email: string;
+  expires_at: string | null;
+  created_at: string | null;
+  accept_url: string;
+  invited_by_email: string | null;
+}
+
+export interface SignupInviteResult {
+  token: string;
+  accept_url: string;
+  expires_at: string | null;
+  email: string;
+}
+
+export function listSignupInvitations(): Promise<{
+  pending: SignupPendingInvite[];
+}> {
+  return apiFetch("/bratrax/superadmins/signup-invitations");
+}
+
+export function createSignupInvite(
+  email: string,
+): Promise<SignupInviteResult> {
+  return apiFetch<SignupInviteResult>("/bratrax/superadmins/signup-invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function revokeSignupInvitation(
+  token: string,
+): Promise<{ revoked: string }> {
+  return apiFetch(`/bratrax/superadmins/signup-invitations/${token}`, {
+    method: "DELETE",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Access requests — submitted from /signup's invite-only screen, reviewed by
+// super_admin. Approve generates a kind='signup' invite (same shape as
+// createSignupInvite); dismiss closes without generating.
+// ---------------------------------------------------------------------------
+
+export interface AccessRequest {
+  id: number;
+  email: string;
+  created_at: string;
+}
+
+export function listAccessRequests(): Promise<{ pending: AccessRequest[] }> {
+  return apiFetch("/bratrax/superadmins/access-requests");
+}
+
+export function approveAccessRequest(id: number): Promise<SignupInviteResult> {
+  return apiFetch<SignupInviteResult>(
+    `/bratrax/superadmins/access-requests/${id}/approve`,
+    { method: "POST" },
+  );
+}
+
+export function dismissAccessRequest(
+  id: number,
+): Promise<{ dismissed: number }> {
+  return apiFetch(`/bratrax/superadmins/access-requests/${id}`, {
+    method: "DELETE",
+  });
+}

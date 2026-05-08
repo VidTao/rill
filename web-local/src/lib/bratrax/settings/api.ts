@@ -132,14 +132,29 @@ export function getInvitation(token: string): Promise<InvitationPreview> {
   return apiFetch<InvitationPreview>(`/bratrax/invitations/${token}`);
 }
 
+export interface InvitationAcceptResult {
+  user_id: number;
+  kind: "team" | "superadmin" | "signup";
+  email: string;
+  company_name: string | null;
+}
+
 export function acceptInvitation(
   token: string,
   password: string,
   name = "",
-): Promise<{ user_id: number }> {
-  return apiFetch(`/bratrax/invitations/${token}/accept`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password, name }),
-  });
+  companyName?: string,
+): Promise<InvitationAcceptResult> {
+  return apiFetch<InvitationAcceptResult>(
+    `/bratrax/invitations/${token}/accept`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password,
+        name,
+        company_name: companyName ?? "",
+      }),
+    },
+  );
 }

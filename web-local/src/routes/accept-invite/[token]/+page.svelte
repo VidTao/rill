@@ -4,6 +4,10 @@
   import { page } from "$app/stores";
   import { acceptInvitation, getInvitation } from "$lib/bratrax/settings/api";
   import type { InvitationPreview } from "$lib/bratrax/settings/types";
+  import { bratraxLogin } from "$lib/bratrax/auth";
+  import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { onboardStart } from "$lib/bratrax/onboarding/api";
+  import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 
   let invite: InvitationPreview | null = null;
   let loadError = "";
@@ -12,13 +16,21 @@
   let name = "";
   let password = "";
   let confirm = "";
+  let companyName = "";
   let submitError = "";
   let submitting = false;
 
   $: token = $page.params.token;
 
+  $: isSignup = invite?.kind === "signup";
   $: passwordsMatch = password.length > 0 && password === confirm;
-  $: canSubmit = !!invite && !invite.expired && !invite.accepted && password.length >= 8 && passwordsMatch;
+  $: canSubmit =
+    !!invite &&
+    !invite.expired &&
+    !invite.accepted &&
+    password.length >= 8 &&
+    passwordsMatch &&
+    (!isSignup || companyName.trim().length > 0);
 
   onMount(async () => {
     try {
@@ -31,11 +43,33 @@
   });
 
   async function submit() {
-    if (!canSubmit) return;
+    if (!canSubmit || !invite) return;
     submitError = "";
     submitting = true;
     try {
-      await acceptInvitation(token, password, name.trim());
+      const result = await acceptInvitation(
+        token,
+        password,
+        name.trim(),
+        isSignup ? companyName.trim() : undefined,
+      );
+
+      // Signup invites: log the new user in immediately and run onboard_start
+      // so they land on /onboard/shopify with a real client. Doing this in one
+      // submit handler keeps the user from getting orphaned (account exists,
+      // no client yet) if they navigate away before completing onboarding.
+      if (result.kind === "signup") {
+        const { user } = await bratraxLogin(result.email, password);
+        bratraxUser.set(user);
+        queryClient.clear();
+        const started = await onboardStart(result.company_name ?? companyName.trim());
+        sessionStorage.setItem("onboard_client_id", started.client_id);
+        sessionStorage.setItem("onboard_client_name", started.client_name);
+        await goto("/onboard/shopify");
+        return;
+      }
+
+      // team / superadmin invites: existing flow — user logs in manually.
       await goto("/login?invited=1");
     } catch (e: any) {
       submitError = e.message ?? "Failed to accept invitation";
@@ -47,6 +81,7 @@
   function roleLabel(r: string): string {
     if (r === "admin") return "Admin";
     if (r === "viewer") return "Viewer";
+    if (r === "super_admin") return "Super admin";
     return r;
   }
 </script>
@@ -94,13 +129,21 @@
       </p>
     {:else if invite}
       <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
-        You're invited
+        {isSignup ? "Welcome to Bratrax" : "You're invited"}
       </div>
       <h1 class="text-xl font-black text-bratrax-text-headline">
-        Join {invite.company_name}
+        {#if isSignup}
+          Create your account
+        {:else}
+          Join {invite.company_name}
+        {/if}
       </h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
-        Joining as <strong>{roleLabel(invite.role)}</strong>{invite.inviter_name ? `, invited by ${invite.inviter_name}` : ""}.
+        {#if isSignup}
+          Set a password and your company name to start onboarding{invite.inviter_name ? `, invited by ${invite.inviter_name}` : ""}.
+        {:else}
+          Joining as <strong>{roleLabel(invite.role)}</strong>{invite.inviter_name ? `, invited by ${invite.inviter_name}` : ""}.
+        {/if}
       </p>
 
       <form on:submit|preventDefault={submit} class="mt-6 flex flex-col gap-3">
@@ -126,6 +169,20 @@
             class="w-full border border-bratrax-border bg-bratrax-bg px-3 py-2 text-sm text-bratrax-text-body placeholder-bratrax-text-muted/50 focus:border-bratrax-acid focus:outline-none"
           />
         </div>
+        {#if isSignup}
+          <div>
+            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              Company name
+            </label>
+            <input
+              type="text"
+              bind:value={companyName}
+              placeholder="Your brand name"
+              required
+              class="w-full border border-bratrax-border bg-bratrax-bg px-3 py-2 text-sm text-bratrax-text-body placeholder-bratrax-text-muted/50 focus:border-bratrax-acid focus:outline-none"
+            />
+          </div>
+        {/if}
         <div>
           <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
             Password
@@ -163,7 +220,11 @@
           disabled={!canSubmit || submitting}
           class="mt-2 w-full bg-bratrax-acid px-4 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
         >
-          {submitting ? "Creating account…" : "Accept invitation"}
+          {#if submitting}
+            {isSignup ? "Setting up…" : "Creating account…"}
+          {:else}
+            {isSignup ? "Create account & start →" : "Accept invitation"}
+          {/if}
         </button>
       </form>
     {/if}

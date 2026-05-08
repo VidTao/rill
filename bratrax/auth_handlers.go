@@ -32,13 +32,14 @@ const (
 
 // AuthService handles authentication endpoints for Bratrax.
 type AuthService struct {
-	store        UserStoreInterface
-	issuer       *auth.Issuer
-	jwks         *keyfunc.JWKS
-	logger       *zap.Logger
-	issuerURL    string
-	audienceURL  string
-	secureCookie bool
+	store              UserStoreInterface
+	issuer             *auth.Issuer
+	jwks               *keyfunc.JWKS
+	logger             *zap.Logger
+	issuerURL          string
+	audienceURL        string
+	secureCookie       bool
+	onlyInvitationLink bool
 }
 
 // jwksKeyFile is the path where the dev JWT signing key is persisted.
@@ -54,7 +55,7 @@ type persistedJWKS struct {
 // NewAuthService creates an AuthService with a persistent JWT issuer.
 // The signing key is saved to ~/.bratrax/jwt_dev_key.json on first run
 // and reused on subsequent runs so tokens survive restarts.
-func NewAuthService(store UserStoreInterface, logger *zap.Logger, issuerURL, audienceURL string, secureCookie bool) (*AuthService, error) {
+func NewAuthService(store UserStoreInterface, logger *zap.Logger, issuerURL, audienceURL string, secureCookie, onlyInvitationLink bool) (*AuthService, error) {
 	issuer, err := loadOrCreateIssuer(logger, issuerURL)
 	if err != nil {
 		return nil, err
@@ -67,13 +68,14 @@ func NewAuthService(store UserStoreInterface, logger *zap.Logger, issuerURL, aud
 	jwks := keyfunc.NewGiven(givenKeys)
 
 	return &AuthService{
-		store:        store,
-		issuer:       issuer,
-		jwks:         jwks,
-		logger:       logger,
-		issuerURL:    issuerURL,
-		audienceURL:  audienceURL,
-		secureCookie: secureCookie,
+		store:              store,
+		issuer:             issuer,
+		jwks:               jwks,
+		logger:             logger,
+		issuerURL:          issuerURL,
+		audienceURL:        audienceURL,
+		secureCookie:       secureCookie,
+		onlyInvitationLink: onlyInvitationLink,
 	}, nil
 }
 
@@ -313,6 +315,18 @@ func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Kill-switch for the public signup form. When ONLY_INVITATION_LINK=true
+	// the only path to a new account is /bratrax/superadmins/signup-invite →
+	// /accept-invite/<token>. Returns a `code` field so the frontend can show
+	// the invite-only UI (vs a generic 403).
+	if s.onlyInvitationLink {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error": "Signup is by invitation only. Contact your administrator for a signup link.",
+			"code":  "signup_invite_only",
+		})
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	var req struct {
 		Email       string `json:"email"`
@@ -369,6 +383,20 @@ func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"token": token,
 		"user":  user,
+	})
+}
+
+// HandleAuthConfig serves GET /bratrax/auth/config. Public, unauthenticated —
+// the frontend calls this on /signup mount to decide whether to render the
+// public signup form or the invite-only message. Add new public-facing config
+// flags to the response shape as needed.
+func (s *AuthService) HandleAuthConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"invite_only": s.onlyInvitationLink,
 	})
 }
 
