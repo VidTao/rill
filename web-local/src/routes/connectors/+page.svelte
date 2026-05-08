@@ -12,6 +12,7 @@
   } from "$lib/bratrax/onboarding/api";
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "./AccountSelectionModal.svelte";
+  import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount
   // (BUG-01: not hardcoded in source). Empty until the fetch completes;
@@ -616,6 +617,8 @@
         </div>
       {/each}
     </div>
+
+    <TrackingTemplateGuide />
   </div>
 </div>
 
