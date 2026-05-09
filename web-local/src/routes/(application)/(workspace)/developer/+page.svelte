@@ -4,7 +4,6 @@
   import { GeneratingMessage } from "@rilldata/web-common/components/generating-message";
   import { generatingCanvas } from "@rilldata/web-common/features/canvas/ai-generation/generateCanvas";
   import BratraxChatGate from "$lib/bratrax/BratraxChatGate.svelte";
-  import OnboardingWorkspace from "@rilldata/web-common/features/onboarding/OnboardingWorkspace.svelte";
   import { generatingSampleData } from "@rilldata/web-common/features/sample-data/generate-sample-data.ts";
   import ProjectCards from "@rilldata/web-common/features/welcome/ProjectCards.svelte";
   import TitleContent from "@rilldata/web-common/features/welcome/TitleContent.svelte";
@@ -92,8 +91,6 @@
           <GeneratingMessage title="Generating your sample data..." />
         {:else if $generatingCanvas}
           <GeneratingMessage title="Generating your Canvas dashboard..." />
-        {:else}
-          <OnboardingWorkspace />
         {/if}
       {:else}
         <div class="scroll" in:fly={{ duration: 1600, delay: 400, y: 8 }}>
