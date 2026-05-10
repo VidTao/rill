@@ -268,11 +268,20 @@
       verifyState = "done";
       if (verifyInterval) clearInterval(verifyInterval);
       verifyInterval = null;
+
+      // Pick the first Canvas/Explore dashboard's file path and route to the
+      // file view, mirroring the post-init redirect in the root +layout.ts.
+      const firstDashboardPath = resources
+        .filter((r) => {
+          const kind = r.meta?.name?.kind;
+          return kind === ResourceKind.Canvas || kind === ResourceKind.Explore;
+        })
+        .flatMap((r) => r.meta?.filePaths ?? [])
+        .find((p) => p.startsWith("/dashboards/"));
+      const target = firstDashboardPath ? `/files${firstDashboardPath}` : "/";
+
       // Brief delay so user sees the final checkmark before redirect
-      redirectTimer = setTimeout(
-        () => goto("/canvas/performance_overview"),
-        1500,
-      );
+      redirectTimer = setTimeout(() => goto(target), 1500);
     } catch (e) {
       // Swallow transient errors — the runtime may be momentarily unreachable
       // as it restarts to pick up newly-deployed project files. Keep polling.
