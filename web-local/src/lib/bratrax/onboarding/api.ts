@@ -63,6 +63,22 @@ export function getOnboardResumeRoute(
   }
 }
 
+// Linear order of onboarding routes. The resume guard uses this to allow
+// forward navigation (e.g. /onboard/stack → /onboard/business when the user
+// clicks "Set up my analytics") while still bouncing backward jumps back to
+// the user's current step.
+const ONBOARD_ROUTE_ORDER = [
+  "/onboard/shopify",
+  "/onboard/embed",
+  "/onboard/stack",
+  "/onboard/business",
+  "/onboard/loading",
+];
+
+export function getOnboardRouteIndex(pathname: string): number {
+  return ONBOARD_ROUTE_ORDER.findIndex((r) => pathname.startsWith(r));
+}
+
 const CRED_KEY_TO_PLATFORM: Record<string, string> = {
   shopify_credentials: "shopify",
   google_ads_credentials: "google_ads",

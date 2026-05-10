@@ -8,6 +8,7 @@ import { bratraxUser, bratraxAuthChecked } from "$lib/bratrax/auth-store";
 import {
   onboardMe,
   getOnboardResumeRoute,
+  getOnboardRouteIndex,
 } from "$lib/bratrax/onboarding/api";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient.js";
 import {
@@ -48,14 +49,20 @@ export async function load({ url, depends, untrack, fetch }) {
   }
 
   // Resume incomplete onboarding: if the user's rill_onboarding_state.step
-  // maps to a specific /onboard/* page and they're not already on it,
-  // redirect. Prefix match allows sub-routes (e.g. /onboard/shopify/callback
-  // stays put while the target is /onboard/shopify).
+  // maps to a specific /onboard/* page, hold them at or after that page.
+  // Forward navigation along the onboard flow is allowed (e.g. clicking
+  // "Set up my analytics" on /onboard/stack must reach /onboard/business
+  // even though the server step is still "platforms_connected"); only
+  // backward jumps and non-onboard routes get bounced back.
   try {
     const me = await onboardMe();
     const target = getOnboardResumeRoute(me?.step);
-    if (target && !url.pathname.startsWith(target)) {
-      throw redirect(307, target);
+    if (target) {
+      const targetIdx = getOnboardRouteIndex(target);
+      const currentIdx = getOnboardRouteIndex(url.pathname);
+      if (currentIdx === -1 || currentIdx < targetIdx) {
+        throw redirect(307, target);
+      }
     }
   } catch (e) {
     // Rethrow SvelteKit redirects; swallow anything else so a transient
