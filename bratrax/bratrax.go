@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 
 	"github.com/rilldata/rill/runtime/pkg/observability"
 	"go.uber.org/zap"
@@ -97,30 +96,6 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	// JWKS endpoint for token validation
 	observability.MuxHandle(mux, "GET /bratrax/.well-known/jwks.json",
 		observability.Middleware("bratrax", logger, authSvc.Issuer().WellKnownHandler()))
-
-	// Apex redirect — free the plain bratrax.com domain. Authenticated users
-	// go to /developer (the former landing page); everyone else is sent to the
-	// Lite marketing/signup subdomain. "GET /{$}" matches ONLY exact "/" — any
-	// other path falls through to the SPA catch-all registered later.
-	liteURL := os.Getenv("BRATRAX_LITE_URL")
-	if liteURL == "" {
-		liteURL = "https://lite.bratrax.com"
-	}
-	apexHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, _, authErr := authMapper.ResolveClientFromCookie(r)
-		if authErr != nil {
-			logger.Debug("apex redirect: auth resolution error", zap.Error(authErr))
-			user = nil
-		}
-		w.Header().Set("Cache-Control", "no-store")
-		if user != nil {
-			http.Redirect(w, r, "/developer", http.StatusFound)
-			return
-		}
-		http.Redirect(w, r, liteURL, http.StatusFound)
-	})
-	observability.MuxHandle(mux, "GET /{$}",
-		observability.Middleware("bratrax", logger, apexHandler))
 
 	// Health and proxy (existing routes)
 	observability.MuxHandle(mux, "/bratrax/health", observability.Middleware("bratrax", logger, healthHandler))

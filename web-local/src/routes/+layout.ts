@@ -24,6 +24,22 @@ Settings.defaultLocale = "en";
 export async function load({ url, depends, untrack, fetch }) {
   depends("init");
 
+  // Apex: marketing homepage, public to everyone. Authed users skip the
+  // marketing page and go straight to their dashboard — preserves the
+  // "logged-in users never see the marketing site" behavior the previous
+  // Go-proxy apex handler enforced. Must run before the isPublicRoute
+  // block below — every path startsWith("/") so a naive prefix match
+  // there would swallow the whole app.
+  if (url.pathname === "/") {
+    const user = await bratraxGetMe(fetch);
+    if (user) {
+      bratraxUser.set(user);
+      bratraxAuthChecked.set(true);
+      throw redirect(307, "/developer");
+    }
+    return { initialized: false };
+  }
+
   // /login, /signup, /accept-invite, and the legal pages are reachable without
   // authentication. Every other path (including /onboard) requires an
   // authenticated session; unauthenticated visitors are bounced to /login
@@ -34,7 +50,8 @@ export async function load({ url, depends, untrack, fetch }) {
     url.pathname.startsWith("/accept-invite") ||
     url.pathname.startsWith("/privacy-policy") ||
     url.pathname.startsWith("/terms-of-service") ||
-    url.pathname.startsWith("/vs/");
+    url.pathname.startsWith("/vs/") ||
+    url.pathname.startsWith("/faq");
 
   if (isPublicRoute) {
     return { initialized: false };
