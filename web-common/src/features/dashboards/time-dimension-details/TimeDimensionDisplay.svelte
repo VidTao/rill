@@ -217,13 +217,6 @@
           We encountered an error while loading the data. Please try refreshing
           the page.
         </div>
-        <div class="text-fg-secondary">
-          If the issue persists, please contact us on <a
-            target="_blank"
-            rel="noopener noreferrer"
-            href="https://discord.gg/2ubRfjC7Rh">Discord</a
-          >.
-        </div>
       </div>
     </div>
   {:else if formattedData && comparisonCopy && measure}

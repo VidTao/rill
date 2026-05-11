@@ -95,13 +95,6 @@
     >
       Documentation
     </DropdownMenu.Item>
-    <DropdownMenu.Item
-      href="https://discord.gg/2ubRfjC7Rh"
-      target="_blank"
-      rel="noreferrer noopener"
-    >
-      Join us on Discord
-    </DropdownMenu.Item>
     <DropdownMenu.Item on:click={handlePylon}>
       Contact Rill support
     </DropdownMenu.Item>

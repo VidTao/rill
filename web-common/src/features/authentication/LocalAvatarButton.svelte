@@ -107,14 +107,6 @@
         >
           Documentation
         </DropdownMenu.Item>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item
-          href="https://discord.gg/2ubRfjC7Rh"
-          target="_blank"
-          rel="noreferrer noopener"
-        >
-          Join us on Discord
-        </DropdownMenu.Item>
       {/if}
 
       {#if externalUser && onLogout}

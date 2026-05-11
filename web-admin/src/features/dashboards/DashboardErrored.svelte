@@ -38,9 +38,4 @@
       </CtaButton>
     </svelte:fragment>
   </ProjectAccessControls>
-  <p class="text-fg-secondary">
-    Need help? Reach out to us on <a href="https://discord.gg/2ubRfjC7Rh"
-      >Discord</a
-    >
-  </p>
 </div>
