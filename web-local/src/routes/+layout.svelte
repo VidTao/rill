@@ -87,6 +87,13 @@
   $: onSettingsPage = $page.url.pathname.startsWith("/settings");
   $: onSuperadminsPage = $page.url.pathname.startsWith("/superadmins");
   $: onHelpPage = $page.url.pathname.startsWith("/help");
+  // Hide the top nav across the entire onboarding flow — none of those tabs
+  // lead anywhere useful for a user who hasn't completed onboarding yet
+  // (no Rill instance, no dashboards, settings would 404 mid-flow). The
+  // resume-onboarding logic in +layout.ts already bounces stray clicks
+  // back, but unmounting the nav avoids the brief flicker AND prevents
+  // users from clicking into half-built pages during /onboard/loading.
+  $: onOnboardPage = $page.url.pathname.startsWith("/onboard");
 
   // Role-based nav visibility. The DB-side enum is super_admin / admin / viewer.
   $: role = $bratraxUser?.role ?? null;
@@ -112,7 +119,7 @@
             {/if}
           </svelte:fragment>
         </ApplicationHeader>
-        {#if !isViewer}
+        {#if !isViewer && !onOnboardPage}
           <nav class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0">
             <a
               href="/developer"
