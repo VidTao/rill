@@ -28,6 +28,8 @@ export interface OnboardMeResult {
   company_name: string;
   clickhouse_db: string;
   shopify_embed_enabled: boolean;
+  is_paid_subscriber: boolean;
+  subscription_status: string | null;
   step: string;
   connected_platforms: PlatformConnection[];
   stack_selections: Record<string, unknown>;
@@ -46,6 +48,8 @@ export function getOnboardResumeRoute(
   switch (step) {
     case "created":
       return "/onboard/shopify";
+    case "payment_pending":
+      return "/onboard/payment";
     case "embed_pending":
       return "/onboard/embed";
     case "platforms_connected":
@@ -160,11 +164,20 @@ export interface OnboardStatus {
 
 export async function onboardStart(
   companyName: string,
+  options: { requiresPayment?: boolean } = {},
 ): Promise<OnboardStartResult> {
+  // requires_payment defaults true on the backend, so we only send the field
+  // explicitly when the caller wants to opt out of the LS paywall (inceptly
+  // invite-link signups). Public /signup omits it → backend defaults TRUE
+  // → step machine starts at payment_pending.
+  const body: Record<string, unknown> = { company_name: companyName };
+  if (options.requiresPayment === false) {
+    body.requires_payment = false;
+  }
   return apiFetch<OnboardStartResult>("/bratrax/onboard/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ company_name: companyName }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -305,4 +318,34 @@ export interface OAuthConfig {
 
 export function getOAuthConfig(): Promise<OAuthConfig> {
   return apiFetch<OAuthConfig>("/bratrax/onboard/oauth-config");
+}
+
+// ----- Lemon Squeezy paywall (C20+ paying-customer onboarding) ---------------
+//
+// Flow: onboard_start sets step='payment_pending' for unpaid clients →
+// layout's getOnboardResumeRoute redirects them to /onboard/payment → page
+// calls getPaymentCheckoutUrl() → window.location = url. After LS payment,
+// LS redirects back to /onboard/payment?return=1, page polls
+// getPaymentStatus() until is_paid=true (webhook confirms it server-side),
+// then goto /onboard/shopify.
+
+export interface PaymentCheckoutResult {
+  checkout_url?: string;
+  already_paid?: boolean;
+  error?: string;
+}
+
+export async function getPaymentCheckoutUrl(): Promise<PaymentCheckoutResult> {
+  return apiFetch<PaymentCheckoutResult>("/bratrax/onboard/payment/checkout", {
+    method: "POST",
+  });
+}
+
+export interface PaymentStatusResult {
+  is_paid: boolean;
+  subscription_status: string | null;
+}
+
+export async function getPaymentStatus(): Promise<PaymentStatusResult> {
+  return apiFetch<PaymentStatusResult>("/bratrax/onboard/payment/status");
 }

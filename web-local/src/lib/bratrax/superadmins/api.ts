@@ -103,6 +103,9 @@ export interface SignupPendingInvite {
   created_at: string | null;
   accept_url: string;
   invited_by_email: string | null;
+  // True = real paying customer (LS checkout required); false = inceptly
+  // internal team (skip payment).
+  requires_payment: boolean;
 }
 
 export interface SignupInviteResult {
@@ -110,6 +113,7 @@ export interface SignupInviteResult {
   accept_url: string;
   expires_at: string | null;
   email: string;
+  requires_payment: boolean;
 }
 
 export function listSignupInvitations(): Promise<{
@@ -120,11 +124,12 @@ export function listSignupInvitations(): Promise<{
 
 export function createSignupInvite(
   email: string,
+  requiresPayment: boolean = true,
 ): Promise<SignupInviteResult> {
   return apiFetch<SignupInviteResult>("/bratrax/superadmins/signup-invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, requires_payment: requiresPayment }),
   });
 }
 

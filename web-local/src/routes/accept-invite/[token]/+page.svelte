@@ -111,9 +111,19 @@
         const { user } = await bratraxLogin(result.email, password);
         bratraxUser.set(user);
         queryClient.clear();
-        const started = await onboardStart(result.company_name ?? companyName.trim());
+        // Forward requires_payment from the accept response so the new
+        // rill_clients row is stamped with the right is_paid_subscriber. If
+        // the invite was inceptly (requires_payment=false), the user skips
+        // /onboard/payment and goes straight to /onboard/shopify.
+        const started = await onboardStart(
+          result.company_name ?? companyName.trim(),
+          { requiresPayment: result.requires_payment ?? true },
+        );
         sessionStorage.setItem("onboard_client_id", started.client_id);
         sessionStorage.setItem("onboard_client_name", started.client_name);
+        // Layout's resume-onboarding logic will redirect to /onboard/payment
+        // for paying users (step=payment_pending) or stay on /onboard/shopify
+        // for inceptly users (step=created).
         await goto("/onboard/shopify");
         return;
       }

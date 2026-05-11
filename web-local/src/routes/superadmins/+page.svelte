@@ -34,13 +34,19 @@
   let inviteResultEmail = "";
   let inviteCopied = false;
 
-  // Signup-invite modal state (customer signup link)
+  // Signup-invite modal state (customer signup link).
+  // signupInviteRequiresPayment: TRUE = real paying customer (LS checkout
+  // required after onboard_start); FALSE = inceptly internal team (skip
+  // payment). Default TRUE for safety — accidentally inviting a paying
+  // customer with the toggle in "free" position would skip billing.
   let signupInviteOpen = false;
   let signupInviteEmail = "";
+  let signupInviteRequiresPayment = true;
   let signupInviteSaving = false;
   let signupInviteResultUrl = "";
   let signupInviteResultExpiresAt = "";
   let signupInviteResultEmail = "";
+  let signupInviteResultRequiresPayment = true;
   let signupInviteCopied = false;
 
   // Access-request actions in flight per id, so the right row's button shows
@@ -161,9 +167,11 @@
 
   function openSignupInvite() {
     signupInviteEmail = "";
+    signupInviteRequiresPayment = true; // safer default
     signupInviteResultUrl = "";
     signupInviteResultExpiresAt = "";
     signupInviteResultEmail = "";
+    signupInviteResultRequiresPayment = true;
     signupInviteCopied = false;
     signupInviteOpen = true;
   }
@@ -177,10 +185,11 @@
     signupInviteSaving = true;
     topError = "";
     try {
-      const result = await createSignupInvite(email);
+      const result = await createSignupInvite(email, signupInviteRequiresPayment);
       signupInviteResultUrl = result.accept_url;
       signupInviteResultExpiresAt = result.expires_at ?? "";
       signupInviteResultEmail = result.email;
+      signupInviteResultRequiresPayment = result.requires_payment;
       await loadData();
     } catch (e: any) {
       topError = e?.message ?? "Failed to create signup link";
@@ -229,10 +238,12 @@
       // the freshly-generated link in the same UX they use for direct
       // invites. The list itself refreshes via loadData() so the request
       // disappears from this section and re-appears under "Customer Signup
-      // Invitations".
+      // Invitations". Access-request approvals always create a paying
+      // invite (no inceptly toggle on the public access-request flow).
       signupInviteResultUrl = result.accept_url;
       signupInviteResultExpiresAt = result.expires_at ?? "";
       signupInviteResultEmail = result.email;
+      signupInviteResultRequiresPayment = result.requires_payment ?? true;
       signupInviteCopied = false;
       signupInviteOpen = true;
       await loadData();
@@ -452,7 +463,12 @@
           {#each signupPending as p (p.token)}
             <li class="flex items-center gap-3 border border-bratrax-border bg-bratrax-bg px-4 py-3">
               <div class="min-w-0 flex-1">
-                <div class="truncate font-mono text-xs font-bold text-bratrax-text-headline">{p.email}</div>
+                <div class="flex items-center gap-2">
+                  <span class="truncate font-mono text-xs font-bold text-bratrax-text-headline">{p.email}</span>
+                  <span class="shrink-0 border px-1.5 py-0.5 font-mono text-[9px] {p.requires_payment ? 'border-bratrax-acid/40 text-bratrax-acid' : 'border-bratrax-border text-bratrax-text-muted'}">
+                    {p.requires_payment ? "REQUIRES PAYMENT" : "FREE (INCEPTLY)"}
+                  </span>
+                </div>
                 <div class="truncate font-mono text-[10px] text-bratrax-text-muted">
                   Signup link · expires {formatDate(p.expires_at)}
                 </div>
@@ -666,7 +682,30 @@
       </p>
 
       {#if !signupInviteResultUrl}
-        <div class="mt-4 flex flex-col gap-3">
+        <div class="mt-4 flex flex-col gap-4">
+          <div>
+            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              User type
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                on:click={() => (signupInviteRequiresPayment = true)}
+                class="border px-3 py-3 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {signupInviteRequiresPayment ? 'border-bratrax-acid text-bratrax-acid bg-bratrax-acid bg-opacity-10' : 'border-bratrax-border text-bratrax-text-muted hover:border-bratrax-acid/40'}"
+              >
+                Real user
+                <span class="block text-[9px] font-normal normal-case tracking-normal text-bratrax-text-muted/70">Requires payment</span>
+              </button>
+              <button
+                type="button"
+                on:click={() => (signupInviteRequiresPayment = false)}
+                class="border px-3 py-3 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {!signupInviteRequiresPayment ? 'border-bratrax-acid text-bratrax-acid bg-bratrax-acid bg-opacity-10' : 'border-bratrax-border text-bratrax-text-muted hover:border-bratrax-acid/40'}"
+              >
+                Inceptly user
+                <span class="block text-[9px] font-normal normal-case tracking-normal text-bratrax-text-muted/70">Free, internal team</span>
+              </button>
+            </div>
+          </div>
           <div>
             <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
               Customer email
@@ -701,6 +740,9 @@
         <div class="mt-4 flex flex-col gap-3">
           <div class="font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
             Link for {signupInviteResultEmail}
+            <span class="ml-2 inline-block border px-1.5 py-0.5 font-mono text-[9px] {signupInviteResultRequiresPayment ? 'border-bratrax-acid/40 text-bratrax-acid' : 'border-bratrax-border text-bratrax-text-muted'}">
+              {signupInviteResultRequiresPayment ? "REQUIRES PAYMENT" : "FREE (INCEPTLY)"}
+            </span>
           </div>
           <div class="flex items-center gap-2">
             <input
