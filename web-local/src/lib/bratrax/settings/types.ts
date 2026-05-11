@@ -37,28 +37,13 @@ export interface InviteResult {
   role: Exclude<Role, "super_admin">;
 }
 
-export interface PaymentMethod {
-  brand: string;
-  last4: string;
-}
-
-export interface Invoice {
-  id: string;
-  date: string;
-  amount_cents: number;
-  status: string;
-  url: string;
-}
-
 export interface BillingSummary {
   plan: string;
   price_cents: number;
   currency: string;
   interval: string;
   status: string;
-  current_period_end: string;
-  payment_method: PaymentMethod | null;
-  invoices: Invoice[];
+  current_period_end: string | null;
 }
 
 export interface InvitationPreview {

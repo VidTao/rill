@@ -240,14 +240,23 @@
       const failed: string[] = [];
       let anyPending = false;
 
+      // A resource is treated as failed ONLY when it has settled (reconcile
+      // status = IDLE) AND still carries a reconcileError. Mid-reconcile
+      // errors are transient: Rill cancels and retries a resource whenever an
+      // upstream's state version changes ("context canceled"), and those
+      // brief error windows would otherwise trigger a permanent "Failed to
+      // build" message and stop the polling cycle — even though the
+      // reconciler self-heals seconds later.
       for (const r of resources) {
         const k = refKey(r.meta?.name);
         if (!required.has(k)) continue;
-        if (r.meta?.reconcileError) {
+        const isIdle =
+          r.meta?.reconcileStatus === V1ReconcileStatus.RECONCILE_STATUS_IDLE;
+        if (isIdle && r.meta?.reconcileError) {
           failed.push(r.meta?.name?.name ?? k);
           continue;
         }
-        if (r.meta?.reconcileStatus !== V1ReconcileStatus.RECONCILE_STATUS_IDLE) {
+        if (!isIdle) {
           anyPending = true;
         }
       }

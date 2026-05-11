@@ -206,7 +206,7 @@
 
     <p class="mt-6 text-xs text-bratrax-text-muted/60">
       Questions about pricing or your subscription? Email
-      <a href="mailto:hello@bratrax.com" class="text-bratrax-acid hover:underline">hello@bratrax.com</a>.
+      <a href="mailto:support@bratrax.com" class="text-bratrax-acid hover:underline">support@bratrax.com</a>.
     </p>
   </div>
 </div>

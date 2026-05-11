@@ -50,6 +50,11 @@
   async function runCompanyCheck() {
     const value = companyName.trim();
     if (!value) return;
+    if (value.length < 3) {
+      companyCheckError = "Company name must be at least 3 characters.";
+      companyChecked = false;
+      return;
+    }
     companyCheckBusy = true;
     try {
       const res = await checkCompanyAvailable(value);

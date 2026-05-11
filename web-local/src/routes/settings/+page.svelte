@@ -420,7 +420,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  function formatDate(iso: string): string {
+  function formatDate(iso: string | null): string {
     if (!iso) return "";
     try {
       return new Date(iso).toLocaleDateString();
@@ -668,71 +668,21 @@
                 {billing.status}
               </span>
             </div>
-            <p class="mt-2 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
-              Renews {formatDate(billing.current_period_end)}
-            </p>
-            <div class="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                disabled
-                class="cursor-not-allowed border border-bratrax-border bg-bratrax-surface px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted opacity-60"
-                title="Coming soon"
-              >
-                Manage Subscription · Coming soon
-              </button>
-            </div>
-          </div>
-
-          {#if billing.payment_method}
-            <div class="border border-bratrax-border bg-bratrax-bg p-4">
-              <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
-                Payment method
-              </div>
-              <div class="mt-2 flex items-center justify-between">
-                <span class="font-mono text-sm text-bratrax-text-headline">
-                  {billing.payment_method.brand.toUpperCase()} ending {billing.payment_method.last4}
-                </span>
-                <button
-                  type="button"
-                  disabled
-                  class="cursor-not-allowed border border-bratrax-border bg-bratrax-surface px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted opacity-60"
-                  title="Coming soon"
-                >
-                  Update card · Coming soon
-                </button>
-              </div>
-            </div>
-          {/if}
-
-          <div>
-            <h3 class="mb-3 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
-              Invoices
-            </h3>
-            {#if billing.invoices.length === 0}
-              <p class="font-mono text-xs text-bratrax-text-muted">No invoices yet.</p>
-            {:else}
-              <ul class="flex flex-col gap-1.5">
-                {#each billing.invoices as inv}
-                  <li class="flex items-center justify-between border border-bratrax-border bg-bratrax-bg px-4 py-2">
-                    <div class="font-mono text-xs text-bratrax-text-body">
-                      {formatDate(inv.date)}
-                    </div>
-                    <div class="font-mono text-xs text-bratrax-text-headline">
-                      {formatPrice(inv.amount_cents, billing.currency)}
-                    </div>
-                    <span class="border border-bratrax-border bg-bratrax-surface px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-text-muted">
-                      {inv.status}
-                    </span>
-                    <a
-                      href={inv.url}
-                      class="font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-acid hover:underline"
-                    >
-                      View
-                    </a>
-                  </li>
-                {/each}
-              </ul>
+            {#if billing.current_period_end}
+              <p class="mt-2 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
+                Renews {formatDate(billing.current_period_end)}
+              </p>
             {/if}
+            <div class="mt-3 flex items-center gap-2">
+              <a
+                href="https://join.bratrax.com/billing"
+                target="_blank"
+                rel="noopener"
+                class="border border-bratrax-acid bg-bratrax-acid/10 px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-acid hover:bg-bratrax-acid/20"
+              >
+                Manage Subscription
+              </a>
+            </div>
           </div>
         </div>
       {:else}
