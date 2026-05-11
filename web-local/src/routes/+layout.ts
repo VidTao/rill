@@ -54,14 +54,50 @@ export async function load({ url, depends, untrack, fetch }) {
   // "Set up my analytics" on /onboard/stack must reach /onboard/business
   // even though the server step is still "platforms_connected"); only
   // backward jumps and non-onboard routes get bounced back.
+  //
+  // HARD-GATE STEPS override the forward-nav allowance — the user must be
+  // exactly on the target path, not anywhere downstream:
+  //   - payment_pending: must complete LS checkout before any onboarding
+  //   - embed_pending:   must enable the Shopify Theme App Embed before
+  //                      proceeding (so attribution doesn't silently miss
+  //                      email signups / Klaviyo onsite events)
+  //   - created:         must connect Shopify next; transitioning out of
+  //                      this step is server-driven (OAuth callback flips
+  //                      to embed_pending), so the forward-nav allowance
+  //                      isn't needed and lets users jump into
+  //                      half-broken downstream pages otherwise.
+  // Without these gates a user could type /onboard/shopify directly while
+  // payment_pending and the forward-nav rule would let them stay there.
+  const HARD_GATE_STEPS = new Set([
+    "payment_pending",
+    "embed_pending",
+    "created",
+  ]);
   try {
     const me = await onboardMe();
+
+    // Fully-onboarded users typing /onboard/* directly: bounce to the
+    // workspace landing. Without this they'd land on stale onboarding
+    // screens — most worryingly /onboard/business which would happily
+    // re-submit the questionnaire and trigger another _run_activation.
+    if (me?.step === "ready" && url.pathname.startsWith("/onboard")) {
+      throw redirect(307, "/developer");
+    }
+
     const target = getOnboardResumeRoute(me?.step);
     if (target) {
-      const targetIdx = getOnboardRouteIndex(target);
-      const currentIdx = getOnboardRouteIndex(url.pathname);
-      if (currentIdx === -1 || currentIdx < targetIdx) {
-        throw redirect(307, target);
+      const isHardGate = me?.step ? HARD_GATE_STEPS.has(me.step) : false;
+      if (isHardGate) {
+        // Must be on the gate page exactly. Anything else bounces back.
+        if (!url.pathname.startsWith(target)) {
+          throw redirect(307, target);
+        }
+      } else {
+        const targetIdx = getOnboardRouteIndex(target);
+        const currentIdx = getOnboardRouteIndex(url.pathname);
+        if (currentIdx === -1 || currentIdx < targetIdx) {
+          throw redirect(307, target);
+        }
       }
     }
   } catch (e) {

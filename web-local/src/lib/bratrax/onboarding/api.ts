@@ -71,7 +71,19 @@ export function getOnboardResumeRoute(
 // forward navigation (e.g. /onboard/stack → /onboard/business when the user
 // clicks "Set up my analytics") while still bouncing backward jumps back to
 // the user's current step.
+//
+// /onboard/payment is first because the LS paywall gates everything else —
+// a user with step='payment_pending' can't reach /onboard/shopify until
+// the subscription webhook flips them to step='created'.
+//
+// Adding a new onboard route requires THREE updates in lockstep:
+//   1. Add a `case` to getOnboardResumeRoute() mapping the step name → route
+//   2. Add the route to ONBOARD_ROUTE_ORDER below in its linear position
+//   3. If it's a hard gate (user MUST be exactly here, no forward bypass),
+//      add the step name to HARD_GATE_STEPS in routes/+layout.ts
+// Missing #2 → infinite redirect loop. Missing #3 → URL-bar bypassable.
 const ONBOARD_ROUTE_ORDER = [
+  "/onboard/payment",
   "/onboard/shopify",
   "/onboard/embed",
   "/onboard/stack",
