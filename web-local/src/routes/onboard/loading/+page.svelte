@@ -5,6 +5,7 @@
   import { onboardStatus, onboardMe } from "$lib/bratrax/onboarding/api";
   import type { OnboardStatus } from "$lib/bratrax/onboarding/api";
   import {
+    runtimeServiceCreateTrigger,
     runtimeServiceListResources,
     V1ReconcileStatus,
     type V1Resource,
@@ -13,7 +14,7 @@
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import { ResourceKind } from "@rilldata/web-common/features/entity-management/resource-selectors";
 
-  type VerifyState = "pending" | "running" | "done" | "error";
+  type VerifyState = "pending" | "running" | "refreshing" | "done" | "error";
 
   let status: OnboardStatus | null = null;
   let error = "";
@@ -23,12 +24,33 @@
   let verifyState: VerifyState = "pending";
   let redirectTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Once reconcile is settled, fire a one-shot source refresh so DuckDB
+  // re-materializes from the freshly-populated ClickHouse tables. Without
+  // this, dashboards render null until the next hourly cron tick.
+  // States: false = not yet, true = in flight, "failed" = trigger errored
+  // (proceed to redirect immediately).
+  let triggeredRefresh: boolean | "failed" = false;
+  let refreshStartMs = 0;
+  // Confirms the trigger actually propagated to resources (we saw at least
+  // one transition out of IDLE post-trigger). Without this we can redirect
+  // prematurely: CreateTrigger returns before the runtime controller has
+  // stamped Trigger=true on the resources, so the next 2s poll still sees
+  // all-IDLE from the pre-trigger state and falsely declares "done".
+  let sawPendingAfterTrigger = false;
+  const REFRESH_TIMEOUT_MS = 5 * 60 * 1000;
+  const TRIGGER_GRACE_MS = 8 * 1000;
+
   // ---------------------------------------------------------------------------
   // Step display configuration
   // ---------------------------------------------------------------------------
+  type StepState = "done" | "running" | "pending" | "error";
   interface StepDisplay {
     label: string;
-    check: (s: OnboardStatus) => "done" | "running" | "pending" | "error";
+    // `vs` is included in the signature so Svelte tracks `verifyState` as a
+    // template-level reactive dep at the call site — without it, changes to
+    // verifyState (which the last two checks read from closure) wouldn't
+    // re-render the step list, leaving the UI stuck on the old state.
+    check: (s: OnboardStatus, vs: VerifyState) => StepState;
   }
 
   const steps: StepDisplay[] = [
@@ -100,9 +122,23 @@
     },
     {
       label: "Verifying dashboards",
-      check: (s) => {
+      check: (s, vs) => {
         if (s.step !== "ready") return "pending";
-        return verifyState;
+        // Conceptually done once we've moved past the reconcile-wait phase
+        // into the source-refresh phase (or have finished entirely).
+        if (vs === "refreshing" || vs === "done") return "done";
+        if (vs === "error") return "error";
+        if (vs === "running") return "running";
+        return "pending";
+      },
+    },
+    {
+      label: "Loading your data",
+      check: (s, vs) => {
+        if (s.step !== "ready") return "pending";
+        if (vs === "refreshing") return "running";
+        if (vs === "done") return "done";
+        return "pending";
       },
     },
   ];
@@ -240,23 +276,43 @@
       const failed: string[] = [];
       let anyPending = false;
 
+      // Kinds whose pending state must block redirect. Walking only the
+      // required-from-dashboards set is too narrow: refs on a MetricsView
+      // may not always advertise every Model it transitively depends on
+      // (downstream model→model refs in particular), so a re-materialization
+      // triggered by our CreateTrigger can leave Models still PENDING while
+      // the required set already shows IDLE. Waiting on the broader set
+      // catches those. Infra kinds (ProjectParser, Connector, Theme) are
+      // excluded — they reconcile briefly on every load and shouldn't gate
+      // user-facing data.
+      const DATA_KINDS = new Set<string>([
+        ResourceKind.Source,
+        ResourceKind.Model,
+        ResourceKind.MetricsView,
+        ResourceKind.Explore,
+        ResourceKind.Canvas,
+        ResourceKind.Component,
+      ]);
+
       // A resource is treated as failed ONLY when it has settled (reconcile
       // status = IDLE) AND still carries a reconcileError. Mid-reconcile
       // errors are transient: Rill cancels and retries a resource whenever an
       // upstream's state version changes ("context canceled"), and those
       // brief error windows would otherwise trigger a permanent "Failed to
       // build" message and stop the polling cycle — even though the
-      // reconciler self-heals seconds later.
+      // reconciler self-heals seconds later. The failed check stays scoped
+      // to the required set: an errored Model that nothing depends on
+      // shouldn't block redirect.
       for (const r of resources) {
         const k = refKey(r.meta?.name);
-        if (!required.has(k)) continue;
+        const kind = r.meta?.name?.kind ?? "";
         const isIdle =
           r.meta?.reconcileStatus === V1ReconcileStatus.RECONCILE_STATUS_IDLE;
-        if (isIdle && r.meta?.reconcileError) {
+        if (required.has(k) && isIdle && r.meta?.reconcileError) {
           failed.push(r.meta?.name?.name ?? k);
           continue;
         }
-        if (!isIdle) {
+        if (!isIdle && DATA_KINDS.has(kind)) {
           anyPending = true;
         }
       }
@@ -269,8 +325,81 @@
         return;
       }
 
+      // Record the moment the triggered resources actually started
+      // reconciling — required before we can trust a subsequent all-IDLE
+      // observation to mean "refresh finished" rather than "trigger not yet
+      // applied".
+      if (triggeredRefresh === true && anyPending) {
+        sawPendingAfterTrigger = true;
+      }
+
       if (anyPending) {
-        verifyState = "running";
+        // Bail out if the post-trigger reconcile drags on past the timeout —
+        // landing the user on a slightly-stale dashboard is better than
+        // trapping them on the loading screen indefinitely. The hourly cron
+        // will catch up regardless.
+        const timedOut =
+          triggeredRefresh === true &&
+          Date.now() - refreshStartMs > REFRESH_TIMEOUT_MS;
+        if (!timedOut) {
+          verifyState = triggeredRefresh ? "refreshing" : "running";
+          return;
+        }
+        console.warn(
+          "Onboarding source refresh exceeded timeout; redirecting anyway.",
+        );
+      }
+
+      // First time we see all-IDLE: reconcile is settled but DuckDB still
+      // holds whatever the last hourly cron materialized — which predates the
+      // just-finished onboarding extracts. Force a source refresh so the
+      // dashboard renders populated data on first paint instead of waiting
+      // for the next cron tick. Set the flag synchronously before awaiting
+      // to keep re-entrant verify() invocations from re-triggering.
+      if (!triggeredRefresh) {
+        triggeredRefresh = true;
+        refreshStartMs = Date.now();
+        verifyState = "refreshing";
+        try {
+          const sourceResources = resources.filter(
+            (r) => r.meta?.name?.kind === ResourceKind.Source,
+          );
+          if (sourceResources.length > 0) {
+            await runtimeServiceCreateTrigger(instanceId, {
+              resources: sourceResources.map((r) => ({
+                kind: ResourceKind.Source,
+                name: r.meta!.name!.name!,
+              })),
+            });
+          } else {
+            // Sources may be listed under kind=Model with definedAsSource;
+            // fall back to triggering all data resources so the fix still
+            // engages instead of silently no-op'ing.
+            await runtimeServiceCreateTrigger(instanceId, { all: true });
+          }
+        } catch (triggerErr) {
+          console.warn(
+            "Onboarding source refresh trigger failed:",
+            triggerErr,
+          );
+          triggeredRefresh = "failed";
+        }
+        return;
+      }
+
+      // All-IDLE post-trigger, but we may have raced ahead of the controller:
+      // CreateTrigger returns before Trigger=true has propagated to each
+      // resource. If we never observed a RECONCILING state since the trigger
+      // fired, give the controller a brief grace window before assuming the
+      // refresh is actually finished. After the grace period, redirect anyway
+      // (the trigger may have legitimately produced no work — e.g. all-empty
+      // source filter falling back to {all:true} that no-op'd).
+      if (
+        triggeredRefresh === true &&
+        !sawPendingAfterTrigger &&
+        Date.now() - refreshStartMs < TRIGGER_GRACE_MS
+      ) {
+        verifyState = "refreshing";
         return;
       }
 
@@ -294,7 +423,7 @@
     } catch (e) {
       // Swallow transient errors — the runtime may be momentarily unreachable
       // as it restarts to pick up newly-deployed project files. Keep polling.
-      verifyState = "running";
+      verifyState = triggeredRefresh ? "refreshing" : "running";
       console.warn("Rill resource verification failed, retrying:", e);
     }
   }
@@ -349,7 +478,7 @@
 
     <div class="flex flex-col gap-3">
       {#each steps as step}
-        {@const state = status ? step.check(status) : "pending"}
+        {@const state = status ? step.check(status, verifyState) : "pending"}
         <div class="flex items-center gap-3">
           {#if state === "done"}
             <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center bg-bratrax-acid/20">
