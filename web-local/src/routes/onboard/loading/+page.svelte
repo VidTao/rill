@@ -31,14 +31,17 @@
   // (proceed to redirect immediately).
   let triggeredRefresh: boolean | "failed" = false;
   let refreshStartMs = 0;
-  // Confirms the trigger actually propagated to resources (we saw at least
-  // one transition out of IDLE post-trigger). Without this we can redirect
-  // prematurely: CreateTrigger returns before the runtime controller has
-  // stamped Trigger=true on the resources, so the next 2s poll still sees
-  // all-IDLE from the pre-trigger state and falsely declares "done".
-  let sawPendingAfterTrigger = false;
-  const REFRESH_TIMEOUT_MS = 5 * 60 * 1000;
-  const TRIGGER_GRACE_MS = 8 * 1000;
+  // Number of consecutive verify() polls that saw zero pending resources
+  // since the trigger fired. We require several in a row before declaring
+  // "done" — Rill reconciles in cascade waves (Source IDLE → brief gap →
+  // downstream Model goes PENDING → IDLE → MetricsView goes PENDING → …),
+  // so a single all-IDLE observation can fall in the gap between two waves
+  // and produce a premature redirect. Also subsumes the older "trigger
+  // hasn't propagated yet" guard: if the trigger had no effect, the counter
+  // simply ticks up uninterrupted and we redirect within ~6 seconds.
+  let consecutiveIdlePolls = 0;
+  const REFRESH_TIMEOUT_MS = 10 * 60 * 1000;
+  const REQUIRED_IDLE_POLLS = 3;
 
   // ---------------------------------------------------------------------------
   // Step display configuration
@@ -325,22 +328,14 @@
         return;
       }
 
-      // Record the moment the triggered resources actually started
-      // reconciling — required before we can trust a subsequent all-IDLE
-      // observation to mean "refresh finished" rather than "trigger not yet
-      // applied".
-      if (triggeredRefresh === true && anyPending) {
-        sawPendingAfterTrigger = true;
-      }
+      const timedOut =
+        triggeredRefresh === true &&
+        Date.now() - refreshStartMs > REFRESH_TIMEOUT_MS;
 
       if (anyPending) {
-        // Bail out if the post-trigger reconcile drags on past the timeout —
-        // landing the user on a slightly-stale dashboard is better than
-        // trapping them on the loading screen indefinitely. The hourly cron
-        // will catch up regardless.
-        const timedOut =
-          triggeredRefresh === true &&
-          Date.now() - refreshStartMs > REFRESH_TIMEOUT_MS;
+        // Any pending resource resets the stability counter — we're not
+        // close to done yet.
+        consecutiveIdlePolls = 0;
         if (!timedOut) {
           verifyState = triggeredRefresh ? "refreshing" : "running";
           return;
@@ -360,6 +355,7 @@
         triggeredRefresh = true;
         refreshStartMs = Date.now();
         verifyState = "refreshing";
+        consecutiveIdlePolls = 0;
         try {
           const sourceResources = resources.filter(
             (r) => r.meta?.name?.kind === ResourceKind.Source,
@@ -387,17 +383,19 @@
         return;
       }
 
-      // All-IDLE post-trigger, but we may have raced ahead of the controller:
-      // CreateTrigger returns before Trigger=true has propagated to each
-      // resource. If we never observed a RECONCILING state since the trigger
-      // fired, give the controller a brief grace window before assuming the
-      // refresh is actually finished. After the grace period, redirect anyway
-      // (the trigger may have legitimately produced no work — e.g. all-empty
-      // source filter falling back to {all:true} that no-op'd).
+      // All-IDLE post-trigger. Require several consecutive idle polls before
+      // redirecting — Rill reconciles in cascade waves (Source IDLE → brief
+      // gap → downstream Model PENDING → IDLE → MetricsView PENDING → …),
+      // and a single all-IDLE observation can fall in the gap between two
+      // waves. The 1.5s redirect timer makes a premature redirect particularly
+      // bad: by the time goto() fires, the next wave has started and the
+      // dashboard renders mid-cascade. Timeout and "failed" trigger bypass
+      // this check.
+      consecutiveIdlePolls += 1;
       if (
+        !timedOut &&
         triggeredRefresh === true &&
-        !sawPendingAfterTrigger &&
-        Date.now() - refreshStartMs < TRIGGER_GRACE_MS
+        consecutiveIdlePolls < REQUIRED_IDLE_POLLS
       ) {
         verifyState = "refreshing";
         return;
