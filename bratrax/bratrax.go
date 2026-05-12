@@ -3,8 +3,10 @@ package bratrax
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/rilldata/rill/runtime/pkg/observability"
 	"go.uber.org/zap"
@@ -96,6 +98,57 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	// JWKS endpoint for token validation
 	observability.MuxHandle(mux, "GET /bratrax/.well-known/jwks.json",
 		observability.Middleware("bratrax", logger, authSvc.Issuer().WellKnownHandler()))
+
+	// sitemap.xml + robots.txt: proxy through to the marketing static repo on
+	// GitHub instead of baking them into the binary. Editing the file in the
+	// GitHub repo updates production without a rebuild. Crawlers fetch these
+	// as raw bytes (not via a browser), so unlike the HTML marketing pages
+	// these can't be iframed client-side — the proxy has to live server-side.
+	githubFetcher := &http.Client{Timeout: 8 * time.Second}
+	fetchGithubStatic := func(rawURL string) ([]byte, error) {
+		resp, getErr := githubFetcher.Get(rawURL)
+		if getErr != nil {
+			return nil, getErr
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("github raw returned HTTP %d", resp.StatusCode)
+		}
+		return io.ReadAll(resp.Body)
+	}
+	observability.MuxHandle(mux, "GET /sitemap.xml",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, fetchErr := fetchGithubStatic("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/sitemap.xml")
+			if fetchErr != nil {
+				logger.Warn("sitemap.xml fetch failed", zap.Error(fetchErr))
+				http.Error(w, "sitemap unavailable", http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+			w.Header().Set("Cache-Control", "public, max-age=300")
+			if _, writeErr := w.Write(body); writeErr != nil {
+				logger.Debug("sitemap.xml write failed", zap.Error(writeErr))
+			}
+		})))
+	observability.MuxHandle(mux, "GET /robots.txt",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, fetchErr := fetchGithubStatic("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/robots.txt")
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			if fetchErr != nil {
+				// Fall back to allow-all rather than 5xx — some crawlers treat
+				// a missing/erroring robots.txt as "back off completely", which
+				// is the opposite of what we want for a marketing site.
+				logger.Warn("robots.txt fetch failed; serving permissive fallback", zap.Error(fetchErr))
+				if _, writeErr := w.Write([]byte("User-agent: *\nDisallow:\n")); writeErr != nil {
+					logger.Debug("robots.txt fallback write failed", zap.Error(writeErr))
+				}
+				return
+			}
+			w.Header().Set("Cache-Control", "public, max-age=300")
+			if _, writeErr := w.Write(body); writeErr != nil {
+				logger.Debug("robots.txt write failed", zap.Error(writeErr))
+			}
+		})))
 
 	// Health and proxy (existing routes)
 	observability.MuxHandle(mux, "/bratrax/health", observability.Middleware("bratrax", logger, healthHandler))
