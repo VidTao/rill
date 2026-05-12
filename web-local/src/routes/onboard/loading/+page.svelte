@@ -465,7 +465,7 @@
         Setting up your analytics
       </h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
-        This usually takes a few minutes. You can close this tab and come back
+        This usually takes 10–15 minutes. You can close this tab and come back
         — we'll keep working in the background.
       </p>
     </div>
