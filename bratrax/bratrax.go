@@ -150,6 +150,82 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 			}
 		})))
 
+	// Marketing pages: serve the GitHub-authored HTML as the actual top-level
+	// document so crawlers, social-media unfurlers, and the browser tab title
+	// see per-page <meta>/<title> tags from the page itself (previously
+	// hidden behind a client-side iframe sandbox). The Svelte iframe routes
+	// at the same paths remain as the fallback for in-app SPA navigation;
+	// direct visits hit these handlers first because the mux's explicit
+	// patterns take precedence over the SPA's catch-all.
+	serveGithubHTML := func(githubURL string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			body, fetchErr := fetchGithubStatic(githubURL)
+			if fetchErr != nil {
+				logger.Warn("marketing page fetch failed",
+					zap.String("path", r.URL.Path),
+					zap.String("github_url", githubURL),
+					zap.Error(fetchErr))
+				http.Error(w, "page temporarily unavailable", http.StatusBadGateway)
+				return
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "public, max-age=300")
+			if _, writeErr := w.Write(body); writeErr != nil {
+				logger.Debug("marketing page write failed", zap.Error(writeErr))
+			}
+		}
+	}
+
+	// Apex: authed users go to /developer, everyone else gets the marketing
+	// homepage as a real crawlable document. Restores the auth-aware split
+	// the old apex handler enforced before being moved to +layout.ts in C25
+	// — keeping it server-side now so unauthed crawlers see proper meta tags
+	// without the iframe sandbox swallowing them.
+	observability.MuxHandle(mux, "GET /{$}",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, _, authErr := authMapper.ResolveClientFromCookie(r)
+			if authErr != nil {
+				logger.Debug("apex auth resolution error", zap.Error(authErr))
+				user = nil
+			}
+			if user != nil {
+				w.Header().Set("Cache-Control", "no-store")
+				http.Redirect(w, r, "/developer", http.StatusFound)
+				return
+			}
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/index.html")(w, r)
+		})))
+
+	observability.MuxHandle(mux, "GET /faq",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/faq/index.html")))
+	observability.MuxHandle(mux, "GET /privacy-policy",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/privacy/index.html")))
+	observability.MuxHandle(mux, "GET /terms-of-service",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/terms/index.html")))
+
+	// /vs/{slug}: competitor comparison pages. Whitelist known slugs so a
+	// random /vs/foobar doesn't proxy a 404 from GitHub raw and confuse
+	// callers. Add new entries here as pages are authored under
+	// bratrax-com-static/vs/.
+	observability.MuxHandle(mux, "GET /vs/{slug}",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			slug := r.PathValue("slug")
+			var githubURL string
+			switch slug {
+			case "triple-whale":
+				githubURL = "https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/vs/triple-whale/index.html"
+			case "hyros":
+				githubURL = "https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/vs/hyros/index.html"
+			default:
+				http.NotFound(w, r)
+				return
+			}
+			serveGithubHTML(githubURL)(w, r)
+		})))
+
 	// Health and proxy (existing routes)
 	observability.MuxHandle(mux, "/bratrax/health", observability.Middleware("bratrax", logger, healthHandler))
 
