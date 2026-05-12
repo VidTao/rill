@@ -1,40 +1,56 @@
 ---
 title: Reading dashboards
 audience: viewer
-order: 2
+order: 8
 status: ready
 ---
 
 # Reading dashboards
 
-A Bratrax dashboard has three regions, top to bottom: KPI tiles, charts, and a detailed table.
+Most Bratrax dashboards follow the same pattern: KPI tiles first, then charts, then a table or pivot you can drill into.
 
 ## KPI tiles
 
-The big numbers across the top — Revenue, Ad Spend, ROAS, Orders, AOV. Each tile shows three things:
+The big numbers across the top show the health of the selected period. Each tile usually shows:
 
 - The current value for the selected time range
-- A small percentage change vs. the previous period (green up, red down)
+- A percentage change vs. the comparison period
 - A sparkline showing the trend across the range
 
-Hover over any tile to see the exact previous-period value.
+Read the tile as a starting point, not the final answer. If a tile moved, use the charts and tables below to find what caused it.
 
 ## Charts
 
-The middle of the dashboard breaks each KPI down by time, channel, campaign, product, or country. Hover to see exact values. **Click** any segment, bar, or line point to filter the rest of the dashboard to just that slice.
+Charts show whether the movement was gradual or caused by a specific day, channel, product, or campaign. Hover to see exact values.
 
-Most charts include a legend you can click to hide or isolate a series.
+When a chart is split by channel or product, use the legend to focus on one series.
 
-## Tables
+## Tables and pivots
 
-The bottom section is a sortable, scrollable breakdown — typically one row per campaign, product, or customer cohort. Click any column header to sort by it. Right-click a row (or use the menu) to export the whole table as CSV.
+Tables and pivots are where you explain the KPI movement. Sort by the metric that matters:
+
+- Sort **Attribution** by spend, ROAS, CPA, or attributed sales.
+- Sort **Products** by product net sales, units, or discount.
+- Sort **Email & SMS** by attributed sales, open rate, click rate, or unsubs.
+- Sort **Customer Analytics** by subscriber count, retention, or subscriber LTV.
 
 ## Comparing periods
 
-Most dashboards include a "compare to" control near the time picker. Set it to **Previous period** to overlay last week on this week, or **Previous year** for year-over-year. The KPI tiles will show the percentage delta and the charts will draw a second, lighter line for the comparison period.
+Most dashboards default to comparing against the previous period. If the date range is Last 7 days, the comparison is the 7 days before that.
+
+Use comparison to answer "what changed?" Turn it off when you only care about the absolute number.
 
 ## Drilling down
 
-Clicking a chart segment, table row, or KPI sparkline filters the entire dashboard to just that slice. Use it when something looks off — click the spike, see what's behind it.
+Clicking a chart segment, table row, or pivot row can filter the dashboard to that slice. Use it when something looks off: click the spike, the channel, or the campaign, then inspect the rest of the page.
 
 To get back, click **Clear filters** at the top, or use the browser back button.
+
+## A simple workflow
+
+1. Pick the dashboard that matches your question.
+2. Set the date range.
+3. Check the top KPIs.
+4. Find the chart or row that moved.
+5. Drill into the table or pivot.
+6. Ask Claude to summarize the driver if you want a plain-English explanation.

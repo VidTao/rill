@@ -1,7 +1,7 @@
 ---
 title: Metric glossary
 audience: viewer
-order: 5
+order: 11
 status: ready
 ---
 

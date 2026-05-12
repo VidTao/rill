@@ -7,28 +7,53 @@ status: ready
 
 # Welcome to Bratrax
 
-Bratrax shows you a single, unified view of how your store is performing across every ad platform and your Shopify checkout. Instead of opening Facebook, Google, TikTok, and Shopify one by one, you see them combined here — with attribution that ties spend to revenue.
+Bratrax is where you answer the operating questions behind your store: are sales healthy, which channels are working, which products are carrying the business, and whether customers are coming back.
 
-## What you'll see
+Start with the dashboards. Each one is built for a different job.
 
-- **Dashboards** in the left sidebar. Each one focuses on a different question — overall performance, channel comparison, customer behavior. Click a name to open it.
-- **KPI tiles** at the top of each dashboard — your most important numbers, with a comparison vs. the previous period.
-- **Charts** that break those numbers down by time, channel, campaign, product, or customer.
-- **Filters** at the top of the dashboard for changing the time range, isolating a channel, or drilling into a campaign.
+## Start here
+
+| If you want to know... | Open this dashboard |
+|---|---|
+| Is the business healthy today? | **Store Performance** |
+| Where did sales come from? | **Attribution** |
+| Which products and SKUs are selling? | **Products** |
+| Are customers and subscriptions growing? | **Customer Analytics** |
+| Are campaigns and flows working? | **Email & SMS** |
+| Which sources bring new customers? | **New Customer Source Report** |
+
+## Your first 5 checks
+
+1. Open **Store Performance** and check Total Sales, MER, Paid ROAS, spend, returns, and new-customer orders.
+2. Open **Attribution** and look at channel, campaign, ad set, and ad performance on last-touch attribution.
+3. Open **Products** and confirm which products and SKUs are driving sales.
+4. Open **Customer Analytics** and check MRR, active subscribers, LTV, and subscriber acquisition.
+5. Open **Email & SMS** and check campaign/flow performance, unsubs, and attributed email sales.
+
+## What changed?
+
+Every dashboard starts with a date range and comparison. Most users should begin with **Last 7 days** or **Last 30 days** and compare to the previous period.
+
+If a KPI moved, do not stop at the tile. Scroll down, click into the channel, product, campaign, or customer group that moved, and use the charts and tables to find the driver.
 
 ## How fresh is the data
 
-Your dashboards refresh every 1–3 hours. Numbers are not live — when you see "Revenue today" it reflects the most recent successful refresh, not the last second.
+Dashboards refresh on a schedule. Numbers are not live to the second. When you see "today," read it as "today as of the last successful refresh."
 
-You'll find an "as of" timestamp on every dashboard so you know how recent the data is.
+Use the dashboard's "as of" timestamp when a number looks stale or when you are comparing against Shopify or an ad platform.
 
-## Asking Claude
+## Good first Claude questions
 
-If your plan includes Claude, you can ask questions in plain English ("Why did my ROAS drop last week?") and get answers grounded in your data. Look for the chat panel on the right side of the screen.
+- "What changed in Store Performance over the last 7 days?"
+- "Which channels drove the change in Attributed Sales?"
+- "Which products contributed most to the sales change?"
+- "Which campaigns acquired new customers at the lowest CPA?"
+- "Why is Direct high in the selected period?"
 
 ## Where to go next
 
-- **Reading dashboards** — how to read the tiles, charts, and tables you'll see
-- **Filters and time range** — how to scope a dashboard to the question you're asking
-- **Glossary** — what every metric means in plain English
-- **Troubleshooting** — what to do when a number looks wrong
+- **Store Performance** — daily business health
+- **Attribution** — channel and campaign performance
+- **Products** — product and SKU sales
+- **Filters and time range** — how to scope any dashboard
+- **Glossary** — what each metric means

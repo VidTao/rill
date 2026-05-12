@@ -13,18 +13,56 @@
   <header>
     <h1>Bratrax Help</h1>
     <p class="lede">
-      Everything you need to read your dashboards, ask Claude, and
-      {#if isAdmin}build new metrics and dashboards{:else}understand the data you see{/if}.
+      Start with the question you are trying to answer. Each guide maps a common
+      ecommerce question to the dashboard, metrics, and drilldowns that matter.
     </p>
   </header>
+
+  <section class="question-grid" aria-label="Dashboard help">
+    <a class="question-card primary" href="/help/viewer/store-performance">
+      <div class="card-tag">Daily health</div>
+      <h2>Is the business up or down?</h2>
+      <p>Use Store Performance for Total Sales, MER, Paid ROAS, returns, customer mix, and subscriptions.</p>
+    </a>
+
+    <a class="question-card" href="/help/viewer/attribution">
+      <div class="card-tag">Channels</div>
+      <h2>Where did sales come from?</h2>
+      <p>Use Attribution to inspect channel, campaign, ad set, ad, Direct, ROAS, CPA, and NC ROAS.</p>
+    </a>
+
+    <a class="question-card" href="/help/viewer/products">
+      <div class="card-tag">Products</div>
+      <h2>What is selling?</h2>
+      <p>Use Products for top products, SKUs, units sold, product net sales, and discount pressure.</p>
+    </a>
+
+    <a class="question-card" href="/help/viewer/customer-analytics">
+      <div class="card-tag">Customers</div>
+      <h2>Are customers coming back?</h2>
+      <p>Use Customer Analytics for MRR, active subscribers, LTV, churn, cohorts, and subscriber acquisition.</p>
+    </a>
+
+    <a class="question-card" href="/help/viewer/email-sms">
+      <div class="card-tag">Retention</div>
+      <h2>Are campaigns and flows working?</h2>
+      <p>Use Email &amp; SMS for sends, opens, clicks, unsubs, flows, campaigns, and attributed sales.</p>
+    </a>
+
+    <a class="question-card" href="/help/viewer/new-customer-source-report">
+      <div class="card-tag">Acquisition</div>
+      <h2>Which sources bring new customers?</h2>
+      <p>Use New Customer Source Report for NCV, NCP, NC ROAS, NC CPA, and source-level acquisition quality.</p>
+    </a>
+  </section>
 
   <section class="help-cards">
     <a class="help-card" href="/help/viewer/welcome">
       <div class="card-tag">For everyone</div>
-      <h2>Using dashboards</h2>
+      <h2>Learn the basics</h2>
       <p>
-        Reading KPIs and charts, picking time ranges, filtering, asking Claude,
-        and a glossary of every metric on screen. {viewerCount} pages.
+        Reading dashboards, picking time ranges, filtering, asking Claude, and
+        understanding the glossary. {viewerCount} pages.
       </p>
     </a>
 
@@ -42,7 +80,7 @@
 
   <footer>
     <p class="hint">
-      Looking for something specific? Pick a page from the sidebar.
+      Looking for a specific metric? Open the Glossary under Reference.
     </p>
   </footer>
 </article>
@@ -64,7 +102,43 @@
     color: var(--color-text-muted);
     font-size: 1rem;
     line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .question-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
     margin-bottom: 32px;
+  }
+  .question-card {
+    display: block;
+    border: 1px solid var(--color-bratrax-border, #e5e7eb);
+    border-radius: 8px;
+    padding: 16px;
+    text-decoration: none;
+    color: inherit;
+    background: var(--color-bratrax-surface);
+    transition: border-color 0.15s, background-color 0.15s;
+    min-height: 150px;
+  }
+  .question-card.primary {
+    border-color: var(--color-acid);
+    background: var(--color-acid-dim);
+  }
+  .question-card:hover {
+    border-color: var(--color-acid);
+    background: var(--color-acid-dim);
+  }
+  .question-card h2 {
+    font-size: 1rem;
+    font-weight: 650;
+    line-height: 1.3;
+    margin-bottom: 6px;
+  }
+  .question-card p {
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.45;
   }
   .help-cards {
     display: grid;
@@ -107,15 +181,5 @@
   footer .hint {
     color: var(--color-text-muted);
     font-size: 0.875rem;
-  }
-  .inline-tag {
-    font-family: "Space Mono", monospace;
-    font-size: 0.625rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    background: var(--color-acid-dim);
-    color: var(--color-text-muted);
-    padding: 1px 6px;
-    border-radius: 3px;
   }
 </style>

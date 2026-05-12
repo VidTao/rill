@@ -1,7 +1,7 @@
 ---
 title: Filters and time range
 audience: viewer
-order: 3
+order: 9
 status: ready
 ---
 
@@ -13,7 +13,14 @@ Every dashboard has controls at the top that scope what you're looking at. Use t
 
 Click the time range picker to change the window. You'll see presets like **Last 7 days**, **Last 30 days**, **Last 90 days** for rolling windows, plus **Month to date**, **Quarter to date**, and **Year to date** that run from the start of the period to now. Pick **Custom** to set any start and end date.
 
-The **time grain** (day, week, or month) is set automatically based on the range. You can override it if you want a different aggregation level.
+Use short ranges for daily operations and longer ranges for strategy:
+
+- **Last 7 days** — daily check-in.
+- **Last 30 days** — campaign and product review.
+- **Month to date** — pacing against the current month.
+- **Last 90 days** — customer and subscription patterns.
+
+The time grain is usually set automatically. If a line chart looks too noisy, switch from day to week.
 
 ## Comparing periods
 
@@ -31,6 +38,15 @@ Below the time controls, click **+ Filter** to add a dimension filter — channe
 
 To remove a filter, click the × on its chip.
 
+## Click-to-filter
+
+Many charts, tables, and pivots can filter the whole dashboard when clicked. This is the fastest way to investigate:
+
+- In **Attribution**, click a channel or campaign.
+- In **Products**, click a product or SKU.
+- In **Email & SMS**, click a campaign or flow.
+- In **Customer Analytics**, click a subscriber acquisition channel.
+
 ## Clearing filters
 
 If you've narrowed things down too far and the dashboard looks empty, click **Clear filters** at the top. This resets dimension filters but keeps your time range.
@@ -38,3 +54,7 @@ If you've narrowed things down too far and the dashboard looks empty, click **Cl
 ## Sharing a filtered view
 
 Filters and the time range are saved in the URL. Copy the URL from your browser and send it — anyone with access to the dashboard will see exactly the same view, with the same filters and time range applied.
+
+## When a dashboard looks empty
+
+Most empty dashboards are caused by a narrow date range or a filter. Click **Clear filters**, then try **Last 30 days**.

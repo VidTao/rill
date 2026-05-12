@@ -1,7 +1,7 @@
 ---
 title: Asking Claude
 audience: viewer
-order: 4
+order: 10
 status: ready
 ---
 
@@ -19,23 +19,32 @@ The clearer your question, the better the answer. Include three things:
 
 A vague question like *"how am I doing?"* gets a vague answer. *"How did ROAS perform last week vs. the week before, broken down by channel?"* gets a useful one.
 
-## Example questions
+## Dashboard-specific questions
 
-**Performance**
-- "How did revenue compare to last month?"
-- "Which day this week had the best ROAS?"
+**Store Performance**
+- "Summarize Store Performance for the last 7 days versus the previous 7 days."
+- "Was the sales change caused by orders, AOV, returns, or spend?"
+- "Why did MER move this week?"
 
-**Diagnostics**
-- "Why did Facebook spend jump on Tuesday?"
-- "What's driving the drop in conversion rate this week?"
+**Attribution**
+- "Which channel drove the biggest change in Attributed Sales?"
+- "Which campaigns have high spend and low ROAS?"
+- "Why is Direct high in this period?"
 
-**Channel and campaign**
-- "Top 5 campaigns by ROAS in the last 30 days"
-- "Which channels have the highest LTV customers?"
+**Products**
+- "Which products drove the sales increase?"
+- "Which SKUs sold the most units but generated low net sales?"
+- "Did discounts increase for top products?"
 
-**Product and customer**
-- "Top SKUs by AOV last quarter"
-- "How are customers acquired in October performing this month?"
+**Customer Analytics**
+- "Which sources acquired the highest-LTV subscribers?"
+- "What changed in active subscribers and MRR this month?"
+- "Which subscriber cohorts have weak retention?"
+
+**Email & SMS**
+- "Which campaigns drove the most attributed sales?"
+- "Did open rate or click rate cause the email sales change?"
+- "Which flows have high unsubscribes?"
 
 ## What Claude can do
 
@@ -50,6 +59,13 @@ A vague question like *"how am I doing?"* gets a vague answer. *"How did ROAS pe
 - Modify your dashboards or data
 - Pull from sources you haven't connected
 - Take actions outside the chat
+
+## Tips for better answers
+
+- Name the dashboard if you know it: "Using Attribution..."
+- Include the date range: "last 30 days" is better than "recently."
+- Ask for a breakdown: "by channel," "by campaign," "by product," or "by cohort."
+- Ask for evidence: "include the numbers behind your answer."
 
 ## When the answer looks wrong
 

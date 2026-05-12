@@ -48,6 +48,7 @@ function pathToSlug(path: string): string {
   // ./content/viewer/02-reading-dashboards.md → viewer/reading-dashboards
   return path
     .replace(/^\.\/content\//, "")
+    .replace(/^_shared\//, "")
     .replace(/\.md$/, "")
     .replace(/\/_/, "/")
     .replace(/(^|\/)\d+-/, "$1");
