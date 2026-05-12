@@ -771,8 +771,13 @@ func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAP
 	connectors := []*runtimev1.Connector{olapConnector, repoConnector, catalogConnector, aiConnector}
 	vars := map[string]string{
 		"rill.download_limit_bytes": "0",
-		"rill.stage_changes":        "false",
-		"rill.watch_repo":           "true",
+		// Stage source/model refreshes through a temp table + atomic rename so
+		// dashboards keep serving old data until the new table is fully written.
+		// Without this, every hourly cron tick DROPs the live table before
+		// rebuilding it, which blanks any dashboard reading from it for the
+		// duration of the CTAS.
+		"rill.stage_changes": "true",
+		"rill.watch_repo":    "true",
 	}
 
 	inst := &drivers.Instance{

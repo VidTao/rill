@@ -169,7 +169,7 @@
       </div>
       <h1 class="text-xl font-black text-bratrax-text-headline">This invitation has already been used</h1>
       <p class="mt-3 text-sm font-light text-bratrax-text-body">
-        Log in with the email <strong>{invite.email}</strong>, or ask {invite.inviter_name || "your admin"}
+        Log in with the email <strong>{invite.email}</strong>, or ask support@bratrax.com
         for a fresh invite.
       </p>
       <a
