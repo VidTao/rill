@@ -100,8 +100,6 @@
       {#if $exploresQuery?.data}
         <Breadcrumbs {pathParts} {currentPath} />
       {/if}
-    {:else if mode === "Developer"}
-      <span class="font-medium">{projectTitle}</span>
     {/if}
   {/if}
 
