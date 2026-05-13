@@ -90,6 +90,13 @@ func (m *mockClientStore) ListAll(_ context.Context) ([]Client, error) {
 	return []Client{*m.defaultClient}, nil
 }
 
+func (m *mockClientStore) ListAllWithAdminEmail(_ context.Context) ([]ClientWithAdmin, error) {
+	if m.defaultClient == nil {
+		return nil, nil
+	}
+	return []ClientWithAdmin{{Client: *m.defaultClient}}, nil
+}
+
 // setupAuthMapper creates an AuthMapper with mock stores and a real JWT issuer.
 func setupAuthMapper(t *testing.T) (*AuthMapper, *AuthService, *mockUserStore, *mockClientStore) {
 	t.Helper()

@@ -50,21 +50,27 @@ func (s *ClientSwitchService) HandleListClients(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	clients, err := s.clientStore.ListAll(r.Context())
+	clients, err := s.clientStore.ListAllWithAdminEmail(r.Context())
 	if err != nil {
 		s.logger.Error("list clients failed", zap.Error(err))
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
-	// Trim payload to fields the dropdown actually needs.
+	// Trim payload to fields the dropdown actually needs. AdminEmail is
+	// surfaced so the super_admin can identify each client by its owner.
 	type listEntry struct {
-		ClientID    string `json:"client_id"`
-		CompanyName string `json:"company_name"`
+		ClientID    string  `json:"client_id"`
+		CompanyName string  `json:"company_name"`
+		AdminEmail  *string `json:"admin_email,omitempty"`
 	}
 	out := make([]listEntry, 0, len(clients))
 	for _, c := range clients {
-		out = append(out, listEntry{ClientID: c.ClientID, CompanyName: c.CompanyName})
+		out = append(out, listEntry{
+			ClientID:    c.ClientID,
+			CompanyName: c.CompanyName,
+			AdminEmail:  c.AdminEmail,
+		})
 	}
 
 	activeID := ""

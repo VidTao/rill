@@ -118,6 +118,7 @@ export async function bratraxGetMe(
 export interface BratraxClientSummary {
   client_id: string;
   company_name: string;
+  admin_email?: string;
 }
 
 export interface BratraxClientList {

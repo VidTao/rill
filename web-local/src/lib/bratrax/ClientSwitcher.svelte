@@ -59,7 +59,9 @@
     aria-label="Active client"
   >
     {#each clients as c (c.client_id)}
-      <option value={c.client_id}>{c.company_name}</option>
+      <option value={c.client_id}
+        >{c.company_name}{c.admin_email ? ` — ${c.admin_email}` : ""}</option
+      >
     {/each}
   </select>
 {/if}

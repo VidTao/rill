@@ -19,6 +19,16 @@ type Client struct {
 	CreatedAt     time.Time `db:"created_at"       json:"created_at"`
 }
 
+// ClientWithAdmin pairs a Client with the earliest-created admin user's
+// email for that client. AdminEmail is nil when no admin user exists yet
+// (e.g. a client row created mid-onboarding before the user record
+// finalises). Used by the super_admin client-switcher dropdown to show
+// who owns each client at a glance.
+type ClientWithAdmin struct {
+	Client
+	AdminEmail *string `db:"admin_email" json:"admin_email,omitempty"`
+}
+
 // ClientStoreInterface abstracts client persistence for testing.
 type ClientStoreInterface interface {
 	GetByRillProjectID(ctx context.Context, projectID string) (*Client, error)
@@ -28,6 +38,7 @@ type ClientStoreInterface interface {
 	GetByMCPToken(ctx context.Context, token string) (*Client, error)
 	GetByClientID(ctx context.Context, clientID string) (*Client, error)
 	ListAll(ctx context.Context) ([]Client, error)
+	ListAllWithAdminEmail(ctx context.Context) ([]ClientWithAdmin, error)
 }
 
 // ClientStore provides read operations on rill_clients.
@@ -182,6 +193,29 @@ func (s *ClientStore) ListAll(ctx context.Context) ([]Client, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bratrax clientstore: list all failed: %w", err)
+	}
+	return out, nil
+}
+
+// ListAllWithAdminEmail returns every client with the earliest-created admin
+// user's email attached. NULL when no admin exists for a client (e.g. a
+// half-onboarded row). The subquery filters `role = 'admin'` so super_admins
+// — who have client_id IS NULL per Track K — are correctly excluded.
+func (s *ClientStore) ListAllWithAdminEmail(ctx context.Context) ([]ClientWithAdmin, error) {
+	var out []ClientWithAdmin
+	err := s.db.SelectContext(ctx, &out,
+		`SELECT
+		   c.client_id, c.company_name, c.clickhouse_db, c.rill_project_id, c.created_at,
+		   (SELECT u.email
+		      FROM rill_users u
+		     WHERE u.client_id = c.client_id AND u.role = 'admin'
+		     ORDER BY u.created_at ASC
+		     LIMIT 1) AS admin_email
+		 FROM rill_clients c
+		 ORDER BY c.company_name ASC, c.created_at ASC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("bratrax clientstore: list all with admin email failed: %w", err)
 	}
 	return out, nil
 }
