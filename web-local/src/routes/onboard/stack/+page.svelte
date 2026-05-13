@@ -503,36 +503,173 @@
         }
         const token = response.authResponse.accessToken;
         fbAccessToken = token;
-        (window as any).FB?.api(
-          "/me",
-          { fields: "name,email" },
-          (userInfo: { email?: string }) => {
+
+        // Run the multi-step account discovery in an async IIFE so we can
+        // await sequential Graph calls instead of nesting callbacks. The
+        // FB JS SDK doesn't return Promises natively; `fbApi` is the
+        // Promise-wrapped shim defined below.
+        (async () => {
+          try {
+            const userInfo = await fbApi<{ email?: string }>("/me", {
+              fields: "name,email",
+            });
             fbEmail = userInfo?.email ?? "";
-            (window as any).FB?.api(
-              "/me/adaccounts",
-              { access_token: token, fields: "account_id,name" },
-              (accountsResponse: {
-                data?: Array<{ account_id: string; name: string }>;
-              }) => {
-                loading = "";
-                const data = accountsResponse?.data ?? [];
-                if (data.length === 0) {
-                  error = "No Facebook ad accounts found for this user.";
-                  return;
-                }
-                accountModalPlatform = "Facebook Ads";
-                accountModalAccounts = data.map((a) => ({
-                  id: a.account_id,
-                  name: a.name || a.account_id,
-                }));
-                showAccountModal = true;
-              },
-            );
-          },
-        );
+          } catch (e) {
+            console.warn("FB /me lookup failed", e);
+          }
+
+          const accounts = await listAllFbAdAccounts(token);
+          loading = "";
+
+          if (accounts.length === 0) {
+            error = "No Facebook ad accounts found for this user.";
+            return;
+          }
+          accountModalPlatform = "Facebook Ads";
+          accountModalAccounts = accounts;
+          showAccountModal = true;
+        })();
       },
-      { scope: "email,ads_read,ads_management" },
+      // business_management is required to enumerate /me/businesses and
+      // each BM's owned + client ad accounts — without it the user only
+      // sees accounts they have direct personal permission on (the historical
+      // single-BM bug).
+      { scope: "email,ads_read,ads_management,business_management" },
     );
+  }
+
+  // Promise-wrap the callback-based FB.api so the discovery flow can use
+  // async/await. Resolves with whatever the SDK passes the callback —
+  // including FB error objects (caller inspects resp.error).
+  function fbApi<T = unknown>(
+    path: string,
+    params: Record<string, unknown>,
+  ): Promise<T> {
+    return new Promise((resolve) => {
+      (window as any).FB?.api(path, params, (resp: T) => resolve(resp));
+    });
+  }
+
+  type FbPagedResponse<T> = {
+    data?: T[];
+    paging?: { next?: string };
+    error?: { message?: string; code?: number };
+  };
+
+  // Walk paging.next cursors until exhausted. FB returns next as an absolute
+  // Graph URL; FB.api accepts that as the path directly. Capped to avoid
+  // accidental infinite loops.
+  async function fbPagedList<T>(
+    path: string,
+    params: Record<string, unknown>,
+  ): Promise<T[]> {
+    const out: T[] = [];
+    let nextPath: string | undefined = path;
+    let nextParams: Record<string, unknown> | undefined = params;
+    for (let i = 0; i < 50 && nextPath; i++) {
+      const resp: FbPagedResponse<T> = await fbApi(
+        nextPath,
+        nextParams ?? {},
+      );
+      if (resp?.error) {
+        throw resp.error;
+      }
+      if (Array.isArray(resp?.data)) out.push(...resp.data);
+      nextPath = resp?.paging?.next;
+      nextParams = undefined;
+    }
+    return out;
+  }
+
+  // Build the full list of ad accounts the user can reach: direct-permission
+  // accounts + every account owned-by or shared-with each Business Manager
+  // they have access to. Each entry is tagged with the BM name (or
+  // "Personal" for direct-permission-only accounts) so the modal can
+  // section the list by Business Manager. Deduped by account_id;
+  // BMs are walked BEFORE /me/adaccounts so accounts present in both
+  // surface under their BM section rather than the Personal fallback.
+  // Per-leg failures are logged and skipped rather than aborted — better
+  // to surface a partial list than block the entire onboarding flow.
+  async function listAllFbAdAccounts(
+    token: string,
+  ): Promise<Array<{ id: string; name: string; group: string }>> {
+    type Row = { account_id: string; name?: string };
+    const seen = new Map<string, { name: string; group: string }>();
+    const add = (rows: Row[] | undefined, group: string) => {
+      for (const a of rows ?? []) {
+        if (a?.account_id && !seen.has(a.account_id)) {
+          seen.set(a.account_id, {
+            name: a.name || a.account_id,
+            group,
+          });
+        }
+      }
+    };
+
+    // 1. BMs first — needs business_management scope. If declined or the
+    // FB app isn't approved for it, this returns empty/error and we fall
+    // back to direct-permission accounts only.
+    let businesses: Array<{ id: string; name?: string }> = [];
+    try {
+      businesses = await fbPagedList<{ id: string; name?: string }>(
+        "/me/businesses",
+        { access_token: token, fields: "id,name", limit: 100 },
+      );
+    } catch (e) {
+      console.warn(
+        "FB /me/businesses failed — falling back to direct-permission accounts only",
+        e,
+      );
+    }
+
+    await Promise.all(
+      businesses.map(async (biz) => {
+        const groupLabel = biz.name || `Business ${biz.id}`;
+        await Promise.all([
+          fbPagedList<Row>(`/${biz.id}/owned_ad_accounts`, {
+            access_token: token,
+            fields: "account_id,name",
+            limit: 100,
+          })
+            .then((rows) => add(rows, groupLabel))
+            .catch((e) =>
+              console.warn(`FB /${biz.id}/owned_ad_accounts failed`, e),
+            ),
+          fbPagedList<Row>(`/${biz.id}/client_ad_accounts`, {
+            access_token: token,
+            fields: "account_id,name",
+            limit: 100,
+          })
+            .then((rows) => add(rows, groupLabel))
+            .catch((e) =>
+              console.warn(`FB /${biz.id}/client_ad_accounts failed`, e),
+            ),
+        ]);
+      }),
+    );
+
+    // 2. Direct-permission accounts fill in anything not already attributed
+    // to a BM (personal ad accounts with no BM, or accounts the user is
+    // added to as a user but whose BM the user can't enumerate).
+    try {
+      add(
+        await fbPagedList<Row>("/me/adaccounts", {
+          access_token: token,
+          fields: "account_id,name",
+          limit: 100,
+        }),
+        "Personal",
+      );
+    } catch (e) {
+      console.warn("FB /me/adaccounts failed", e);
+    }
+
+    return [...seen.entries()]
+      .map(([id, v]) => ({ id, name: v.name, group: v.group }))
+      .sort((a, b) => {
+        if (a.group !== b.group) return a.group.localeCompare(b.group);
+        return a.name.localeCompare(b.name);
+      });
   }
 
   interface GoogleAdAccountNode {
@@ -543,20 +680,29 @@
     children?: GoogleAdAccountNode[];
   }
 
-  function flattenAccounts(accounts: GoogleAdAccountNode[]): Array<{ id: string; name: string }> {
-    const flat: Array<{ id: string; name: string }> = [];
+  function flattenAccounts(
+    accounts: GoogleAdAccountNode[],
+  ): Array<{ id: string; name: string; group: string }> {
+    const flat: Array<{ id: string; name: string; group: string }> = [];
     googleManagerMap = {};
-    function walk(list: GoogleAdAccountNode[]) {
+    // A manager node (has children) becomes its own group header — children
+    // inherit its name. A leaf inherits whatever parent we walked in with.
+    // Standalone top-level accounts (no parent, no children) get "" and
+    // render in the modal's ungrouped fallback section.
+    function walk(list: GoogleAdAccountNode[], parentName: string) {
       for (const acc of list) {
         const id = String(acc.customer_id);
-        flat.push({ id, name: acc.name || acc.descriptive_name || id });
+        const name = acc.name || acc.descriptive_name || id;
+        const isManager = !!(acc.children && acc.children.length > 0);
+        const group = isManager ? name : parentName;
+        flat.push({ id, name, group });
         if (acc.manager_account_id) {
           googleManagerMap[id] = String(acc.manager_account_id);
         }
-        if (acc.children) walk(acc.children);
+        if (acc.children) walk(acc.children, name);
       }
     }
-    walk(accounts);
+    walk(accounts, "");
     return flat;
   }
 
