@@ -97,8 +97,22 @@ export async function load({ url, depends, untrack, fetch }) {
     // workspace landing. Without this they'd land on stale onboarding
     // screens — most worryingly /onboard/business which would happily
     // re-submit the questionnaire and trigger another _run_activation.
+    //
+    // Exception: /connectors reuses /onboard/shopify (and its OAuth
+    // callback) as the shop-URL prompt when a ready user reconnects
+    // Shopify, and detours through /onboard/embed when the Theme App
+    // Embed got disabled. handleShopifyConnect sets onboard_oauth_return
+    // before navigating; the embed page clears it on success. Scope the
+    // bypass to those two subtrees so /onboard/business stays gated.
     if (me?.step === "ready" && url.pathname.startsWith("/onboard")) {
-      throw redirect(307, "/developer");
+      const isShopifyReconnect =
+        (url.pathname.startsWith("/onboard/shopify") ||
+          url.pathname.startsWith("/onboard/embed")) &&
+        typeof sessionStorage !== "undefined" &&
+        !!sessionStorage.getItem("onboard_oauth_return");
+      if (!isShopifyReconnect) {
+        throw redirect(307, "/developer");
+      }
     }
 
     const target = getOnboardResumeRoute(me?.step);

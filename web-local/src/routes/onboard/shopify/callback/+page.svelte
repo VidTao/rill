@@ -4,7 +4,11 @@
   import { page } from "$app/stores";
   import { get } from "svelte/store";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
-  import { onboardConnect, onboardMe } from "$lib/bratrax/onboarding/api";
+  import {
+    onboardConnect,
+    onboardMe,
+    verifyEmbedStatus,
+  } from "$lib/bratrax/onboarding/api";
 
   let status = "Completing Shopify connection...";
   let error = "";
@@ -44,6 +48,26 @@
       // path that didn't set sessionStorage.
       status = "Connected! Redirecting...";
       const returnTo = sessionStorage.getItem("onboard_oauth_return") || "/onboard/stack";
+
+      // Reconnect flow (returnTo points outside /onboard, e.g. /connectors):
+      // the backend keeps step="ready" for fully-onboarded users, so the
+      // layout's embed_pending hard-gate won't fire. Mirror the initial
+      // onboard by checking the Theme App Embed ourselves and detouring
+      // through /onboard/embed when it's off — that page honors
+      // onboard_oauth_return and will route back to returnTo once enabled.
+      if (clientId && !returnTo.startsWith("/onboard")) {
+        try {
+          const embed = await verifyEmbedStatus(clientId);
+          if (!embed.enabled) {
+            await goto("/onboard/embed");
+            return;
+          }
+        } catch {
+          // Non-fatal: fall through to returnTo. The /connectors banner
+          // will surface the missing-embed state on the next render.
+        }
+      }
+
       sessionStorage.removeItem("onboard_oauth_return");
       await goto(returnTo);
     } catch (e) {

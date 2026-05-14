@@ -32,11 +32,18 @@
           clearInterval(pollHandle);
           pollHandle = null;
         }
-        // Backend has already advanced step → platforms_connected.
-        // Send the user to the Build Your Stack screen so they can connect
-        // ad platforms next. /onboard alone has no +page.svelte and would
-        // dead-end; /onboard/stack is the canonical stack-building screen.
-        await goto("/onboard/stack");
+        // Reconnect flow from /connectors leaves onboard_oauth_return set;
+        // honor it so the user lands back where they started. Initial
+        // onboard goes to the canonical stack-building screen (the
+        // backend has just advanced step → platforms_connected; /onboard
+        // alone has no +page.svelte and would dead-end).
+        const returnTo = sessionStorage.getItem("onboard_oauth_return");
+        if (returnTo) {
+          sessionStorage.removeItem("onboard_oauth_return");
+          await goto(returnTo);
+        } else {
+          await goto("/onboard/stack");
+        }
         return true;
       }
     } catch (e) {
@@ -78,7 +85,15 @@
     }
     if (me.shopify_embed_enabled) {
       // Already verified on a prior session — skip straight ahead.
-      await goto("/onboard");
+      // Reconnect flow goes back to /connectors; initial onboard hits
+      // /onboard and lets the layout resume-route logic land it.
+      const returnTo = sessionStorage.getItem("onboard_oauth_return");
+      if (returnTo) {
+        sessionStorage.removeItem("onboard_oauth_return");
+        await goto(returnTo);
+      } else {
+        await goto("/onboard");
+      }
       return;
     }
     clientId = me.client_id;

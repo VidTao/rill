@@ -124,6 +124,22 @@
     for (const p of connectedFromStackSelections(stackSelections)) next.add(p);
     connectedPlatforms = next;
     connectedAt = dates;
+
+    // Live-check the embed when Shopify is connected. The cached
+    // me.shopify_embed_enabled flag only ever ticks from false → true (the
+    // verify endpoint flips it on detection, nothing flips it back), so a
+    // merchant who disabled the embed after our last check would keep a
+    // stale "enabled" cache and the banner would never surface. Hit
+    // /bratrax/onboard/embed-status on every visit so the banner reflects
+    // Shopify's current state, not the snapshot from connect day.
+    if (next.has("shopify") && clientId) {
+      try {
+        const res = await verifyEmbedStatus(clientId);
+        shopifyEmbedEnabled = res.enabled;
+      } catch {
+        // Non-fatal: keep the cached value from onboardMe.
+      }
+    }
   }
 
   function explainEmbedReason(reason: string | undefined): string {
