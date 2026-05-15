@@ -88,6 +88,13 @@
           color: "#000000",
         },
         {
+          id: "bing_ads",
+          name: "Microsoft Bing Ads",
+          type: "oauth",
+          authUrlPath: "/bratrax/onboard/bing-ads/auth-url",
+          color: "#00A4EF",
+        },
+        {
           id: "pinterest_ads",
           name: "Pinterest",
           type: "coming_soon",
@@ -161,7 +168,7 @@
   // snippet inline — selection alone wouldn't tell them what to do next.
   let showSnippetModal = false;
 
-  const adPlatformIds = new Set(["facebook_ads", "google_ads", "tiktok_ads", "pinterest_ads", "amazon_ads"]);
+  const adPlatformIds = new Set(["facebook_ads", "google_ads", "tiktok_ads", "bing_ads", "pinterest_ads", "amazon_ads"]);
 
   $: hasAdPlatform = [...connectedPlatforms].some((p) => adPlatformIds.has(p));
 
@@ -253,6 +260,7 @@
   let googleManagerMap: Record<string, string> = {};
   let tiktokState = "";
   let klaviyoState = "";
+  let bingAdsState = "";
 
   // Google Ads tracking_url_template confirmation modal — wedged between
   // /onboard/google/connect and /onboard/activate so each leaf customer gets
@@ -376,6 +384,20 @@
       await handleKlaviyoReturn(klaviyoCode, klaviyoStateParam);
     }
 
+    // 3c. Microsoft Bing Ads redirects back with ?code=…&state=…. Disambiguated
+    //     from Klaviyo (which uses the same param names) by which sessionStorage
+    //     state key matches the returned state.
+    const bingCode = $page.url.searchParams.get("code");
+    const bingStateParam = $page.url.searchParams.get("state");
+    const expectedBingState = sessionStorage.getItem("bing_ads_oauth_state");
+    if (
+      bingCode &&
+      bingStateParam &&
+      expectedBingState === bingStateParam
+    ) {
+      await handleBingAdsReturn(bingCode, bingStateParam);
+    }
+
     // 4. Load Google Identity Services SDK (Google Ads popup OAuth).
     if (!document.getElementById("gis-sdk")) {
       const script = document.createElement("script");
@@ -466,6 +488,43 @@
       url.searchParams.delete("code");
       url.searchParams.delete("state");
       url.searchParams.delete("scopes");
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = "";
+    }
+  }
+
+  async function handleBingAdsReturn(code: string, state: string) {
+    error = "";
+    loading = "bing_ads";
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(
+        `${host}/bratrax/onboard/bing-ads/accounts?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? "Failed to list Bing Ads accounts");
+      }
+      const body = (await res.json()) as {
+        state: string;
+        accounts: Array<{ id: string; name: string }>;
+      };
+      bingAdsState = body.state;
+      accountModalAccounts = body.accounts.map((a) => ({
+        id: a.id,
+        name: a.name || a.id,
+      }));
+      accountModalPlatform = "Microsoft Bing Ads";
+      showAccountModal = true;
+
+      // Strip the callback params so a refresh doesn't re-trigger.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("code");
+      url.searchParams.delete("state");
       window.history.replaceState({}, "", url.toString());
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -1041,12 +1100,21 @@
       const isFacebook = accountModalPlatform === "Facebook Ads";
       const isTikTok = accountModalPlatform === "TikTok Ads";
       const isKlaviyo = accountModalPlatform === "Klaviyo";
+      const isBingAds = accountModalPlatform === "Microsoft Bing Ads";
 
       let endpoint: string;
       let body: Record<string, unknown>;
       let connectedKey: string;
 
-      if (isKlaviyo) {
+      if (isBingAds) {
+        endpoint = `${host}/bratrax/onboard/bing-ads/connect`;
+        body = {
+          state: bingAdsState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "bing_ads";
+      } else if (isKlaviyo) {
         endpoint = `${host}/bratrax/onboard/klaviyo/connect`;
         body = {
           state: klaviyoState,
@@ -1128,6 +1196,10 @@
       if (isKlaviyo) {
         sessionStorage.removeItem("klaviyo_oauth_state");
         klaviyoState = "";
+      }
+      if (isBingAds) {
+        sessionStorage.removeItem("bing_ads_oauth_state");
+        bingAdsState = "";
       }
 
       // Re-pull from the server so the card renders from the source of

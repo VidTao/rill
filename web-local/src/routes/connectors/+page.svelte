@@ -45,6 +45,7 @@
     { id: "google_ads",     name: "Google Ads",             type: "client_sdk",                                                       color: "#4285F4" },
     { id: "facebook_ads",   name: "Facebook Ads",           type: "client_sdk",                                                       color: "#1877F2" },
     { id: "tiktok_ads",     name: "TikTok Ads",             type: "oauth",            authUrlPath: "/bratrax/onboard/tiktok/auth-url",      color: "#000000" },
+    { id: "bing_ads",       name: "Microsoft Bing Ads",     type: "oauth",            authUrlPath: "/bratrax/onboard/bing-ads/auth-url",    color: "#00A4EF" },
     { id: "klaviyo",        name: "Klaviyo",                type: "oauth",            authUrlPath: "/bratrax/onboard/klaviyo/auth-url",     color: "#2D2D2D" },
     { id: "external_pages", name: "External Landing Pages", type: "snippet_install",                                                  color: "#F59E0B" },
 

@@ -90,6 +90,18 @@ export const PLATFORMS: PlatformConfig[] = [
     detailType: "ad",
   },
   {
+    id: "bing-ads",
+    name: "Microsoft Bing Ads",
+    logo: "bing-ads-logo.webp",
+    description: "Connect Microsoft Advertising for Bing/MSN campaign tracking",
+    category: "advertising",
+    flowType: "oauth-redirect",
+    apiSlug: "bing-ads",
+    callbackParams: ["code", "state"],
+    connectionKey: "Bing Ads",
+    detailType: "ad",
+  },
+  {
     id: "taboola",
     name: "Taboola",
     logo: "taboola-logo.png",

@@ -101,6 +101,7 @@ const CRED_KEY_TO_PLATFORM: Record<string, string> = {
   facebook_ads_credentials: "facebook_ads",
   tiktok_ads_credentials: "tiktok_ads",
   klaviyo_credentials: "klaviyo",
+  bing_ads_credentials: "bing_ads",
 };
 
 /**
