@@ -14,6 +14,7 @@
   import AccountSelectionModal from "../../connectors/AccountSelectionModal.svelte";
   import TrackingTemplateConfirmModal from "../../connectors/TrackingTemplateConfirmModal.svelte";
   import FbUrlTagsConfirmModal from "../../connectors/FbUrlTagsConfirmModal.svelte";
+  import ExternalPagesInstallModal from "../../connectors/ExternalPagesInstallModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
 
   // ---------------------------------------------------------------------------
@@ -136,7 +137,7 @@
         {
           id: "external_pages",
           name: "I have external landing pages",
-          type: "coming_soon",
+          type: "selection",
           color: "#F59E0B",
         },
       ],
@@ -152,6 +153,13 @@
   let error = "";
   let activating = false;
   let clientId = "";
+  let shopifyShopDomain = "";
+  let connectedAt: Record<string, string> = {};
+
+  // Third-party page pixel (B12) install snippet modal. Opens when the user
+  // clicks the "I have external landing pages" radio so they get the install
+  // snippet inline — selection alone wouldn't tell them what to do next.
+  let showSnippetModal = false;
 
   const adPlatformIds = new Set(["facebook_ads", "google_ads", "tiktok_ads", "pinterest_ads", "amazon_ads"]);
 
@@ -299,16 +307,23 @@
     if (!me?.client_id) return;
     clientId = me.client_id;
 
+    const stack = (me.stack_selections || {}) as Record<string, unknown>;
+    const creds = stack.shopify_credentials as { shop?: string } | undefined;
+    shopifyShopDomain = creds?.shop ?? "";
+
     const next = new Set<string>();
+    const dates: Record<string, string> = {};
     for (const p of me.connected_platforms || []) {
       if (typeof p === "object" && p.platform) {
         next.add(p.platform);
+        if (p.connected_at) dates[p.platform] = p.connected_at;
       }
     }
     for (const p of connectedFromStackSelections(me.stack_selections)) {
       next.add(p);
     }
     connectedPlatforms = next;
+    connectedAt = dates;
   }
 
   onMount(async () => {
@@ -1144,9 +1159,24 @@
       else if (platform.id === "facebook_ads") handleFacebookConnect();
     } else if (platform.type === "coming_soon") {
       // Do nothing
+    } else if (platform.id === "external_pages") {
+      // Selecting the radio alone is opaque — open the snippet modal so the
+      // user immediately sees the install code. The "I've installed it"
+      // button inside the modal persists the connection via /onboard/connect,
+      // which then flows through refreshFromServer → connectedPlatforms.
+      handleSelectionToggle(platform);
+      if (selectedPlatforms.has("external_pages")) {
+        error = "";
+        showSnippetModal = true;
+      }
     } else {
       handleSelectionToggle(platform);
     }
+  }
+
+  async function handleExternalPagesInstalled() {
+    showSnippetModal = false;
+    await refreshFromServer();
   }
 
   async function handleActivate() {
@@ -1310,3 +1340,14 @@
   onApplyEmptyOnly={() => handleFbUrlTagsChoice("empty_only")}
   onCancel={() => handleFbUrlTagsChoice("cancel")}
 />
+
+{#if showSnippetModal}
+  <ExternalPagesInstallModal
+    {clientId}
+    {shopifyShopDomain}
+    connected={connectedPlatforms.has("external_pages")}
+    connectedAt={connectedAt["external_pages"] || ""}
+    on:installed={handleExternalPagesInstalled}
+    on:close={() => (showSnippetModal = false)}
+  />
+{/if}

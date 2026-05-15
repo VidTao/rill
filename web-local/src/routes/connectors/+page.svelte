@@ -12,6 +12,7 @@
   } from "$lib/bratrax/onboarding/api";
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "./AccountSelectionModal.svelte";
+  import ExternalPagesInstallModal from "./ExternalPagesInstallModal.svelte";
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount
@@ -31,17 +32,21 @@
   interface Platform {
     id: string;          // matches connected_platforms[].platform + stack_selections key prefix
     name: string;
-    type: "oauth" | "client_sdk" | "shopify";  // shopify needs a shop-domain input page first
+    // "shopify" needs a shop-domain input page first; "snippet_install" is a
+    // copy-paste pixel (no OAuth) — flagged installed when the user clicks
+    // "I've installed it" in the snippet modal.
+    type: "oauth" | "client_sdk" | "shopify" | "snippet_install";
     authUrlPath?: string;  // for redirect OAuth (TikTok / Klaviyo)
     color: string;
   }
 
   const platforms: Platform[] = [
-    { id: "shopify",      name: "Shopify",      type: "shopify",                                                          color: "#95BF47" },
-    { id: "google_ads",   name: "Google Ads",   type: "client_sdk",                                                       color: "#4285F4" },
-    { id: "facebook_ads", name: "Facebook Ads", type: "client_sdk",                                                       color: "#1877F2" },
-    { id: "tiktok_ads",   name: "TikTok Ads",   type: "oauth",      authUrlPath: "/bratrax/onboard/tiktok/auth-url",      color: "#000000" },
-    { id: "klaviyo",      name: "Klaviyo",      type: "oauth",      authUrlPath: "/bratrax/onboard/klaviyo/auth-url",     color: "#2D2D2D" },
+    { id: "shopify",        name: "Shopify",                type: "shopify",                                                          color: "#95BF47" },
+    { id: "google_ads",     name: "Google Ads",             type: "client_sdk",                                                       color: "#4285F4" },
+    { id: "facebook_ads",   name: "Facebook Ads",           type: "client_sdk",                                                       color: "#1877F2" },
+    { id: "tiktok_ads",     name: "TikTok Ads",             type: "oauth",            authUrlPath: "/bratrax/onboard/tiktok/auth-url",      color: "#000000" },
+    { id: "klaviyo",        name: "Klaviyo",                type: "oauth",            authUrlPath: "/bratrax/onboard/klaviyo/auth-url",     color: "#2D2D2D" },
+    { id: "external_pages", name: "External Landing Pages", type: "snippet_install",                                                  color: "#F59E0B" },
 
     // --- Re-enable as each platform is migrated to rill_onboarding_state ---
     // { id: "pinterest_ads", name: "Pinterest",   type: "oauth", authUrlPath: "/bratrax/connectors/pinterest/auth-url",   color: "#E60023" },
@@ -92,6 +97,11 @@
   let shopifyShopDomain = "";
   let embedRecheckBusy = false;
   let embedRecheckMessage = "";
+
+  // Third-party page pixel (B12) install snippet modal. No OAuth — the
+  // merchant pastes the snippet into a non-Shopify page and clicks "I've
+  // installed it" to flag external_pages in connected_platforms.
+  let showSnippetModal = false;
 
   $: showShopifyEmbedBanner =
     connectedPlatforms.has("shopify") && !shopifyEmbedEnabled;
@@ -505,9 +515,21 @@
       else if (platform.id === "facebook_ads") handleFacebookConnect();
     } else if (platform.type === "shopify") {
       handleShopifyConnect();
+    } else if (platform.type === "snippet_install") {
+      openSnippetModal();
     } else {
       handleOAuthConnect(platform);
     }
+  }
+
+  function openSnippetModal() {
+    error = "";
+    showSnippetModal = true;
+  }
+
+  async function handleExternalPagesInstalled() {
+    showSnippetModal = false;
+    await refreshFromServer();
   }
 
   // ---------------------------------------------------------------------------
@@ -607,11 +629,11 @@
           <div class="connector-actions">
             {#if connected}
               <button
-                on:click={() => handleView(platform)}
+                on:click={() => platform.type === "snippet_install" ? openSnippetModal() : handleView(platform)}
                 disabled={loading === platform.id}
                 class="btn-bratrax btn-neutral btn-compact"
               >
-                View accounts
+                {platform.type === "snippet_install" ? "View snippet" : "View accounts"}
               </button>
               <button
                 on:click={() => requestDisconnect(platform)}
@@ -626,7 +648,13 @@
                 disabled={loading === platform.id}
                 class="btn-bratrax btn-primary btn-compact"
               >
-                {loading === platform.id ? "Connecting…" : "Connect →"}
+                {#if loading === platform.id}
+                  Connecting…
+                {:else if platform.type === "snippet_install"}
+                  Install →
+                {:else}
+                  Connect →
+                {/if}
               </button>
             {/if}
           </div>
@@ -780,6 +808,17 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if showSnippetModal}
+  <ExternalPagesInstallModal
+    {clientId}
+    {shopifyShopDomain}
+    connected={isConnected("external_pages")}
+    connectedAt={connectedAt["external_pages"] || ""}
+    on:installed={handleExternalPagesInstalled}
+    on:close={() => (showSnippetModal = false)}
+  />
 {/if}
 
 <style lang="postcss">
