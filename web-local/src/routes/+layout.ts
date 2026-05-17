@@ -98,19 +98,26 @@ export async function load({ url, depends, untrack, fetch }) {
     // screens — most worryingly /onboard/business which would happily
     // re-submit the questionnaire and trigger another _run_activation.
     //
-    // Exception: /connectors reuses /onboard/shopify (and its OAuth
-    // callback) as the shop-URL prompt when a ready user reconnects
-    // Shopify, and detours through /onboard/embed when the Theme App
-    // Embed got disabled. handleShopifyConnect sets onboard_oauth_return
-    // before navigating; the embed page clears it on success. Scope the
-    // bypass to those two subtrees so /onboard/business stays gated.
+    // Exceptions (all gated on `onboard_oauth_return` being set, so we
+    // only bypass when /connectors initiated the flow):
+    //   - /onboard/shopify  — reused as the shop-URL prompt when a ready
+    //     user reconnects Shopify from /connectors.
+    //   - /onboard/embed    — detour when the Theme App Embed got disabled.
+    //   - /onboard/stack    — redirect-OAuth landing for TikTok / Klaviyo /
+    //     Microsoft Bing Ads when initiated from /connectors. The page
+    //     enters `isOAuthBounce` mode, opens AccountSelectionModal over a
+    //     minimal "Completing connection…" screen, then goto(returnTo)
+    //     once the user submits.
+    // handleOAuthConnect / handleShopifyConnect set onboard_oauth_return
+    // before navigating; the destination page clears it on success.
     if (me?.step === "ready" && url.pathname.startsWith("/onboard")) {
-      const isShopifyReconnect =
+      const isOAuthCallbackBounce =
         (url.pathname.startsWith("/onboard/shopify") ||
-          url.pathname.startsWith("/onboard/embed")) &&
+          url.pathname.startsWith("/onboard/embed") ||
+          url.pathname.startsWith("/onboard/stack")) &&
         typeof sessionStorage !== "undefined" &&
         !!sessionStorage.getItem("onboard_oauth_return");
-      if (!isShopifyReconnect) {
+      if (!isOAuthCallbackBounce) {
         throw redirect(307, "/developer");
       }
     }
