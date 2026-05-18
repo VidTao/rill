@@ -310,6 +310,46 @@
   // Single source of truth for "which platforms are connected": the server.
   // Rebuilds the connectedPlatforms Set as a new reference so Svelte
   // reactivity always fires (Set.add + self-assign is unreliable).
+  function explainOAuthError(code: string, desc: string | null, bingClientId: string): string {
+    // Microsoft AADSTS error codes have specific guidance — surface the
+    // actionable fix rather than the wall-of-text Azure trace string.
+    // For unknown codes, fall back to the provider's own description.
+    if (desc && desc.includes("AADSTS650052")) {
+      // Service-principal-missing: enterprise tenants need an admin to
+      // pre-consent so Azure provisions the Microsoft Advertising service
+      // principal in the tenant. The admin-consent URL provisions it in
+      // one click.
+      const adminUrl = bingClientId
+        ? `https://login.microsoftonline.com/common/adminconsent?client_id=${bingClientId}`
+        : "(admin-consent URL unavailable — OAuth config failed to load)";
+      return (
+        "Microsoft Ads connection failed: your organization hasn't consented " +
+        "to the Microsoft Advertising service yet. An Azure AD admin needs to " +
+        `visit this URL once to grant tenant-level consent, then you can retry:\n\n${adminUrl}\n\n` +
+        "(Error AADSTS650052 — service principal not provisioned in your tenant.)"
+      );
+    }
+    if (desc && desc.includes("AADSTS65001")) {
+      return (
+        "Microsoft Ads connection failed: the user or admin hasn't consented to " +
+        "the requested permissions. Re-run the OAuth flow and click 'Consent on " +
+        "behalf of your organization' if you're an admin, otherwise ask your IT " +
+        "admin to grant consent. (Error AADSTS65001.)"
+      );
+    }
+    if (code === "access_denied") {
+      return "OAuth cancelled — you declined to authorise the connection. Retry from the platform card to try again.";
+    }
+    // Generic fallback. Strip Microsoft trace IDs from the description so
+    // the error stays readable; users don't need the GUID-soup.
+    const cleanedDesc = (desc || "")
+      .replace(/Trace ID:\s*[\w-]+\.?\s*/g, "")
+      .replace(/Correlation ID:\s*[\w-]+\.?\s*/g, "")
+      .replace(/Timestamp:\s*[\d:\sZT-]+\.?\s*/g, "")
+      .trim();
+    return `OAuth error (${code}): ${cleanedDesc || "no description provided by the OAuth provider"}`;
+  }
+
   async function refreshFromServer() {
     const me = await onboardMe();
     if (!me?.client_id) return;
@@ -345,6 +385,54 @@
     const returnTo = sessionStorage.getItem("onboard_oauth_return");
     isOAuthBounce =
       hasCallback && returnTo !== null && returnTo !== "/onboard/stack";
+
+    // 0a. OAuth providers return ?error=…&error_description=… when the user
+    //     cancels, the consent fails, or — most commonly for Microsoft —
+    //     the user's tenant lacks a service principal for the requested
+    //     service (AADSTS650052). Surface a useful error instead of silently
+    //     landing on the build-your-stack screen with no feedback.
+    const oauthError = $page.url.searchParams.get("error");
+    const oauthErrorDesc = $page.url.searchParams.get("error_description");
+    if (oauthError) {
+      // Fetch the OAuth config now so the AADSTS650052 branch can render a
+      // real admin-consent URL inline. Best-effort: a failed fetch only
+      // degrades the URL placeholder, not the rest of the error message.
+      let bingClientIdForError = "";
+      try {
+        const cfg = await getOAuthConfig();
+        bingClientIdForError = cfg.bing_ads_client_id || "";
+      } catch {
+        // Non-fatal — fall through to the unavailable-URL message branch.
+      }
+      const errorMsg = explainOAuthError(oauthError, oauthErrorDesc, bingClientIdForError);
+      const where = sessionStorage.getItem("onboard_oauth_return");
+      // Strip the params so a refresh doesn't re-show the error and we
+      // don't leak Microsoft trace/correlation IDs to address-bar history.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("error");
+      url.searchParams.delete("error_description");
+      url.searchParams.delete("error_uri");
+      url.searchParams.delete("state");
+      window.history.replaceState({}, "", url.toString());
+      // Clean up pending OAuth sessionStorage so the user can retry from a
+      // clean slate (stale CSRF state would block the next attempt).
+      sessionStorage.removeItem("bing_ads_oauth_state");
+      sessionStorage.removeItem("klaviyo_oauth_state");
+      sessionStorage.removeItem("tiktok_ads_oauth_state");
+      sessionStorage.removeItem("onboard_oauth_return");
+      sessionStorage.removeItem("onboard_oauth_platform");
+      isOAuthBounce = false;
+      // If the flow originated from /connectors, push the error through
+      // sessionStorage and bounce back — leaving the user stranded on
+      // /onboard/stack with an error message would be a confusing UX.
+      if (where && where !== "/onboard/stack") {
+        sessionStorage.setItem("connectors_error", errorMsg);
+        await goto(where);
+        return;
+      }
+      error = errorMsg;
+      return;
+    }
 
     // 1. Pull initial state from the server.
     await refreshFromServer();
@@ -1310,7 +1398,7 @@
     </div>
 
     {#if error}
-      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+      <div class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
         {error}
       </div>
     {/if}

@@ -327,6 +327,7 @@ export async function verifyEmbedStatus(
 export interface OAuthConfig {
   fb_app_id: string;
   google_client_id: string;
+  bing_ads_client_id: string;
 }
 
 export function getOAuthConfig(): Promise<OAuthConfig> {

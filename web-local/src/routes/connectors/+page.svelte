@@ -537,6 +537,16 @@
   // Init
   // ---------------------------------------------------------------------------
   onMount(async () => {
+    // If the OAuth flow failed on the /onboard/stack side and bounced us
+    // back here, /onboard/stack's onMount stashed the explanation under
+    // `connectors_error`. Surface it once and clear so a refresh doesn't
+    // re-show it.
+    const carriedError = sessionStorage.getItem("connectors_error");
+    if (carriedError) {
+      error = carriedError;
+      sessionStorage.removeItem("connectors_error");
+    }
+
     await refreshFromServer();
     // Public OAuth client IDs (BUG-01: not hardcoded in source).
     try {
@@ -567,7 +577,7 @@
     </div>
 
     {#if error}
-      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+      <div class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
         {error}
       </div>
     {/if}
