@@ -42,7 +42,7 @@
       "    debug: false\n" +
       "  };\n" +
       closeTag + "\n" +
-      `<script async src="https://api.bratrax.com/static/bratrax-funnelish-pixel.js">${closeTag}`
+      `<script async src="https://api.bratrax.com/bratrax-funnelish-pixel.js">${closeTag}`
     );
   }
 
