@@ -80,7 +80,7 @@
 
   $: ({ route } = $page);
 
-  $: mode = route.id?.includes("(viz)") ? "Preview" : "Developer";
+  $: mode = route.id?.includes("(viz)") ? "Preview" : "Dashboards";
 
   $: onConnectorsPage = $page.url.pathname.startsWith("/connectors");
   $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
@@ -126,7 +126,7 @@
               class="bratrax-nav-link"
               class:active={!onConnectorsPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage && !onHelpPage}
             >
-              Developer
+              Dashboards
             </a>
             {#if isAdminOrSuper}
               <a
