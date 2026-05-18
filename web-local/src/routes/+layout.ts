@@ -110,6 +110,15 @@ export async function load({ url, depends, untrack, fetch }) {
     //     once the user submits.
     // handleOAuthConnect / handleShopifyConnect set onboard_oauth_return
     // before navigating; the destination page clears it on success.
+    //
+    // ⚠️ MAINTENANCE: this exception list is the most-forgotten step when
+    //   adding a new redirect-OAuth platform whose provider redirect URI
+    //   lands on /onboard/stack (TikTok, Klaviyo, Bing all do). If a new
+    //   platform's redirect URI is anywhere else under /onboard/* and
+    //   /connectors will initiate it, add the path here too — otherwise
+    //   ready users get bounced to /developer mid-OAuth and the
+    //   AccountSelectionModal never opens. See the full new-connector
+    //   cascade in docs/lite/CLAUDE.md ("Adding a new OAuth connector").
     if (me?.step === "ready" && url.pathname.startsWith("/onboard")) {
       const isOAuthCallbackBounce =
         (url.pathname.startsWith("/onboard/shopify") ||
