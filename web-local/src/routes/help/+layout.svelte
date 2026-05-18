@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { bratraxUser } from "$lib/bratrax/auth-store";
+  import HelpSearch from "$lib/help/HelpSearch.svelte";
   import { pagesFor, type HelpPage } from "$lib/help";
 
   $: role = $bratraxUser?.role ?? null;
@@ -11,6 +12,9 @@
   $: sharedPages = visiblePages.filter((p) => p.audience === "shared");
 
   $: currentSlug = $page.url.pathname.replace(/^\/help\/?/, "");
+
+  let searchQuery = "";
+  $: searching = searchQuery.trim().length > 0;
 
   function isActive(p: HelpPage): boolean {
     return currentSlug === p.slug;
@@ -23,7 +27,14 @@
       Help
     </a>
 
-    {#if viewerPages.length > 0}
+    <HelpSearch
+      pages={visiblePages}
+      variant="sidebar"
+      placeholder="Search help…"
+      bind:query={searchQuery}
+    />
+
+    {#if !searching && viewerPages.length > 0}
       <div class="nav-section">
         <div class="nav-header">For everyone</div>
         <ul class="nav-list">
@@ -45,7 +56,7 @@
       </div>
     {/if}
 
-    {#if adminPages.length > 0}
+    {#if !searching && adminPages.length > 0}
       <div class="nav-section">
         <div class="nav-header">For admins</div>
         <ul class="nav-list">
@@ -67,7 +78,7 @@
       </div>
     {/if}
 
-    {#if sharedPages.length > 0}
+    {#if !searching && sharedPages.length > 0}
       <div class="nav-section">
         <div class="nav-header">Reference</div>
         <ul class="nav-list">

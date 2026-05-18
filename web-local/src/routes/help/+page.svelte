@@ -1,5 +1,6 @@
 <script lang="ts">
   import { bratraxUser } from "$lib/bratrax/auth-store";
+  import HelpSearch from "$lib/help/HelpSearch.svelte";
   import { pagesFor } from "$lib/help";
 
   $: role = $bratraxUser?.role ?? null;
@@ -7,6 +8,10 @@
   $: viewerCount = visiblePages.filter((p) => p.audience === "viewer").length;
   $: adminCount = visiblePages.filter((p) => p.audience === "admin").length;
   $: isAdmin = role === "admin" || role === "super_admin";
+
+  let searchQuery = "";
+  $: searching = searchQuery.trim().length > 0;
+  $: searchPlaceholder = `Search ${visiblePages.length} help pages…`;
 </script>
 
 <article class="help-landing">
@@ -18,6 +23,16 @@
     </p>
   </header>
 
+  <div class="search-row">
+    <HelpSearch
+      pages={visiblePages}
+      variant="landing"
+      placeholder={searchPlaceholder}
+      bind:query={searchQuery}
+    />
+  </div>
+
+  {#if !searching}
   <section class="question-grid" aria-label="Dashboard help">
     <a class="question-card primary" href="/help/viewer/store-performance">
       <div class="card-tag">Daily health</div>
@@ -83,6 +98,7 @@
       Looking for a specific metric? Open the Glossary under Reference.
     </p>
   </footer>
+  {/if}
 </article>
 
 <style lang="postcss">
@@ -103,6 +119,9 @@
     font-size: 1rem;
     line-height: 1.6;
     margin-bottom: 24px;
+  }
+  .search-row {
+    margin-bottom: 32px;
   }
   .question-grid {
     display: grid;

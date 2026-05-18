@@ -98,3 +98,101 @@ export function canAccess(
   if (page.audience === "admin") return role === "admin" || role === "super_admin";
   return false;
 }
+
+// Sentinels wrap matched terms inside snippet strings so the rendering layer
+// can split on them and emit <mark> without ever calling {@html}.
+export const HELP_SNIPPET_MARK_START = "";
+export const HELP_SNIPPET_MARK_END = "";
+
+export interface HelpSearchResult {
+  page: HelpPage;
+  snippet: string;
+  titleMatch: boolean;
+  score: number;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildSnippet(body: string, terms: string[]): string {
+  const lower = body.toLowerCase();
+
+  let firstMatch = -1;
+  for (const term of terms) {
+    const idx = lower.indexOf(term);
+    if (idx !== -1 && (firstMatch === -1 || idx < firstMatch)) firstMatch = idx;
+  }
+
+  let excerpt: string;
+  if (firstMatch === -1) {
+    excerpt = body.slice(0, 200);
+    if (body.length > 200) excerpt += "…";
+  } else {
+    const start = Math.max(0, firstMatch - 80);
+    const end = Math.min(body.length, firstMatch + 120);
+    excerpt =
+      (start > 0 ? "…" : "") +
+      body.slice(start, end) +
+      (end < body.length ? "…" : "");
+  }
+
+  excerpt = excerpt
+    .replace(/^[#>\s]+/gm, "")
+    .replace(/[*_`]/g, "")
+    .replace(/\|/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (terms.length > 0) {
+    const pattern = new RegExp(`(${terms.map(escapeRegExp).join("|")})`, "gi");
+    excerpt = excerpt.replace(
+      pattern,
+      `${HELP_SNIPPET_MARK_START}$1${HELP_SNIPPET_MARK_END}`,
+    );
+  }
+
+  return excerpt;
+}
+
+export function searchHelp(query: string, pages: HelpPage[]): HelpSearchResult[] {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return [];
+
+  const terms = trimmed.split(/\s+/).filter((t) => t.length > 0);
+  if (terms.length === 0) return [];
+
+  const results: HelpSearchResult[] = [];
+
+  for (const page of pages) {
+    const lowerTitle = page.title.toLowerCase();
+    const lowerBody = page.body.toLowerCase();
+
+    const titleMatch = terms.some((t) => lowerTitle.includes(t));
+
+    let bodyMatchCount = 0;
+    for (const term of terms) {
+      let idx = 0;
+      while ((idx = lowerBody.indexOf(term, idx)) !== -1) {
+        bodyMatchCount++;
+        idx += term.length;
+      }
+    }
+
+    if (!titleMatch && bodyMatchCount === 0) continue;
+
+    results.push({
+      page,
+      snippet: buildSnippet(page.body, terms),
+      titleMatch,
+      score: (titleMatch ? 1000 : 0) + bodyMatchCount,
+    });
+  }
+
+  results.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.page.order - b.page.order;
+  });
+
+  return results;
+}
