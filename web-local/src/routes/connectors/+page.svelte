@@ -12,7 +12,8 @@
   } from "$lib/bratrax/onboarding/api";
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "./AccountSelectionModal.svelte";
-  import ExternalPagesInstallModal from "./ExternalPagesInstallModal.svelte";
+  import ExternalPagesBuilderPickerModal from "./ExternalPagesBuilderPickerModal.svelte";
+  import FunnelishInstallModal from "./FunnelishInstallModal.svelte";
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount
@@ -99,10 +100,24 @@
   let embedRecheckBusy = false;
   let embedRecheckMessage = "";
 
-  // Third-party page pixel (B12) install snippet modal. No OAuth — the
-  // merchant pastes the snippet into a non-Shopify page and clicks "I've
-  // installed it" to flag external_pages in connected_platforms.
-  let showSnippetModal = false;
+  // External-pages install flow: clicking the "External Landing Pages"
+  // card opens a builder picker (Funnelish active, ClickFunnels / GHL /
+  // Custom coming soon); picking a builder opens the matching install
+  // modal. Each builder is recorded as its own platform in
+  // connected_platforms (e.g. "funnelish"); the umbrella card is "connected"
+  // when any underlying builder is connected.
+  let showBuilderPickerModal = false;
+  let showFunnelishModal = false;
+
+  // Builder ids that map to the "external_pages" umbrella. Keep in sync with
+  // ExternalPagesBuilderPickerModal's `available` list.
+  const externalBuilderIds = new Set(["funnelish"]);
+  $: hasExternalBuilder = [...connectedPlatforms].some((p) =>
+    externalBuilderIds.has(p),
+  );
+  $: connectedBuilderName = hasExternalBuilder
+    ? [...connectedPlatforms].find((p) => externalBuilderIds.has(p))
+    : "";
 
   $: showShopifyEmbedBanner =
     connectedPlatforms.has("shopify") && !shopifyEmbedEnabled;
@@ -197,7 +212,13 @@
     }
   }
 
-  $: isConnected = (id: string): boolean => connectedPlatforms.has(id);
+  // "external_pages" is a UI umbrella — there's no platform of that name in
+  // connected_platforms. Treat it as connected when any underlying builder
+  // (Funnelish, future ClickFunnels / GoHighLevel) is connected.
+  $: isConnected = (id: string): boolean => {
+    if (id === "external_pages") return hasExternalBuilder;
+    return connectedPlatforms.has(id);
+  };
 
   // ---------------------------------------------------------------------------
   // OAuth init handlers (mirror /onboard/stack — only difference: return-to
@@ -463,7 +484,15 @@
     error = "";
     loading = platform.id;
     try {
-      await onboardDisconnect(clientId, platform.id);
+      // The "external_pages" card is a UI umbrella — there's no platform of
+      // that name in connected_platforms. Translate to the actual underlying
+      // builder (Funnelish today; ClickFunnels / GHL later) so the backend
+      // disconnect path can remove the right row.
+      const target =
+        platform.id === "external_pages" && connectedBuilderName
+          ? connectedBuilderName
+          : platform.id;
+      await onboardDisconnect(clientId, target);
       await refreshFromServer();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -517,19 +546,39 @@
     } else if (platform.type === "shopify") {
       handleShopifyConnect();
     } else if (platform.type === "snippet_install") {
-      openSnippetModal();
+      openBuilderPickerModal();
     } else {
       handleOAuthConnect(platform);
     }
   }
 
-  function openSnippetModal() {
+  function openBuilderPickerModal() {
     error = "";
-    showSnippetModal = true;
+    showBuilderPickerModal = true;
   }
 
-  async function handleExternalPagesInstalled() {
-    showSnippetModal = false;
+  // "View snippet" on a connected external_pages row — open the install
+  // modal for whichever builder is currently connected, so the merchant can
+  // re-copy the right snippet or see their connected timestamp. Falls back
+  // to the picker if (somehow) nothing is connected yet.
+  function openConnectedBuilderModal() {
+    error = "";
+    if (connectedBuilderName === "funnelish") {
+      showFunnelishModal = true;
+    } else {
+      showBuilderPickerModal = true;
+    }
+  }
+
+  function handleBuilderPicked(e: CustomEvent<{ builder: string }>) {
+    showBuilderPickerModal = false;
+    if (e.detail.builder === "funnelish") {
+      showFunnelishModal = true;
+    }
+  }
+
+  async function handleFunnelishInstalled() {
+    showFunnelishModal = false;
     await refreshFromServer();
   }
 
@@ -640,7 +689,7 @@
           <div class="connector-actions">
             {#if connected}
               <button
-                on:click={() => platform.type === "snippet_install" ? openSnippetModal() : handleView(platform)}
+                on:click={() => platform.type === "snippet_install" ? openConnectedBuilderModal() : handleView(platform)}
                 disabled={loading === platform.id}
                 class="btn-bratrax btn-neutral btn-compact"
               >
@@ -821,14 +870,21 @@
   </div>
 {/if}
 
-{#if showSnippetModal}
-  <ExternalPagesInstallModal
+{#if showBuilderPickerModal}
+  <ExternalPagesBuilderPickerModal
+    on:select={handleBuilderPicked}
+    on:close={() => (showBuilderPickerModal = false)}
+  />
+{/if}
+
+{#if showFunnelishModal}
+  <FunnelishInstallModal
     {clientId}
     {shopifyShopDomain}
-    connected={isConnected("external_pages")}
-    connectedAt={connectedAt["external_pages"] || ""}
-    on:installed={handleExternalPagesInstalled}
-    on:close={() => (showSnippetModal = false)}
+    connected={connectedPlatforms.has("funnelish")}
+    connectedAt={connectedAt["funnelish"] || ""}
+    on:installed={handleFunnelishInstalled}
+    on:close={() => (showFunnelishModal = false)}
   />
 {/if}
 

@@ -14,7 +14,8 @@
   import AccountSelectionModal from "../../connectors/AccountSelectionModal.svelte";
   import TrackingTemplateConfirmModal from "../../connectors/TrackingTemplateConfirmModal.svelte";
   import FbUrlTagsConfirmModal from "../../connectors/FbUrlTagsConfirmModal.svelte";
-  import ExternalPagesInstallModal from "../../connectors/ExternalPagesInstallModal.svelte";
+  import ExternalPagesBuilderPickerModal from "../../connectors/ExternalPagesBuilderPickerModal.svelte";
+  import FunnelishInstallModal from "../../connectors/FunnelishInstallModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
 
   // ---------------------------------------------------------------------------
@@ -163,10 +164,20 @@
   let shopifyShopDomain = "";
   let connectedAt: Record<string, string> = {};
 
-  // Third-party page pixel (B12) install snippet modal. Opens when the user
-  // clicks the "I have external landing pages" radio so they get the install
-  // snippet inline — selection alone wouldn't tell them what to do next.
-  let showSnippetModal = false;
+  // Two-step external-pages flow: clicking "I have external landing pages"
+  // opens the builder picker; picking Funnelish opens the install snippet
+  // modal. Each builder gets its own install pixel + snippet (we ship
+  // Funnelish first; ClickFunnels / GoHighLevel / Other are placeholders).
+  let showBuilderPickerModal = false;
+  let showFunnelishModal = false;
+
+  // Set of builder ids that map to the "external_pages" umbrella. Keep this
+  // in sync with ExternalPagesBuilderPickerModal — adding a new builder
+  // requires updating both this set and the picker's `available` list.
+  const externalBuilderIds = new Set(["funnelish"]);
+  $: hasExternalBuilder = [...connectedPlatforms].some((p) =>
+    externalBuilderIds.has(p),
+  );
 
   const adPlatformIds = new Set(["facebook_ads", "google_ads", "tiktok_ads", "bing_ads", "pinterest_ads", "amazon_ads"]);
 
@@ -177,7 +188,13 @@
   // hides the Set behind an opaque call, so Svelte only re-renders when
   // some OTHER reactive variable changes (observed: card didn't turn green
   // after connect, only refreshed when `loading` flipped on the next click).
-  $: isConnected = (id: string): boolean => connectedPlatforms.has(id);
+  // "external_pages" is a UI umbrella — there's no platform of that name in
+  // connected_platforms. Treat it as connected when any underlying builder
+  // (Funnelish, future ClickFunnels / GoHighLevel) is connected.
+  $: isConnected = (id: string): boolean => {
+    if (id === "external_pages") return hasExternalBuilder;
+    return connectedPlatforms.has(id);
+  };
   $: isSelected = (id: string): boolean => selectedPlatforms.has(id);
 
   // ---------------------------------------------------------------------------
@@ -372,6 +389,18 @@
     }
     connectedPlatforms = next;
     connectedAt = dates;
+
+    // If any external-pages builder (Funnelish, …) is connected, default
+    // the "pages" radio to "I have external landing pages" on hard refresh
+    // so the card renders correctly and the user doesn't have to re-click.
+    const hasExternalBuilderNow = [...next].some((p) =>
+      externalBuilderIds.has(p),
+    );
+    if (hasExternalBuilderNow) {
+      selectedPlatforms.delete("shopify_only");
+      selectedPlatforms.add("external_pages");
+      selectedPlatforms = selectedPlatforms;
+    }
   }
 
   onMount(async () => {
@@ -1320,22 +1349,31 @@
     } else if (platform.type === "coming_soon") {
       // Do nothing
     } else if (platform.id === "external_pages") {
-      // Selecting the radio alone is opaque — open the snippet modal so the
-      // user immediately sees the install code. The "I've installed it"
-      // button inside the modal persists the connection via /onboard/connect,
-      // which then flows through refreshFromServer → connectedPlatforms.
+      // Selecting the radio alone is opaque — open the builder picker so
+      // the user picks which funnel platform (Funnelish, ClickFunnels, …)
+      // hosts their pages. The picker then opens the matching install
+      // modal; "I've installed it" persists the builder-specific platform
+      // (e.g. "funnelish") via /onboard/connect, which flows back through
+      // refreshFromServer → connectedPlatforms.
       handleSelectionToggle(platform);
       if (selectedPlatforms.has("external_pages")) {
         error = "";
-        showSnippetModal = true;
+        showBuilderPickerModal = true;
       }
     } else {
       handleSelectionToggle(platform);
     }
   }
 
-  async function handleExternalPagesInstalled() {
-    showSnippetModal = false;
+  function handleBuilderPicked(e: CustomEvent<{ builder: string }>) {
+    showBuilderPickerModal = false;
+    if (e.detail.builder === "funnelish") {
+      showFunnelishModal = true;
+    }
+  }
+
+  async function handleFunnelishInstalled() {
+    showFunnelishModal = false;
     await refreshFromServer();
   }
 
@@ -1501,13 +1539,20 @@
   onCancel={() => handleFbUrlTagsChoice("cancel")}
 />
 
-{#if showSnippetModal}
-  <ExternalPagesInstallModal
+{#if showBuilderPickerModal}
+  <ExternalPagesBuilderPickerModal
+    on:select={handleBuilderPicked}
+    on:close={() => (showBuilderPickerModal = false)}
+  />
+{/if}
+
+{#if showFunnelishModal}
+  <FunnelishInstallModal
     {clientId}
     {shopifyShopDomain}
-    connected={connectedPlatforms.has("external_pages")}
-    connectedAt={connectedAt["external_pages"] || ""}
-    on:installed={handleExternalPagesInstalled}
-    on:close={() => (showSnippetModal = false)}
+    connected={connectedPlatforms.has("funnelish")}
+    connectedAt={connectedAt["funnelish"] || ""}
+    on:installed={handleFunnelishInstalled}
+    on:close={() => (showFunnelishModal = false)}
   />
 {/if}

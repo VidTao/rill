@@ -2,10 +2,10 @@
   import { createEventDispatcher } from "svelte";
   import { onboardConnect } from "$lib/bratrax/onboarding/api";
 
-  // Snippet-install modal for the third-party page pixel (B12). Shared by
-  // /onboard/stack (initial onboarding) and /connectors (post-onboard add).
-  // Owns its own snippet/copy/install state; parents react to the
-  // `installed` event by refreshing connection state.
+  // Snippet-install modal for the Funnelish pixel. Shared by /onboard/stack
+  // and /connectors via the external-pages builder picker. Owns its own
+  // snippet/copy/install state; parents react to the `installed` event by
+  // refreshing connection state.
   export let clientId: string;
   export let shopifyShopDomain: string = "";
   export let connected: boolean = false;
@@ -17,11 +17,6 @@
   let snippetMarking = false;
   let error = "";
 
-  // Build the install snippet with the merchant's clientId baked in. If
-  // Shopify is connected we pre-fill shopifyDomains with their shop domain
-  // plus the matching .myshopify.com fallback so link decoration just works;
-  // otherwise we leave illustrative placeholders for the user to replace.
-  //
   // The Svelte compiler scans this <script lang="ts"> block for a literal
   // closing tag, so the snippet's closing tag is built from concatenated
   // pieces — a raw closing tag anywhere in here (even in a comment or
@@ -40,14 +35,14 @@
     const closeTag = "</" + "script>";
     return (
       "<script>\n" +
-      "  window.bratraxThirdPartyPixel = {\n" +
+      "  window.bratraxFunnelishPixel = {\n" +
       `    clientId: "${id}",\n` +
       `    endpoint: "https://api.bratrax.com/events/ingest",\n` +
       `    shopifyDomains: ${domainsLiteral},\n` +
       "    debug: false\n" +
       "  };\n" +
       closeTag + "\n" +
-      `<script async src="https://api.bratrax.com/static/bratrax-third-party-pixel.js">${closeTag}`
+      `<script async src="https://api.bratrax.com/static/bratrax-funnelish-pixel.js">${closeTag}`
     );
   }
 
@@ -59,8 +54,6 @@
       snippetCopied = true;
       setTimeout(() => { snippetCopied = false; }, 2000);
     } catch {
-      // Clipboard API unavailable (older browsers, insecure context) — user
-      // can still select + copy by hand from the visible <pre>.
       snippetCopied = false;
     }
   }
@@ -70,7 +63,7 @@
     error = "";
     snippetMarking = true;
     try {
-      await onboardConnect(clientId, "external_pages");
+      await onboardConnect(clientId, "funnelish", { builder: "funnelish" });
       dispatch("installed");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -101,7 +94,7 @@
 
     <div class="mb-4 flex items-baseline justify-between">
       <h2 class="text-lg font-black text-bratrax-text-headline">
-        External Landing Pages
+        Funnelish
       </h2>
       <button
         on:click={close}
@@ -112,10 +105,10 @@
     </div>
 
     <p class="mb-3 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
-      Paste this snippet into the {'<head>'} of every non-Shopify page
-      (advertorial, quiz, funnel, custom landing page) you want to track.
-      It captures page views and decorates links pointing at your Shopify
-      store so the visit stitches together.
+      Paste this snippet into Funnelish → Settings → Custom Codes (head). It
+      captures page views, leads, checkout intent, purchases, OTO accepts,
+      and decorates links pointing at your Shopify store so the visit
+      stitches together end-to-end.
     </p>
 
     {#if connected && connectedAt}

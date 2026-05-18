@@ -102,6 +102,7 @@ const CRED_KEY_TO_PLATFORM: Record<string, string> = {
   tiktok_ads_credentials: "tiktok_ads",
   klaviyo_credentials: "klaviyo",
   bing_ads_credentials: "bing_ads",
+  funnelish_credentials: "funnelish",
 };
 
 /**
@@ -216,17 +217,30 @@ export async function checkCompanyAvailable(
 export async function onboardConnect(
   clientId: string,
   platform: string,
-  accountId?: string,
+  accountIdOrExtra?: string | Record<string, unknown>,
   accountName?: string,
 ): Promise<OnboardConnectResult> {
+  // Backwards-compat overload: legacy callers pass (clientId, platform,
+  // accountId, accountName). New callers (snippet-install platforms with no
+  // account ID) pass an `extra` bag like { builder: "funnelish" } in the
+  // third slot; the backend merges these into stack_selections so the
+  // builder choice survives a refresh.
+  let accountId = "";
+  let extra: Record<string, unknown> | undefined;
+  if (typeof accountIdOrExtra === "string" || accountIdOrExtra == null) {
+    accountId = accountIdOrExtra ?? "";
+  } else {
+    extra = accountIdOrExtra;
+  }
   return apiFetch<OnboardConnectResult>("/bratrax/onboard/connect", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       client_id: clientId,
       platform,
-      account_id: accountId ?? "",
+      account_id: accountId,
       account_name: accountName ?? "",
+      ...(extra ? { extra } : {}),
     }),
   });
 }
