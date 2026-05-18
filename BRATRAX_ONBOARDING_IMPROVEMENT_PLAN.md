@@ -22,7 +22,6 @@ Super admins (the Bratrax team and agency operators) are users too. Their first 
 
 - Specific UI bugs reported by users (e.g., date defaults, timezone plumbing, dashboard flash bug, hardcoded ranges, missing time presets).
 - Cross-panel data-display inconsistencies and attribution-label work.
-- Broader Rill → Bratrax rebrand sweep across web-admin billing dialogs, meta tags, etc.
 - Feature gaps (per-variant COGS, Microsoft Ads, PMAX views, customer-journey-per-order view).
 - Structural switching costs (UTM auto-detection from incumbent attribution tools).
 
@@ -317,6 +316,52 @@ The primary success metric for this entire plan: percentage of newly-signed-up u
 
 ---
 
+## Workstream 10 — Rill → Bratrax rebrand sweep
+
+**Why this is onboarding work:** A new user signs up to "Bratrax." Encountering "Rill Cloud" in a billing dialog, a docs link to `docs.rilldata.com`, "Rill-managed" infrastructure copy, an "ASK CLAUDE" button, or a browser tab titled "Rill Cloud" creates immediate cognitive dissonance — *"Wait, what product am I actually using?"* This undermines trust at exactly the moment we're asking the user to trust the product. The rebrand is not cosmetic; it's part of feeling welcomed by a coherent product.
+
+The internal rebrand is already partially complete (`runtime/ai/instructions/data/*.md` and `docker-compose.yml` reference Bratrax), but user-facing strings in web-admin still leak Rill identity. Approximately 32 files in `web-admin/src/` contain Rill references in user-visible copy.
+
+### 10a — Centralize brand strings
+
+Create `web-common/src/lib/branding.ts` exporting:
+
+- `PRODUCT_NAME` (`"Bratrax"`)
+- `PRODUCT_DOMAIN` (`"bratrax.com"`)
+- `DOCS_URL` (`"https://docs.bratrax.com"` once that exists; fall back to docs.rilldata.com with a UI label like "Reference docs" until then)
+- `AI_ASSISTANT_NAME` (`"Bratrax"` — the chat backend is agent-agnostic per `web-common/src/features/chat/core/conversation.ts`)
+
+All user-facing references read from this module. Future rebranding becomes a one-line change.
+
+### 10b — Specific replacements (web-admin)
+
+- `web-admin/src/features/billing/plans/WelcomeToRillCloudDialog.svelte` — rename file to `WelcomeToBratraxDialog.svelte`; update the dialog title.
+- `web-admin/src/routes/+layout.svelte:132` — `<meta name="description" content="Rill Cloud">` → `"Bratrax"`. Also update browser tab title.
+- `web-admin/src/features/projects/status/overview/DeploymentSection.svelte` — "Rill-managed" infrastructure label.
+- All hardcoded `docs.rilldata.com` / `www.rilldata.com` / `ui.rilldata.com` links — route through `DOCS_URL`. Where Bratrax has no equivalent docs URL yet, keep the rilldata.com link but relabel the in-UI text (e.g., "Reference documentation" instead of "Rill docs").
+
+### 10c — Specific replacements (web-local / shared)
+
+- `web-local/src/lib/bratrax/onboarding/WelcomeBanner.svelte:50` — `ASK CLAUDE →` → `ASK BRATRAX →`. (This file is removed when Workstream 2 ships; the label change is interim.)
+- Any "Rill" strings in shared components under `web-common/src/` that surface to end users.
+
+### 10d — Welcome-page example projects
+
+`web-common/src/features/welcome/constants.ts` lists three example projects: `rill-cost-monitoring`, `rill-openrtb-prog-ads`, `rill-github-analytics`. None of these are relevant to a DTC operator. Two options:
+
+- **Recommended:** Gate the example-projects section to super-admin role only. Brand operators should never see it.
+- Alternative: Replace with Bratrax-relevant examples (e.g., "Sample DTC store — 60 days of demo data," "Subscription product — cohort + LTV").
+
+### 10e — Verify `EMPTY_PROJECT_TITLE`
+
+`web-common/src/features/welcome/constants.ts:1` is already `"Untitled Bratrax Project"`. Confirm it surfaces correctly to users; no change expected, just verification.
+
+### Rollout note
+
+10a and 10b are content-only changes — ship in the same week as Workstream 1 (the getting-started guide). 10d depends on the role-gating already being in place; ship after Workstream 7.
+
+---
+
 ## Voice and tone for all onboarding content
 
 Brat's response to Alessio set the template:
@@ -348,14 +393,14 @@ Better:
 
 ## Suggested rollout sequence
 
-1. **Week 1 — Workstream 1 (written getting-started guide).** Independent of code. Highest impact per hour of work; Alessio asked for it directly. Ship as soon as the copy is ready.
+1. **Week 1 — Workstream 1 (written getting-started guide) + Workstream 10a-10c (rebrand sweep — content-only).** Independent of code. Highest impact per hour of work; Alessio asked for the guide directly, and the rebrand fixes the immediate trust-undermining "Rill" references.
 2. **Week 1-2 — Workstream 9 (telemetry) + Workstream 8 (server-side preferences) + Workstream 7a-7b (hide sensitive files, hide SUPERADMINS tab from non-admins).** Foundational + the quick-win admin chrome fixes. Telemetry is a hard prerequisite for Workstream 2.
 3. **Week 2 — Workstream 5 (metric literacy).** Mostly content, low code risk. Quick win that addresses "I don't know what I'm looking at" before the checklist ships.
 4. **Week 3-4 — Workstream 2 (checklist).** Ship hybrid v1 (manual fallback for backend-dependent items), harden auto-detection in v1.1 once the backend endpoint lands.
 5. **Week 4 — Workstream 4 (empty-state linkage).** Light touch; goes in after the checklist exists.
 6. **Week 4-5 — Workstream 3 (tour infrastructure) + Section 4 tours.** Largest engineering lift; builds on prior work.
 7. **Week 5 — Workstream 6 (dashboard discoverability).** Polish.
-8. **Week 5-6 — Workstream 7c-7f (admin sidebar display names, search, view-as toggle, `bratrax.yaml`).** Larger structural changes; ship behind a feature flag.
+8. **Week 5-6 — Workstream 7c-7f (admin sidebar display names, search, view-as toggle, `bratrax.yaml`) + Workstream 10d (gate welcome-page example projects to super-admins).** Larger structural changes; ship behind a feature flag.
 
 Two rules across the rollout:
 
@@ -397,6 +442,8 @@ Two rules across the rollout:
 **Workstream 7 (admin chrome):** Sign in as a super admin. Verify `.env` and `claude_system_prompt.txt` no longer appear in the file tree. Verify sidebar shows display names; hover shows file names. Verify search filters work. Toggle "View as: Brand operator" — verify the chrome matches what a brand operator sees. Sign in as a brand operator; verify the `SUPERADMINS` tab is not visible.
 
 **Workstream 9 (telemetry):** Build an activation funnel in the analytics warehouse: `bratrax_first_login` → `onboarding_section_completed[section=1]` → `onboarding_section_completed[section=4]` → 7-day retention. This is the primary metric for whether this entire effort worked.
+
+**Workstream 10 (rebrand):** Sign up a fresh test account in web-admin. Click through billing, settings, deploy status, every dialog, every browser tab. Grep the rendered DOM for "Rill" and "Claude" — should be zero hits in user-visible copy (excluding internal documentation, code identifiers, and any externally-linked Rill docs that have been intentionally relabeled in the UI). Verify the welcome page's example projects are not visible to a non-super-admin role.
 
 **Tests:**
 
