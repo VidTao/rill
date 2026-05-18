@@ -181,6 +181,14 @@
 
   const adPlatformIds = new Set(["facebook_ads", "google_ads", "tiktok_ads", "bing_ads", "pinterest_ads", "amazon_ads"]);
 
+  // Ids that behave as radio buttons (one-of-N selection) — distinct from
+  // `type === "selection"`, which also includes the display-only Shopify card.
+  // Keep in sync with the two Sets in handleSelectionToggle().
+  const radioToggleIds = new Set([
+    "shopify_only", "external_pages",
+    "recharge", "bold", "skio", "no_subscriptions",
+  ]);
+
   $: hasAdPlatform = [...connectedPlatforms].some((p) => adPlatformIds.has(p));
 
   // Reactive declarations so the template sees connectedPlatforms /
@@ -1458,7 +1466,7 @@
                 on:click={() => handleCardClick(platform)}
                 disabled={loading === platform.id || platform.id === "shopify" || platform.type === "coming_soon"}
                 class="flex items-center gap-2 border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-all
-                  {platform.type === 'selection'
+                  {radioToggleIds.has(platform.id)
                     ? isSelected(platform.id)
                       ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
                       : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'
@@ -1476,7 +1484,7 @@
                   class="h-3 w-3"
                   style="background-color: {platform.color}"
                 ></span>
-                {#if platform.type === 'selection' ? isSelected(platform.id) : isConnected(platform.id)}
+                {#if radioToggleIds.has(platform.id) ? isSelected(platform.id) : isConnected(platform.id)}
                   <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
