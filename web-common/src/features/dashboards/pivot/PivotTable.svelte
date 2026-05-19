@@ -61,6 +61,19 @@
   export let setPivotRowLimitForExpanded:
     | ((expandIndex: string, limit: number) => void)
     | undefined = undefined;
+  // Optional measure-cell click hook for canvas pivots. Fires after the regular
+  // active-cell update so observers (Bratrax order-attribution drilldown) can
+  // open a modal scoped to the clicked cell. Receives the same (rowId, columnId)
+  // the active-cell pathway uses.
+  export let onMeasureCellClick:
+    | ((rowId: string, columnId: string) => void)
+    | undefined = undefined;
+  // Optional predicate that marks specific measure columns as clickable. Cells
+  // matching get the existing interactive-cell styling (pointer cursor + hover
+  // tint) so users can see the drilldown affordance. Without this, cells stay
+  // visually inert even when onMeasureCellClick is wired.
+  export let isClickableColumn: ((columnId: string) => boolean) | undefined =
+    undefined;
 
   const options: Readable<TableOptions<PivotDataRow>> = derived(
     [pivotDataStore, pivotState],
@@ -238,8 +251,11 @@
 
     if (rowHeader) {
       if (row.getCanExpand()) row.getToggleExpandedHandler()();
-    } else if (setPivotActiveCell && canShowDataViewer) {
-      setPivotActiveCell(rowId, columnId);
+    } else {
+      if (setPivotActiveCell && canShowDataViewer) {
+        setPivotActiveCell(rowId, columnId);
+      }
+      onMeasureCellClick?.(rowId, columnId);
     }
   }
 
@@ -321,6 +337,7 @@
       {after}
       {totalRowSize}
       {canShowDataViewer}
+      {isClickableColumn}
       {hasMeasureContextColumns}
       activeCell={$pivotState.activeCell}
       {assembled}
@@ -344,6 +361,7 @@
       {dataRows}
       {measures}
       {canShowDataViewer}
+      {isClickableColumn}
       activeCell={$pivotState.activeCell}
       {assembled}
       {scrollLeft}

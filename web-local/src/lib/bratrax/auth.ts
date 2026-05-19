@@ -7,6 +7,13 @@ export interface BratraxUser {
   name: string;
   role: "super_admin" | "admin" | "viewer";
   project_id: string | null;
+  // Bratrax client the user is bound to (null for super_admins who can switch).
+  // Already serialized by the Go proxy's User struct; surfaced here so frontend
+  // code can gate features per-client without an extra round trip.
+  client_id?: string | null;
+  // For super_admins: the most recent client they were active on, used to
+  // resolve the active client when no bratrax_active_client cookie is set.
+  last_client_id?: string | null;
 }
 
 function getBaseUrl(): string {

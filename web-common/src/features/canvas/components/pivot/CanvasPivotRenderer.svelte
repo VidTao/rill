@@ -20,6 +20,11 @@
   export let pivotConfig: Readable<PivotDataStoreConfig> | undefined;
   export let pivotState: Writable<PivotState>;
   export let hasHeader = false;
+  export let onMeasureCellClick:
+    | ((rowId: string, columnId: string) => void)
+    | undefined = undefined;
+  export let isClickableColumn: ((columnId: string) => boolean) | undefined =
+    undefined;
 
   $: pivotColumns = splitPivotChips($pivotState.columns);
 
@@ -51,6 +56,8 @@
         {pivotDataStore}
         config={pivotConfig}
         {pivotState}
+        {onMeasureCellClick}
+        {isClickableColumn}
         setPivotExpanded={(expanded) => {
           pivotState.update((state) => ({
             ...state,

@@ -24,6 +24,10 @@
   export let dataRows: PivotDataRow[];
   export let hasMeasureContextColumns: boolean;
   export let canShowDataViewer = false;
+  // Optional canvas-side predicate: when supplied, cells whose column id passes
+  // the predicate get the same interactive styling explore mode uses.
+  export let isClickableColumn: ((columnId: string) => boolean) | undefined =
+    undefined;
   export let activeCell: { rowId: string; columnId: string } | null | undefined;
 
   // Table props
@@ -194,7 +198,8 @@
           <td
             class="ui-copy-number cell truncate"
             class:active-cell={isActive}
-            class:interactive-cell={canShowDataViewer &&
+            class:interactive-cell={(canShowDataViewer ||
+              isClickableColumn?.(cell.column.id)) &&
               cell.getValue() !== undefined}
             class:text-right={getMeasureColumn(cell.column)}
             class:border-r={hasBorderRight(cell.column.id)}

@@ -32,6 +32,11 @@
   export let measures: MeasureColumnProps;
   export let totalsRow: PivotDataRow | undefined;
   export let canShowDataViewer = false;
+  // Optional canvas-side predicate: when supplied, cells whose column id passes
+  // the predicate get the same interactive styling explore mode uses, so a
+  // drilldown handler has a visible cursor/hover affordance.
+  export let isClickableColumn: ((columnId: string) => boolean) | undefined =
+    undefined;
   export let activeCell: { rowId: string; columnId: string } | null | undefined;
 
   // Table props
@@ -339,7 +344,8 @@
           <td
             class="ui-copy-number cell truncate group/cell"
             class:active-cell={isActive}
-            class:interactive-cell={canShowDataViewer}
+            class:interactive-cell={canShowDataViewer ||
+              isClickableColumn?.(cell.column.id)}
             class:border-r={shouldShowRightBorder(i)}
             data-value={cell.getValue()}
             data-rowid={cell.row.id}
