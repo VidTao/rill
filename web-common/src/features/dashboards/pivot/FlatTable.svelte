@@ -201,6 +201,8 @@
             class:interactive-cell={(canShowDataViewer ||
               isClickableColumn?.(cell.column.id)) &&
               cell.getValue() !== undefined}
+            class:drilldown-link-cell={isClickableColumn?.(cell.column.id) &&
+              cell.getValue() !== undefined}
             class:text-right={getMeasureColumn(cell.column)}
             class:border-r={hasBorderRight(cell.column.id)}
             class:total-label={cell.getValue() === "Total"}
@@ -318,5 +320,17 @@
   }
   .active-cell.cell {
     @apply bg-primary-50;
+  }
+  /* Bratrax order-attribution drilldown: blue + underlined value so it reads
+     as a hyperlink, distinct from the generic interactive-cell affordance. */
+  .drilldown-link-cell {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+  .drilldown-link-cell:hover {
+    color: #1d4ed8;
+  }
+  .drilldown-link-cell :global(*) {
+    color: inherit;
   }
 </style>

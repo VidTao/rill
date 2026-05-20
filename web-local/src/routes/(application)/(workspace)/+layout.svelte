@@ -2,7 +2,6 @@
   import Navigation from "@rilldata/web-common/layout/navigation/Navigation.svelte";
   import ViewerNavigation from "$lib/bratrax/ViewerNavigation.svelte";
   import { bratraxUser } from "$lib/bratrax/auth-store";
-  import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
   import type { LayoutData } from "../$types";
 
   export let data: LayoutData;
@@ -29,16 +28,14 @@
   $: allowedPaths = isAdmin ? ADMIN_ALLOWED_PATHS : null;
 </script>
 
-<OrderDrilldownProvider>
-  <div class="flex size-full overflow-hidden">
-    {#if data.initialized && !isViewer}
-      <Navigation allowedTopLevelPaths={allowedPaths} />
-    {:else if isViewer}
-      <ViewerNavigation />
-    {/if}
+<div class="flex size-full overflow-hidden">
+  {#if data.initialized && !isViewer}
+    <Navigation allowedTopLevelPaths={allowedPaths} />
+  {:else if isViewer}
+    <ViewerNavigation />
+  {/if}
 
-    <section class="size-full overflow-hidden">
-      <slot />
-    </section>
-  </div>
-</OrderDrilldownProvider>
+  <section class="size-full overflow-hidden">
+    <slot />
+  </section>
+</div>

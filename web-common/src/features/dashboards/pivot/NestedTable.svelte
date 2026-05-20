@@ -346,6 +346,7 @@
             class:active-cell={isActive}
             class:interactive-cell={canShowDataViewer ||
               isClickableColumn?.(cell.column.id)}
+            class:drilldown-link-cell={isClickableColumn?.(cell.column.id)}
             class:border-r={shouldShowRightBorder(i)}
             data-value={cell.getValue()}
             data-rowid={cell.row.id}
@@ -506,6 +507,19 @@
   }
   .active-cell.cell {
     @apply bg-primary-50;
+  }
+  /* Bratrax order-attribution drilldown: paint the value blue + underlined so
+     it reads as a hyperlink, separate from the generic interactive-cell hover
+     affordance used in explore mode. */
+  .drilldown-link-cell {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+  .drilldown-link-cell:hover {
+    color: #1d4ed8;
+  }
+  .drilldown-link-cell :global(*) {
+    color: inherit;
   }
 
   /* Show more row styling */

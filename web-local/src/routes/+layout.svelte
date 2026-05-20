@@ -31,6 +31,7 @@
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
   import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
+  import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
 
   export let data: LayoutData;
 
@@ -104,6 +105,7 @@
 
 <QueryClientProvider client={queryClient}>
   <FileAndResourceWatcher {host} {instanceId}>
+    <OrderDrilldownProvider>
     <div class="body h-screen w-screen overflow-hidden absolute flex flex-col">
       {#if $bratraxUser}
         <BannerCenter />
@@ -175,6 +177,7 @@
 
       <slot />
     </div>
+    </OrderDrilldownProvider>
   </FileAndResourceWatcher>
 </QueryClientProvider>
 
