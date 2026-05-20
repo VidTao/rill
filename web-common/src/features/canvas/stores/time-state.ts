@@ -118,11 +118,14 @@ export class TimeState {
       }
     });
 
-    this.timeZoneStore = derived([this.urlTimeZoneStore], ([urlTimeZone]) => {
-      if (urlTimeZone) return urlTimeZone;
+    this.timeZoneStore = derived(
+      [this.urlTimeZoneStore, this.manager.availableTimeZonesStore],
+      ([urlTimeZone, availableTimeZones]) => {
+        if (urlTimeZone) return urlTimeZone;
 
-      return "UTC";
-    });
+        return availableTimeZones[0] || "UTC";
+      },
+    );
 
     this.interval = derived<
       [

@@ -22,6 +22,22 @@
     .filter((c) => c.name);
 
   $: currentPath = $page.url.pathname;
+
+  const dashboardStateParams = ["tr", "grain", "compare_tr", "compare_dim"];
+
+  $: dashboardStateQuery = (() => {
+    const params = new URLSearchParams();
+    for (const key of dashboardStateParams) {
+      const value = $page.url.searchParams.get(key);
+      if (value) params.set(key, value);
+    }
+    const query = params.toString();
+    return query ? "?" + query : "";
+  })();
+
+  function dashboardHref(name: string) {
+    return "/files/dashboards/" + name + ".yaml" + dashboardStateQuery;
+  }
 </script>
 
 <nav class="viewer-nav">
@@ -32,7 +48,7 @@
       {#each canvases as canvas}
         <li>
           <a
-            href="/files/dashboards/{canvas.name}.yaml"
+            href={dashboardHref(canvas.name)}
             class="nav-link"
             class:active={currentPath === `/files/dashboards/${canvas.name}.yaml`}
           >
