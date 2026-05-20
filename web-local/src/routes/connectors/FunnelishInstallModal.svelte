@@ -14,6 +14,7 @@
   const dispatch = createEventDispatcher<{ close: void; installed: void }>();
 
   let snippetCopied = false;
+  let webhookUrlCopied = false;
   let snippetMarking = false;
   let error = "";
 
@@ -48,6 +49,13 @@
 
   $: snippetText = buildSnippet();
 
+  function buildWebhookUrl(): string {
+    const id = clientId || "REPLACE_WITH_BRATRAX_CLIENT_ID";
+    return `https://api.bratrax.com/webhooks/funnelish?client_id=${id}`;
+  }
+
+  $: webhookUrl = buildWebhookUrl();
+
   async function copySnippet() {
     try {
       await navigator.clipboard.writeText(snippetText);
@@ -55,6 +63,16 @@
       setTimeout(() => { snippetCopied = false; }, 2000);
     } catch {
       snippetCopied = false;
+    }
+  }
+
+  async function copyWebhookUrl() {
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      webhookUrlCopied = true;
+      setTimeout(() => { webhookUrlCopied = false; }, 2000);
+    } catch {
+      webhookUrlCopied = false;
     }
   }
 
@@ -120,6 +138,34 @@
     <pre
       class="mb-3 max-h-72 overflow-auto border border-bratrax-border bg-bratrax-bg p-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body"
     >{snippetText}</pre>
+
+    <div class="mb-3 mt-5 border-t border-bratrax-border pt-4">
+      <p class="mb-2 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
+        Set up automation webhooks so server-side events (purchases, opt-ins,
+        subscriptions, refunds) reach Bratrax. In Funnelish → Automations →
+        New automation, pick a trigger, add a Webhook action, paste the URL
+        below, and save. Repeat for each trigger you want to capture.
+      </p>
+
+      <pre
+        class="mb-2 overflow-auto border border-bratrax-border bg-bratrax-bg p-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body"
+      >{webhookUrl}</pre>
+
+      <div class="mb-2 flex items-center justify-end">
+        <button
+          on:click={copyWebhookUrl}
+          class="btn-bratrax btn-neutral btn-compact"
+        >
+          {webhookUrlCopied ? "Copied" : "Copy webhook URL"}
+        </button>
+      </div>
+
+      <p class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">
+        Available triggers: On Purchase · Purchase Attempt · Optin ·
+        Recurring Payment · Recurring Payment Fails · On Refund ·
+        New Subscription · Subscription Canceled
+      </p>
+    </div>
 
     {#if !shopifyShopDomain}
       <p class="mb-3 font-mono text-[10px] uppercase tracking-wider text-bratrax-tomato/80">
