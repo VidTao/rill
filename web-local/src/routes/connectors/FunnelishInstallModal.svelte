@@ -136,8 +136,17 @@
     {/if}
 
     <pre
-      class="mb-3 max-h-72 overflow-auto border border-bratrax-border bg-bratrax-bg p-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body"
+      class="mb-2 max-h-72 overflow-auto border border-bratrax-border bg-bratrax-bg p-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body"
     >{snippetText}</pre>
+
+    <div class="mb-3 flex items-center justify-end">
+      <button
+        on:click={copySnippet}
+        class="btn-bratrax btn-neutral btn-compact"
+      >
+        {snippetCopied ? "Copied" : "Copy snippet"}
+      </button>
+    </div>
 
     <div class="mb-3 mt-5 border-t border-bratrax-border pt-4">
       <p class="mb-2 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
@@ -181,12 +190,6 @@
     {/if}
 
     <div class="flex items-center justify-end gap-2">
-      <button
-        on:click={copySnippet}
-        class="btn-bratrax btn-neutral btn-compact"
-      >
-        {snippetCopied ? "Copied" : "Copy snippet"}
-      </button>
       {#if !connected}
         <button
           on:click={markInstalled}
