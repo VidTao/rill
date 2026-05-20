@@ -9,7 +9,6 @@
   import { Wand } from "lucide-svelte";
   import { V1ReconcileStatus } from "../../../runtime-client";
   import { runtime } from "../../../runtime-client/runtime-store";
-  import { allowPrimary } from "../../dashboards/workspace/DeployProjectCTA.svelte";
   import { featureFlags } from "../../feature-flags";
   import { useCreateMetricsViewFromTableUIAction } from "../../metrics-views/ai-generation/generateMetricsView";
   import { useModel } from "../selectors";
@@ -44,7 +43,7 @@
   <Button
     disabled={!modelIsIdle || !hasResultTable}
     onClick={createMetricsViewFromModel}
-    type={$allowPrimary ? "primary" : "secondary"}
+    type="secondary"
   >
     <IconSpaceFixer pullLeft pullRight={collapse}>
       <Wand size="14px" />

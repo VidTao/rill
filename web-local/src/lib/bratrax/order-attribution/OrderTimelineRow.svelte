@@ -192,7 +192,7 @@
     text-decoration: underline;
   }
   .evidence-toggle:hover {
-    color: #1a1a18;
+    color: var(--color-text, #1a1a18);
   }
   .evidence-list {
     margin: 6px 0 0 0;
