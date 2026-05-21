@@ -10,6 +10,7 @@
     buildOrderListWhere,
     dedupeOrders,
     extractCellLabels,
+    humanizeResolutionReason,
     ORDER_TIMELINE_METRICS_VIEW,
   } from "./api";
   import type { OrderTimelineRow } from "./types";
@@ -149,6 +150,7 @@
               <th class="num">Weight</th>
               <th>Confidence</th>
               <th>Reason</th>
+              <th>How matched</th>
             </tr>
           </thead>
           <tbody>
@@ -166,6 +168,9 @@
                 <td class="num">{fmtWeight(o.last_touch_weight)}</td>
                 <td>{o.resolution_confidence ?? "—"}</td>
                 <td class="reason">{o.resolution_reason ?? "—"}</td>
+                <td class="how-matched">
+                  {humanizeResolutionReason(o.resolution_reason)}
+                </td>
               </tr>
             {/each}
           </tbody>
@@ -245,5 +250,9 @@
     font-family: "Space Mono", "JetBrains Mono", monospace;
     font-size: 11px;
     color: var(--color-text-muted, #6b7280);
+  }
+  .how-matched {
+    max-width: 220px;
+    white-space: nowrap;
   }
 </style>

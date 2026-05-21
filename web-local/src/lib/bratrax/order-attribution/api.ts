@@ -177,6 +177,38 @@ export function findWinner(
   };
 }
 
+// Plain-English description of why this order was matched to its campaign,
+// derived from the technical resolution_reason code. The resolver appends
+// "; recovered_*" modifiers when it fills in missing ad/adset metadata —
+// strip those before classifying so the column stays short.
+//
+// Patterns (see clickhouse/attribution/attribution_sale_level_v2.sql):
+//   order_source_rule                            Shopify order's source_name
+//   order_url_param:<param>                      UTM/click ID on the order URL
+//   order_url_classification                     order URL referrer matched a platform
+//   <source>_param:<param>                       tracking param on a viewed page
+//   order_param_ledger:<path>:<param>            stored param from a past order
+//   <source>_param_ledger:<path>:<param>         stored param from a past visit
+//   <source>_classification                      visit URL matched a platform
+//   klaviyo_event:<name>:<id_source>             Klaviyo email/SMS click
+//   fallback_direct_no_signal                    no signal — attributed to Direct
+export function humanizeResolutionReason(
+  reason: string | undefined,
+): string {
+  if (!reason) return "—";
+  const base = reason.split(";")[0].trim();
+  if (base === "order_source_rule") return "Shopify source field";
+  if (base === "order_url_classification") return "Checkout URL classified";
+  if (base === "fallback_direct_no_signal") return "No signal — counted as Direct";
+  if (base.startsWith("order_url_param:")) return "Tracking on checkout URL";
+  if (base.startsWith("order_param_ledger:")) return "Saved checkout tracking";
+  if (base.startsWith("klaviyo_event:")) return "Klaviyo email/SMS click";
+  if (base.includes("_param_ledger:")) return "Saved visit tracking";
+  if (base.includes("_param:")) return "Tracking on visited page";
+  if (base.endsWith("_classification")) return "Visit URL classified";
+  return base;
+}
+
 // Walk an AND-of-INs filter expression and pull the (dim, value) pairs out,
 // used to render Modal 1's subtitle as "Meta / Campaign X / Adset Y / Ad Z".
 // Only handles the shape getFiltersForCell emits — top-level AND with leaf
