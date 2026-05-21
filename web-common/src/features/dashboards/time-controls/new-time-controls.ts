@@ -64,6 +64,7 @@ export const RILL_TO_LABEL: Record<
 
 export const RILL_PERIOD_TO_DATE = [
   "rill-TD",
+  "rill-PDC",
   "rill-WTD",
   "rill-MTD",
   "rill-QTD",
@@ -71,7 +72,6 @@ export const RILL_PERIOD_TO_DATE = [
 ] as const;
 
 export const RILL_PREVIOUS_PERIOD = [
-  "rill-PDC",
   "rill-PWC",
   "rill-PMC",
   "rill-PQC",
@@ -558,6 +558,9 @@ export function bucketYamlRanges(
     allTime: false,
   };
 
+  let todayIdx = -1;
+  let yesterdaySeen = false;
+
   yamlRanges.forEach(({ range }) => {
     if (!range) return;
 
@@ -579,16 +582,21 @@ export function bucketYamlRanges(
       } else if (interval instanceof RillTimeStartEndInterval) {
         if (previousPeriodRegex.test(range)) {
           skeleton.previous.push(parsed);
+          if (range === "-1D/D to ref/D") yesterdaySeen = true;
         } else {
           skeleton.custom.push(parsed);
         }
       } else if (interval instanceof RillPeriodToGrainInterval) {
         skeleton.periodToDate.push(parsed);
+        if (range === "DTD") todayIdx = skeleton.periodToDate.length - 1;
       } else if (interval instanceof RillLegacyDaxInterval) {
         if (isRillPreviousPeriod(range)) {
           skeleton.previous.push(parsed);
         } else if (isRillPeriodToDate(range)) {
           skeleton.periodToDate.push(parsed);
+          if (range === "rill-TD")
+            todayIdx = skeleton.periodToDate.length - 1;
+          if (range === "rill-PDC") yesterdaySeen = true;
         } else {
           skeleton.custom.push(parsed);
         }
@@ -599,6 +607,18 @@ export function bucketYamlRanges(
       console.error("Error parsing RillTime", e);
     }
   });
+
+  // Auto-inject Yesterday directly below Today whenever a dashboard declares
+  // Today but omits Yesterday — saves authors from having to add it to every
+  // dashboard's time_ranges list.
+  if (todayIdx !== -1 && !yesterdaySeen) {
+    try {
+      const yesterday = parseRillTime("rill-PDC");
+      skeleton.periodToDate.splice(todayIdx + 1, 0, yesterday);
+    } catch (e) {
+      console.error("Error parsing Yesterday RillTime", e);
+    }
+  }
 
   return skeleton;
 }

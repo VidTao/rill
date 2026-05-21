@@ -48,13 +48,18 @@ export function getDefaultRangeBuckets(
       }
     });
 
-    const timeRange = `-1${primaryGrainAlias}/${primaryGrainAlias} to ref/${primaryGrainAlias}`;
+    const previousRange = `-1${primaryGrainAlias}/${primaryGrainAlias} to ref/${primaryGrainAlias}`;
 
-    try {
-      const parsed = parseRillTime(timeRange);
-      rangeBuckets.previous.push(parsed);
-    } catch {
-      // no-op
+    // Yesterday is rendered directly below Today in the dropdown, so the
+    // day-grain "previous" item is emitted with DTD into periodToDate
+    // rather than the previous bucket.
+    if (grain !== V1TimeGrain.TIME_GRAIN_DAY) {
+      try {
+        const parsed = parseRillTime(previousRange);
+        rangeBuckets.previous.push(parsed);
+      } catch {
+        // no-op
+      }
     }
 
     if (grain === V1TimeGrain.TIME_GRAIN_MINUTE) {
@@ -62,8 +67,16 @@ export function getDefaultRangeBuckets(
     }
 
     const periodToDate = parseRillTime(`${primaryGrainAlias}TD`);
-
     rangeBuckets.periodToDate.push(periodToDate);
+
+    if (grain === V1TimeGrain.TIME_GRAIN_DAY) {
+      try {
+        const yesterday = parseRillTime(previousRange);
+        rangeBuckets.periodToDate.push(yesterday);
+      } catch {
+        // no-op
+      }
+    }
   });
 
   return rangeBuckets;
