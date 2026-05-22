@@ -683,7 +683,6 @@ func (l *LegacyISOInterval) expand(parseOpts ParseOptions) (*StartEndInterval, e
 		Start: &PointInTime{
 			Points: []*PointInTimeWithSnap{
 				refLabelPoint,
-				offsetPoint,
 				grainPointFromISO,
 			},
 		},

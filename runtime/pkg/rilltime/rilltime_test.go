@@ -29,7 +29,8 @@ func TestEval_PreviousAndCurrentCompleteGrain(t *testing.T) {
 		// Current complete second
 		{"1s as of watermark/s+1s", "2025-05-13T06:32:36Z", "2025-05-13T06:32:37Z", timeutil.TimeGrainMillisecond, 1, 1},
 		{"-1s to ref as of watermark/s+1s", "2025-05-13T06:32:36Z", "2025-05-13T06:32:37Z", timeutil.TimeGrainMillisecond, 1, 1},
-		{"PT1S", "2025-05-13T06:32:36Z", "2025-05-13T06:32:37Z", timeutil.TimeGrainMillisecond, 1, 1},
+		// ISO PT1S: current second + 1 prior second = 2 seconds (Shopify-style "Last N seconds").
+		{"PT1S", "2025-05-13T06:32:35Z", "2025-05-13T06:32:37Z", timeutil.TimeGrainSecond, 1, 1},
 		{"sTD as of watermark/s+1s", "2025-05-13T06:32:37Z", "2025-05-13T06:32:37Z", timeutil.TimeGrainMillisecond, 1, 1},
 
 		// Previous complete minute
@@ -44,7 +45,8 @@ func TestEval_PreviousAndCurrentCompleteGrain(t *testing.T) {
 		// Current complete minute
 		{"1m as of watermark/m+1m", "2025-05-13T06:32:00Z", "2025-05-13T06:33:00Z", timeutil.TimeGrainSecond, 1, 1},
 		{"-1m to ref as of watermark/m+1m", "2025-05-13T06:32:00Z", "2025-05-13T06:33:00Z", timeutil.TimeGrainSecond, 1, 1},
-		{"PT1M", "2025-05-13T06:32:00Z", "2025-05-13T06:33:00Z", timeutil.TimeGrainSecond, 1, 1},
+		// ISO PT1M: current minute + 1 prior minute = 2 minutes (Shopify-style "Last N minutes").
+		{"PT1M", "2025-05-13T06:31:00Z", "2025-05-13T06:33:00Z", timeutil.TimeGrainMinute, 1, 1},
 		{"mTD as of watermark/m+1m", "2025-05-13T06:33:00Z", "2025-05-13T06:33:00Z", timeutil.TimeGrainMillisecond, 1, 1},
 
 		// Previous complete hour
@@ -59,7 +61,8 @@ func TestEval_PreviousAndCurrentCompleteGrain(t *testing.T) {
 		// Current complete hour
 		{"1h as of watermark/h+1h", "2025-05-13T06:00:00Z", "2025-05-13T07:00:00Z", timeutil.TimeGrainMinute, 1, 1},
 		{"-1h to ref as of watermark/h+1h", "2025-05-13T06:00:00Z", "2025-05-13T07:00:00Z", timeutil.TimeGrainMinute, 1, 1},
-		{"PT1H", "2025-05-13T06:00:00Z", "2025-05-13T07:00:00Z", timeutil.TimeGrainMinute, 1, 1},
+		// ISO PT1H: current hour + 1 prior hour = 2 hours (Shopify-style "Last N hours").
+		{"PT1H", "2025-05-13T05:00:00Z", "2025-05-13T07:00:00Z", timeutil.TimeGrainHour, 1, 1},
 		{"hTD as of watermark/h+1h", "2025-05-13T07:00:00Z", "2025-05-13T07:00:00Z", timeutil.TimeGrainMillisecond, 1, 1},
 
 		// Previous complete day
@@ -74,7 +77,8 @@ func TestEval_PreviousAndCurrentCompleteGrain(t *testing.T) {
 		// Current complete day
 		{"1D as of watermark/D+1D", "2025-05-13T00:00:00Z", "2025-05-14T00:00:00Z", timeutil.TimeGrainHour, 1, 1},
 		{"-1D to ref as of watermark/D+1D", "2025-05-13T00:00:00Z", "2025-05-14T00:00:00Z", timeutil.TimeGrainHour, 1, 1},
-		{"P1D", "2025-05-13T00:00:00Z", "2025-05-14T00:00:00Z", timeutil.TimeGrainHour, 1, 1},
+		// ISO P1D: today + 1 prior day = 2 calendar days (Shopify-style "Last N days").
+		{"P1D", "2025-05-12T00:00:00Z", "2025-05-14T00:00:00Z", timeutil.TimeGrainDay, 1, 1},
 		{"DTD as of watermark/D+1D", "2025-05-14T00:00:00Z", "2025-05-14T00:00:00Z", timeutil.TimeGrainMillisecond, 1, 1},
 
 		// Previous complete week
@@ -89,7 +93,8 @@ func TestEval_PreviousAndCurrentCompleteGrain(t *testing.T) {
 		// Current complete week
 		{"1W as of watermark/W+1W", "2025-05-12T00:00:00Z", "2025-05-19T00:00:00Z", timeutil.TimeGrainDay, 1, 1},
 		{"-1W to ref as of watermark/W+1W", "2025-05-12T00:00:00Z", "2025-05-19T00:00:00Z", timeutil.TimeGrainDay, 1, 1},
-		{"P1W", "2025-05-12T00:00:00Z", "2025-05-19T00:00:00Z", timeutil.TimeGrainDay, 1, 1},
+		// ISO P1W: current week + 1 prior week = 2 weeks (Shopify-style "Last N weeks").
+		{"P1W", "2025-05-05T00:00:00Z", "2025-05-19T00:00:00Z", timeutil.TimeGrainWeek, 1, 1},
 		{"WTD as of watermark/W+1W", "2025-05-19T00:00:00Z", "2025-05-19T00:00:00Z", timeutil.TimeGrainMillisecond, 1, 1},
 
 		// Previous complete month
@@ -104,7 +109,8 @@ func TestEval_PreviousAndCurrentCompleteGrain(t *testing.T) {
 		// Current complete month
 		{"1M as of watermark/M+1M", "2025-05-01T00:00:00Z", "2025-06-01T00:00:00Z", timeutil.TimeGrainDay, 1, 1},
 		{"-1M to ref as of watermark/M+1M", "2025-05-01T00:00:00Z", "2025-06-01T00:00:00Z", timeutil.TimeGrainDay, 1, 1},
-		{"P1M", "2025-05-01T00:00:00Z", "2025-06-01T00:00:00Z", timeutil.TimeGrainDay, 1, 1},
+		// ISO P1M: current month + 1 prior month = 2 months (Shopify-style "Last N months").
+		{"P1M", "2025-04-01T00:00:00Z", "2025-06-01T00:00:00Z", timeutil.TimeGrainMonth, 1, 1},
 		{"MTD as of watermark/M+1M", "2025-06-01T00:00:00Z", "2025-06-01T00:00:00Z", timeutil.TimeGrainMillisecond, 1, 1},
 
 		// Previous complete quarter
@@ -133,7 +139,8 @@ func TestEval_PreviousAndCurrentCompleteGrain(t *testing.T) {
 		// Current complete year
 		{"1Y as of watermark/Y+1Y", "2025-01-01T00:00:00Z", "2026-01-01T00:00:00Z", timeutil.TimeGrainMonth, 1, 1},
 		{"-1Y to ref as of watermark/Y+1Y", "2025-01-01T00:00:00Z", "2026-01-01T00:00:00Z", timeutil.TimeGrainMonth, 1, 1},
-		{"P1Y", "2025-01-01T00:00:00Z", "2026-01-01T00:00:00Z", timeutil.TimeGrainMonth, 1, 1},
+		// ISO P1Y: current year + 1 prior year = 2 years (Shopify-style "Last N years").
+		{"P1Y", "2024-01-01T00:00:00Z", "2026-01-01T00:00:00Z", timeutil.TimeGrainYear, 1, 1},
 		{"YTD as of watermark/Y+1Y", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", timeutil.TimeGrainMillisecond, 1, 1},
 	}
 
@@ -436,8 +443,9 @@ func TestEval_BackwardsCompatibility(t *testing.T) {
 
 		// `inf` => `earliest to latest+1s`
 		{"inf", "2020-01-01T00:32:36Z", "2025-05-14T06:32:37Z", timeutil.TimeGrainUnspecified, 1, 1},
-		{"P2DT10H", "2025-05-10T21:00:00Z", "2025-05-13T07:00:00Z", timeutil.TimeGrainHour, 1, 1},
-		{"P1Y2M3W4DT10H15M", "2024-02-17T20:18:00Z", "2025-05-13T06:33:00Z", timeutil.TimeGrainMinute, 1, 1},
+		// ISO durations: Shopify-style window = current period + N prior periods (shifts start back by one of the smallest grain).
+		{"P2DT10H", "2025-05-10T20:00:00Z", "2025-05-13T07:00:00Z", timeutil.TimeGrainHour, 1, 1},
+		{"P1Y2M3W4DT10H15M", "2024-02-17T20:17:00Z", "2025-05-13T06:33:00Z", timeutil.TimeGrainMinute, 1, 1},
 	}
 
 	runTests(t, testCases, now, minTime, maxTime, watermark, nil)
