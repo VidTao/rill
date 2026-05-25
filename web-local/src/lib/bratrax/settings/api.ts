@@ -141,6 +141,10 @@ export interface InvitationAcceptResult {
   // the new client row gets is_paid_subscriber=true at create time when
   // the inviting super_admin marked the invite as inceptly (no payment).
   requires_payment: boolean | null;
+  // Only meaningful for kind='signup'. When true, onboardStart creates a
+  // rill_multi_clients parent + links the first sub-store, and the dashboard
+  // renders the client switcher + "Add store" header button.
+  is_multi_store: boolean | null;
 }
 
 export function acceptInvitation(

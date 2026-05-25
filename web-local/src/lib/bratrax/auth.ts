@@ -14,6 +14,10 @@ export interface BratraxUser {
   // For super_admins: the most recent client they were active on, used to
   // resolve the active client when no bratrax_active_client cookie is set.
   last_client_id?: string | null;
+  // For multi-store admins/viewers: the rill_multi_clients parent that owns
+  // the user's sub-stores. NULL for legacy single-store users. When set, the
+  // client switcher dropdown + "Add store" header button are rendered.
+  multi_client_id?: string | null;
 }
 
 function getBaseUrl(): string {

@@ -28,6 +28,7 @@ const activeClientCookieName = "bratrax_active_client"
 var headersToStrip = []string{
 	"X-Bratrax-User-Id",
 	"X-Bratrax-Client-Id",
+	"X-Bratrax-Multi-Client-Id",
 	"X-Bratrax-Org-Id",
 	"X-Bratrax-User-Email",
 	"X-Bratrax-User-Role",
@@ -178,6 +179,9 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		if client != nil {
 			r.Header.Set("X-Bratrax-Client-Id", client.ClientID)
 		}
+		if user.MultiClientID != nil && *user.MultiClientID != "" {
+			r.Header.Set("X-Bratrax-Multi-Client-Id", *user.MultiClientID)
+		}
 		r.Header.Set("X-Bratrax-User-Email", user.Email)
 		r.Header.Set("X-Bratrax-User-Role", user.Role)
 
@@ -231,7 +235,10 @@ func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, e
 
 // resolveActiveClient picks the client to use for this request.
 //
-//   - admin/viewer: looks up rill_users.client_id (existing FK behavior).
+//   - admin/viewer (single-store): rill_users.client_id (existing FK).
+//   - admin/viewer (multi-store, multi_client_id != NULL): bratrax_active_client
+//     cookie if it points at a sibling under the same multi_client_id;
+//     otherwise rill_users.client_id (the "home" sub-store).
 //   - super_admin: reads the bratrax_active_client cookie; if missing or
 //     stale, falls back to user.last_client_id, then to the first client
 //     by company_name. The second return value is the cookie value the
@@ -242,6 +249,23 @@ func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, e
 // or zero clients in the system). The caller decides whether that's an error.
 func (a *AuthMapper) resolveActiveClient(ctx context.Context, user *User, r *http.Request) (*Client, string, error) {
 	if user.Role != "super_admin" {
+		// Multi-store user: cookie wins if it points at a sibling. Falls back
+		// to the home sub-store on rill_users.client_id. Guards against
+		// hijacking: even if a hostile cookie names another tenant's client,
+		// it only takes effect when that client is under the user's parent.
+		if user.MultiClientID != nil && *user.MultiClientID != "" {
+			if cookie, cookieErr := r.Cookie(activeClientCookieName); cookieErr == nil && cookie.Value != "" {
+				client, err := a.clientStore.GetByClientID(ctx, cookie.Value)
+				if err != nil {
+					return nil, "", err
+				}
+				if client != nil && client.MultiClientID != nil &&
+					*client.MultiClientID == *user.MultiClientID {
+					return client, "", nil
+				}
+				// Cookie missing / pointing at a foreign client — fall through.
+			}
+		}
 		client, err := a.clientStore.GetByUserID(ctx, user.ID)
 		return client, "", err
 	}

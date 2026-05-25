@@ -178,15 +178,20 @@ export interface OnboardStatus {
 
 export async function onboardStart(
   companyName: string,
-  options: { requiresPayment?: boolean } = {},
+  options: { requiresPayment?: boolean; isMultiStore?: boolean } = {},
 ): Promise<OnboardStartResult> {
   // requires_payment defaults true on the backend, so we only send the field
   // explicitly when the caller wants to opt out of the LS paywall (inceptly
   // invite-link signups). Public /signup omits it → backend defaults TRUE
   // → step machine starts at payment_pending.
+  // is_multi_store defaults false on the backend; only set when the invite
+  // carried the multi-store toggle so we create a rill_multi_clients parent.
   const body: Record<string, unknown> = { company_name: companyName };
   if (options.requiresPayment === false) {
     body.requires_payment = false;
+  }
+  if (options.isMultiStore === true) {
+    body.is_multi_store = true;
   }
   return apiFetch<OnboardStartResult>("/bratrax/onboard/start", {
     method: "POST",

@@ -16,6 +16,9 @@ type Client struct {
 	CompanyName   string    `db:"company_name"     json:"company_name"`
 	ClickhouseDB  string    `db:"clickhouse_db"    json:"clickhouse_db"`
 	RillProjectID *string   `db:"rill_project_id"  json:"rill_project_id"`
+	// MultiClientID is the parent rill_multi_clients row this sub-store
+	// belongs to, or NULL for legacy single-store clients.
+	MultiClientID *string   `db:"multi_client_id"  json:"multi_client_id,omitempty"`
 	CreatedAt     time.Time `db:"created_at"       json:"created_at"`
 }
 
@@ -39,6 +42,7 @@ type ClientStoreInterface interface {
 	GetByClientID(ctx context.Context, clientID string) (*Client, error)
 	ListAll(ctx context.Context) ([]Client, error)
 	ListAllWithAdminEmail(ctx context.Context) ([]ClientWithAdmin, error)
+	ListByMultiClientID(ctx context.Context, multiClientID string) ([]Client, error)
 }
 
 // ClientStore provides read operations on rill_clients.
@@ -55,7 +59,7 @@ func NewClientStore(db *sqlx.DB) *ClientStore {
 func (s *ClientStore) GetByRillProjectID(ctx context.Context, projectID string) (*Client, error) {
 	var c Client
 	err := s.db.GetContext(ctx, &c,
-		`SELECT client_id, company_name, clickhouse_db, rill_project_id, created_at
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, multi_client_id, created_at
 		 FROM rill_clients WHERE rill_project_id = $1`,
 		projectID,
 	)
@@ -72,7 +76,7 @@ func (s *ClientStore) GetByRillProjectID(ctx context.Context, projectID string) 
 func (s *ClientStore) GetDefault(ctx context.Context) (*Client, error) {
 	var c Client
 	err := s.db.GetContext(ctx, &c,
-		`SELECT client_id, company_name, clickhouse_db, rill_project_id, created_at
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, multi_client_id, created_at
 		 FROM rill_clients ORDER BY created_at, client_id LIMIT 1`,
 	)
 	if err != nil {
@@ -119,7 +123,7 @@ func (s *ClientStore) GetByMCPToken(ctx context.Context, token string) (*Client,
 	}
 	var c Client
 	err := s.db.GetContext(ctx, &c,
-		`SELECT client_id, company_name, clickhouse_db, rill_project_id, created_at
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, multi_client_id, created_at
 		 FROM rill_clients WHERE mcp_token = $1`,
 		token,
 	)
@@ -168,7 +172,7 @@ func (s *ClientStore) GetByClientID(ctx context.Context, clientID string) (*Clie
 	}
 	var c Client
 	err := s.db.GetContext(ctx, &c,
-		`SELECT client_id, company_name, clickhouse_db, rill_project_id, created_at
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, multi_client_id, created_at
 		 FROM rill_clients WHERE client_id = $1`,
 		clientID,
 	)
@@ -187,12 +191,35 @@ func (s *ClientStore) GetByClientID(ctx context.Context, clientID string) (*Clie
 func (s *ClientStore) ListAll(ctx context.Context) ([]Client, error) {
 	var out []Client
 	err := s.db.SelectContext(ctx, &out,
-		`SELECT client_id, company_name, clickhouse_db, rill_project_id, created_at
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, multi_client_id, created_at
 		 FROM rill_clients
 		 ORDER BY company_name ASC, created_at ASC`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bratrax clientstore: list all failed: %w", err)
+	}
+	return out, nil
+}
+
+// ListByMultiClientID returns every sub-store under a given multi-client,
+// ordered the same way ListAll is so the switcher dropdown ordering matches
+// the super_admin experience. Returns an empty slice (no error) if there are
+// no rows. Used by the /bratrax/auth/list-clients endpoint to scope the
+// switcher for multi-store users to their parent's siblings.
+func (s *ClientStore) ListByMultiClientID(ctx context.Context, multiClientID string) ([]Client, error) {
+	if multiClientID == "" {
+		return nil, nil
+	}
+	var out []Client
+	err := s.db.SelectContext(ctx, &out,
+		`SELECT client_id, company_name, clickhouse_db, rill_project_id, multi_client_id, created_at
+		 FROM rill_clients
+		 WHERE multi_client_id = $1
+		 ORDER BY company_name ASC, created_at ASC`,
+		multiClientID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("bratrax clientstore: list by multi_client_id failed: %w", err)
 	}
 	return out, nil
 }

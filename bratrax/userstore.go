@@ -26,8 +26,14 @@ type User struct {
 	// as a fallback when the bratrax_active_client cookie is missing/invalid
 	// (e.g. fresh login). NULL for new super_admins until their first switch.
 	LastClientID *string   `db:"last_client_id" json:"last_client_id,omitempty"`
-	CreatedAt    time.Time `db:"created_at"    json:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"    json:"updated_at"`
+	// MultiClientID ties a non-super_admin user to a rill_multi_clients parent.
+	// NULL for legacy single-store users (no behavior change). When set, the
+	// user can switch between sibling sub-stores via the same client-switcher
+	// UI super_admins use, and can add new sub-stores via the "Add store"
+	// header button (POST /bratrax/multi-client/add-store).
+	MultiClientID *string   `db:"multi_client_id" json:"multi_client_id,omitempty"`
+	CreatedAt     time.Time `db:"created_at"    json:"created_at"`
+	UpdatedAt     time.Time `db:"updated_at"    json:"updated_at"`
 }
 
 // UserStoreInterface abstracts user persistence for testing.
@@ -73,7 +79,7 @@ func (s *UserStore) Close() error {
 func (s *UserStore) Authenticate(ctx context.Context, email, password string) (*User, error) {
 	var u User
 	err := s.db.GetContext(ctx, &u,
-		"SELECT id, email, password_hash, name, role, project_id, client_id, last_client_id, created_at, updated_at FROM rill_users WHERE email = $1",
+		"SELECT id, email, password_hash, name, role, project_id, client_id, last_client_id, multi_client_id, created_at, updated_at FROM rill_users WHERE email = $1",
 		email,
 	)
 	if err != nil {
@@ -94,7 +100,7 @@ func (s *UserStore) Authenticate(ctx context.Context, email, password string) (*
 func (s *UserStore) GetByID(ctx context.Context, id int) (*User, error) {
 	var u User
 	err := s.db.GetContext(ctx, &u,
-		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, created_at, updated_at FROM rill_users WHERE id = $1",
+		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, multi_client_id, created_at, updated_at FROM rill_users WHERE id = $1",
 		id,
 	)
 	if err != nil {
@@ -123,7 +129,7 @@ func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role 
 	err = s.db.QueryRowxContext(ctx,
 		`INSERT INTO rill_users (email, password_hash, name, role, project_id)
 		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, created_at, updated_at`,
+		 RETURNING id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, multi_client_id, created_at, updated_at`,
 		email, string(hash), name, role, projectID,
 	).StructScan(&u)
 	if err != nil {
@@ -137,7 +143,7 @@ func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role 
 func (s *UserStore) ListUsers(ctx context.Context) ([]User, error) {
 	var users []User
 	err := s.db.SelectContext(ctx, &users,
-		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, created_at, updated_at FROM rill_users ORDER BY id",
+		"SELECT id, email, '' AS password_hash, name, role, project_id, client_id, last_client_id, multi_client_id, created_at, updated_at FROM rill_users ORDER BY id",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bratrax userstore: query failed: %w", err)

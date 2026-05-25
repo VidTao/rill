@@ -115,9 +115,15 @@
         // rill_clients row is stamped with the right is_paid_subscriber. If
         // the invite was inceptly (requires_payment=false), the user skips
         // /onboard/payment and goes straight to /onboard/shopify.
+        // Forward is_multi_store so the backend creates a rill_multi_clients
+        // parent + links the first sub-store; the dashboard then renders the
+        // client switcher + "Add store" header button.
         const started = await onboardStart(
           result.company_name ?? companyName.trim(),
-          { requiresPayment: result.requires_payment ?? true },
+          {
+            requiresPayment: result.requires_payment ?? true,
+            isMultiStore: result.is_multi_store ?? false,
+          },
         );
         sessionStorage.setItem("onboard_client_id", started.client_id);
         sessionStorage.setItem("onboard_client_name", started.client_name);

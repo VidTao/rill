@@ -106,6 +106,10 @@ export interface SignupPendingInvite {
   // True = real paying customer (LS checkout required); false = inceptly
   // internal team (skip payment).
   requires_payment: boolean;
+  // True = multi-store invite (creates a rill_multi_clients parent + first
+  // sub-store on acceptance, lets the user add more stores from the dashboard).
+  // Orthogonal to requires_payment.
+  is_multi_store: boolean;
 }
 
 export interface SignupInviteResult {
@@ -114,6 +118,7 @@ export interface SignupInviteResult {
   expires_at: string | null;
   email: string;
   requires_payment: boolean;
+  is_multi_store: boolean;
 }
 
 export function listSignupInvitations(): Promise<{
@@ -125,11 +130,16 @@ export function listSignupInvitations(): Promise<{
 export function createSignupInvite(
   email: string,
   requiresPayment: boolean = true,
+  isMultiStore: boolean = false,
 ): Promise<SignupInviteResult> {
   return apiFetch<SignupInviteResult>("/bratrax/superadmins/signup-invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, requires_payment: requiresPayment }),
+    body: JSON.stringify({
+      email,
+      requires_payment: requiresPayment,
+      is_multi_store: isMultiStore,
+    }),
   });
 }
 

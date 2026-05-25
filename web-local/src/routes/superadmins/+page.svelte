@@ -39,14 +39,19 @@
   // required after onboard_start); FALSE = inceptly internal team (skip
   // payment). Default TRUE for safety — accidentally inviting a paying
   // customer with the toggle in "free" position would skip billing.
+  // signupInviteMultiStore: TRUE = agency-style parent account that owns
+  // several sub-stores (rill_multi_clients). Orthogonal to requires_payment.
+  // Default FALSE — opt-in only.
   let signupInviteOpen = false;
   let signupInviteEmail = "";
   let signupInviteRequiresPayment = true;
+  let signupInviteMultiStore = false;
   let signupInviteSaving = false;
   let signupInviteResultUrl = "";
   let signupInviteResultExpiresAt = "";
   let signupInviteResultEmail = "";
   let signupInviteResultRequiresPayment = true;
+  let signupInviteResultMultiStore = false;
   let signupInviteCopied = false;
 
   // Access-request actions in flight per id, so the right row's button shows
@@ -168,10 +173,12 @@
   function openSignupInvite() {
     signupInviteEmail = "";
     signupInviteRequiresPayment = true; // safer default
+    signupInviteMultiStore = false; // safer default
     signupInviteResultUrl = "";
     signupInviteResultExpiresAt = "";
     signupInviteResultEmail = "";
     signupInviteResultRequiresPayment = true;
+    signupInviteResultMultiStore = false;
     signupInviteCopied = false;
     signupInviteOpen = true;
   }
@@ -185,11 +192,16 @@
     signupInviteSaving = true;
     topError = "";
     try {
-      const result = await createSignupInvite(email, signupInviteRequiresPayment);
+      const result = await createSignupInvite(
+        email,
+        signupInviteRequiresPayment,
+        signupInviteMultiStore,
+      );
       signupInviteResultUrl = result.accept_url;
       signupInviteResultExpiresAt = result.expires_at ?? "";
       signupInviteResultEmail = result.email;
       signupInviteResultRequiresPayment = result.requires_payment;
+      signupInviteResultMultiStore = result.is_multi_store;
       await loadData();
     } catch (e: any) {
       topError = e?.message ?? "Failed to create signup link";
@@ -244,6 +256,7 @@
       signupInviteResultExpiresAt = result.expires_at ?? "";
       signupInviteResultEmail = result.email;
       signupInviteResultRequiresPayment = result.requires_payment ?? true;
+      signupInviteResultMultiStore = result.is_multi_store ?? false;
       signupInviteCopied = false;
       signupInviteOpen = true;
       await loadData();
@@ -468,6 +481,11 @@
                   <span class="shrink-0 border px-1.5 py-0.5 font-mono text-[9px] {p.requires_payment ? 'border-bratrax-acid/40 text-bratrax-acid' : 'border-bratrax-border text-bratrax-text-muted'}">
                     {p.requires_payment ? "REQUIRES PAYMENT" : "FREE (INCEPTLY)"}
                   </span>
+                  {#if p.is_multi_store}
+                    <span class="shrink-0 border border-bratrax-acid/40 px-1.5 py-0.5 font-mono text-[9px] text-bratrax-acid">
+                      MULTI-STORE
+                    </span>
+                  {/if}
                 </div>
                 <div class="truncate font-mono text-[10px] text-bratrax-text-muted">
                   Signup link · expires {formatDate(p.expires_at)}
@@ -708,6 +726,29 @@
           </div>
           <div>
             <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              Account type
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                on:click={() => (signupInviteMultiStore = false)}
+                class="border px-3 py-3 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {!signupInviteMultiStore ? 'border-bratrax-acid text-bratrax-acid bg-bratrax-acid bg-opacity-10' : 'border-bratrax-border text-bratrax-text-muted hover:border-bratrax-acid/40'}"
+              >
+                Single store
+                <span class="block text-[9px] font-normal normal-case tracking-normal text-bratrax-text-muted/70">One Shopify brand</span>
+              </button>
+              <button
+                type="button"
+                on:click={() => (signupInviteMultiStore = true)}
+                class="border px-3 py-3 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {signupInviteMultiStore ? 'border-bratrax-acid text-bratrax-acid bg-bratrax-acid bg-opacity-10' : 'border-bratrax-border text-bratrax-text-muted hover:border-bratrax-acid/40'}"
+              >
+                Multi-store
+                <span class="block text-[9px] font-normal normal-case tracking-normal text-bratrax-text-muted/70">Agency w/ multiple brands</span>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
               Customer email
             </label>
             <input
@@ -743,6 +784,11 @@
             <span class="ml-2 inline-block border px-1.5 py-0.5 font-mono text-[9px] {signupInviteResultRequiresPayment ? 'border-bratrax-acid/40 text-bratrax-acid' : 'border-bratrax-border text-bratrax-text-muted'}">
               {signupInviteResultRequiresPayment ? "REQUIRES PAYMENT" : "FREE (INCEPTLY)"}
             </span>
+            {#if signupInviteResultMultiStore}
+              <span class="ml-1 inline-block border border-bratrax-acid/40 px-1.5 py-0.5 font-mono text-[9px] text-bratrax-acid">
+                MULTI-STORE
+              </span>
+            {/if}
           </div>
           <div class="flex items-center gap-2">
             <input

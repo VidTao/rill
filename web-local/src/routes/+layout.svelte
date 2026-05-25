@@ -31,6 +31,7 @@
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
   import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
+  import AddStoreButton from "$lib/bratrax/AddStoreButton.svelte";
   import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
 
   export let data: LayoutData;
@@ -101,6 +102,10 @@
   $: isViewer = role === "viewer";
   $: isSuper = role === "super_admin";
   $: isAdminOrSuper = role === "admin" || isSuper;
+  // Multi-store users (rill_users.multi_client_id != NULL) get the same
+  // client switcher dropdown super_admins use — the backend scopes the
+  // returned list to their sibling sub-stores.
+  $: isMultiStore = !!$bratraxUser?.multi_client_id;
 </script>
 
 <QueryClientProvider client={queryClient}>
@@ -116,8 +121,11 @@
           onLogout={handleBratraxLogout}
         >
           <svelte:fragment slot="header-extras">
-            {#if isSuper}
+            {#if isSuper || isMultiStore}
               <ClientSwitcher />
+            {/if}
+            {#if isMultiStore && !isViewer && !onOnboardPage}
+              <AddStoreButton />
             {/if}
           </svelte:fragment>
         </ApplicationHeader>
