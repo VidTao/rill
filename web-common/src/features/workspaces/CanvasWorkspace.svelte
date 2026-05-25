@@ -25,6 +25,9 @@
   import CanvasInitialization from "../canvas/CanvasInitialization.svelte";
 
   export let fileArtifact: FileArtifact;
+  // Bratrax: pass-through for the page-level Canvas configurations panel
+  // visibility (set false for non-super_admin in web-local).
+  export let showPageEditor: boolean = true;
 
   let canvasName: string;
   let selectedView: "split" | "code" | "viz";
@@ -143,6 +146,7 @@
           <VisualCanvasEditing
             {canvasName}
             {fileArtifact}
+            {showPageEditor}
             autoSave={selectedView === "viz" || $autoSave}
           />
         {/if}

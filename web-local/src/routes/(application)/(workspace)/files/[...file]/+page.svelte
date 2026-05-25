@@ -20,6 +20,7 @@
   import WorkspaceEditorContainer from "@rilldata/web-common/layout/workspace/WorkspaceEditorContainer.svelte";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient.js";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+  import { bratraxUser } from "$lib/bratrax/auth-store";
   import { onMount } from "svelte";
   import type { PageData } from "./$types";
 
@@ -54,6 +55,10 @@
   $: resourceKind = <ResourceKind | undefined>$resourceName?.kind;
 
   $: workspace = workspaces.get(resourceKind ?? $inferredResourceKind);
+
+  // Bratrax: only super_admin sees the Canvas configurations panel.
+  $: isSuperAdmin = $bratraxUser?.role === "super_admin";
+  $: isCanvasWorkspace = workspace === CanvasWorkspace;
 
   $: resourceQuery = getResource(queryClient, instanceId);
 
@@ -97,6 +102,8 @@
   <div class="flex-1 overflow-hidden">
     {#if $generatingCanvas}
       <GeneratingMessage title="Generating your Canvas dashboard..." />
+    {:else if isCanvasWorkspace}
+      <CanvasWorkspace {fileArtifact} showPageEditor={isSuperAdmin} />
     {:else if workspace}
       <svelte:component this={workspace} {fileArtifact} />
     {:else}

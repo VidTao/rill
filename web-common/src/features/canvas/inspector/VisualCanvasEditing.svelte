@@ -11,6 +11,9 @@
   export let fileArtifact: FileArtifact;
   export let autoSave: boolean;
   export let canvasName: string;
+  // Bratrax: gate the page-level Canvas configurations panel. Component
+  // editing remains visible — role logic lives in web-local, not here.
+  export let showPageEditor: boolean = true;
 
   $: ({ instanceId } = $runtime);
 
@@ -62,10 +65,12 @@
   }
 </script>
 
-<Inspector minWidth={320} filePath={path}>
-  {#if component}
-    <ComponentsEditor {component} />
-  {:else}
-    <PageEditor {canvasName} {fileArtifact} {updateProperties} />
-  {/if}
-</Inspector>
+{#if component || showPageEditor}
+  <Inspector minWidth={320} filePath={path}>
+    {#if component}
+      <ComponentsEditor {component} />
+    {:else if showPageEditor}
+      <PageEditor {canvasName} {fileArtifact} {updateProperties} />
+    {/if}
+  </Inspector>
+{/if}
