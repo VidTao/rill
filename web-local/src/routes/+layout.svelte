@@ -88,6 +88,7 @@
   $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
   $: onSettingsPage = $page.url.pathname.startsWith("/settings");
   $: onSuperadminsPage = $page.url.pathname.startsWith("/superadmins");
+  $: onClientsPage = $page.url.pathname.startsWith("/clients");
   $: onHelpPage = $page.url.pathname.startsWith("/help");
   // Hide the top nav across the entire onboarding flow — none of those tabs
   // lead anywhere useful for a user who hasn't completed onboarding yet
@@ -134,7 +135,7 @@
             <a
               href="/developer"
               class="bratrax-nav-link"
-              class:active={!onConnectorsPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage && !onHelpPage}
+              class:active={!onConnectorsPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage && !onClientsPage && !onHelpPage}
             >
               Dashboards
             </a>
@@ -170,6 +171,13 @@
                 class:active={onSuperadminsPage}
               >
                 Superadmins
+              </a>
+              <a
+                href="/clients"
+                class="bratrax-nav-link"
+                class:active={onClientsPage}
+              >
+                Clients
               </a>
             {/if}
             <a

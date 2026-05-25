@@ -181,3 +181,42 @@ export function dismissAccessRequest(
     method: "DELETE",
   });
 }
+
+// ---------------------------------------------------------------------------
+// Clients overview (super_admin Clients tab)
+//
+// Lists every rill_clients row with its multi-store status + lets a super_admin
+// flip a single-store client into a multi-store parent in one click.
+// ---------------------------------------------------------------------------
+
+export interface SuperadminClientRow {
+  client_id: string;
+  company_name: string;
+  created_at: string | null;
+  admin_email: string | null;
+  multi_client_id: string | null;
+  multi_client_display_name: string | null;
+  // Per-client billing flag (legacy single-store source of truth).
+  is_paid_subscriber: boolean;
+  // Parent's billing flag — present only when multi_client_id is set.
+  multi_client_is_paid_subscriber: boolean | null;
+}
+
+export function listAllClients(): Promise<{ clients: SuperadminClientRow[] }> {
+  return apiFetch("/bratrax/superadmins/clients");
+}
+
+export interface EnableMultiStoreResult {
+  client_id: string;
+  multi_client_id: string;
+  linked_users: number;
+}
+
+export function enableMultiStoreForClient(
+  clientId: string,
+): Promise<EnableMultiStoreResult> {
+  return apiFetch<EnableMultiStoreResult>(
+    `/bratrax/superadmins/clients/${encodeURIComponent(clientId)}/enable-multi-store`,
+    { method: "POST" },
+  );
+}
