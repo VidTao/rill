@@ -3,24 +3,40 @@
   import { bratraxSwitchClient } from "./auth";
 
   // Header button — visible only when the parent layout has determined the
-  // current user belongs to a multi-client. Click prompts for the new
-  // store's display name, provisions it via /bratrax/multi-client/add-store,
-  // then switches the active-client cookie to the new sub-store and
-  // hard-reloads into /onboard/shopify (the route guard handles the rest).
+  // current user belongs to a multi-client. Click opens a styled modal asking
+  // for the new store's display name, then provisions it via
+  // /bratrax/multi-client/add-store, switches the active-client cookie to the
+  // new sub-store, and hard-reloads into /onboard/shopify (the route guard
+  // handles the rest).
 
+  let modalOpen = false;
+  let storeName = "";
   let busy = false;
+  let error = "";
+  let inputEl: HTMLInputElement | null = null;
 
-  async function handleClick() {
+  function openModal() {
     if (busy) return;
-    // Quick prompt for the new store's name. Matches what the user enters
-    // for the first store on the accept-invite page (the "company_name"
-    // input). Replace with a proper modal later if we want richer UX.
-    const name = window.prompt("Name of the new store?");
-    if (!name) return;
-    const trimmed = name.trim();
-    if (!trimmed) return;
+    storeName = "";
+    error = "";
+    modalOpen = true;
+    // Focus the input on the next tick once Svelte mounts it.
+    queueMicrotask(() => inputEl?.focus());
+  }
 
+  function closeModal() {
+    if (busy) return;
+    modalOpen = false;
+  }
+
+  async function submit() {
+    const trimmed = storeName.trim();
+    if (!trimmed) {
+      error = "Store name is required";
+      return;
+    }
     busy = true;
+    error = "";
     try {
       const result = await bratraxAddStore(trimmed);
       // Flip the active-client cookie so the next page load loads the new
@@ -34,15 +50,18 @@
       window.location.href = "/onboard/shopify";
     } catch (e: any) {
       busy = false;
-      // eslint-disable-next-line no-alert
-      alert(e?.message ?? "Failed to add store");
+      error = e?.message ?? "Failed to add store";
     }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") closeModal();
   }
 </script>
 
 <button
   type="button"
-  on:click={handleClick}
+  on:click={openModal}
   class="bratrax-add-store-btn"
   disabled={busy}
   title="Add a new store under this account"
@@ -64,6 +83,83 @@
   </svg>
   <span>Add store</span>
 </button>
+
+{#if modalOpen}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    on:click={closeModal}
+    on:keydown={handleKeydown}
+    role="presentation"
+  >
+    <div
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-store-title"
+      tabindex="-1"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        ADD STORE
+      </div>
+      <h2 id="add-store-title" class="text-lg font-black text-bratrax-text-headline">
+        Add a new store
+      </h2>
+      <p class="mt-2 text-sm font-light text-bratrax-text-body">
+        This starts a fresh onboarding flow for a new Shopify brand under your account. The new store inherits your billing — no payment screen.
+      </p>
+
+      <div class="mt-4 flex flex-col gap-3">
+        <div>
+          <label
+            for="add-store-name"
+            class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+          >
+            Store name
+          </label>
+          <input
+            id="add-store-name"
+            type="text"
+            bind:value={storeName}
+            bind:this={inputEl}
+            on:keydown={(e) => e.key === "Enter" && !busy && submit()}
+            class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm text-bratrax-text-body focus:border-bratrax-acid focus:outline-none"
+            placeholder="My new brand"
+            disabled={busy}
+          />
+        </div>
+
+        {#if error}
+          <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+            {error}
+          </div>
+        {/if}
+      </div>
+
+      <div class="mt-6 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          on:click={closeModal}
+          disabled={busy}
+          class="btn-bratrax btn-neutral btn-compact"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          on:click={submit}
+          disabled={busy}
+          class="btn-bratrax btn-primary btn-compact"
+        >
+          {busy ? "Creating…" : "Create store"}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   /* Matches .bratrax-theme-toggle visual weight but with a label so the
