@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { portal } from "@rilldata/web-common/lib/actions/portal";
   import { bratraxAddStore } from "./multiClient";
   import { bratraxSwitchClient } from "./auth";
 
@@ -85,8 +86,12 @@
 </button>
 
 {#if modalOpen}
+  <!-- use:portal lifts the overlay out of any ancestor stacking context (the
+       application header + dashboard chrome both create their own), so a high
+       z-index reliably wins over the dashboard toolbar. -->
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    use:portal
+    class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
     on:click={closeModal}
     on:keydown={handleKeydown}
     role="presentation"
