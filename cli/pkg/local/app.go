@@ -726,7 +726,14 @@ func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAP
 
 	// OLAP (DuckDB) connector
 	olapConfig, err := structpb.NewStruct(map[string]any{
-		"pool_size":   "4",
+		// pool_size = max concurrent DuckDB connections this Rill instance
+		// uses for reads + writes. Bumped from 4 → 16 because the
+		// post-activation reconcile cascade was queueing ~20 sources / models
+		// through 4 connections, blowing reconcile time out to ~20 min.
+		// Diminishing returns: DuckDB still serializes mutating ops on its
+		// file lock, but concurrent CTAS staging + concurrent reads no
+		// longer queue as deeply.
+		"pool_size":   "16",
 		"log_queries": strconv.FormatBool(a.debugFlag),
 	})
 	if err != nil {
