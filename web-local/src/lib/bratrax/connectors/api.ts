@@ -71,18 +71,6 @@ export async function exchangeShopifyTokens(
   });
 }
 
-// ── Outbrain-specific (credential flow) ──
-
-export async function submitOutbrainCredentials(
-  encodedAuth: string,
-): Promise<unknown> {
-  return apiFetch(`/bratrax/connectors/outbrain/auth-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ auth: encodedAuth }),
-  });
-}
-
 // ── Facebook-specific (client SDK flow) ──
 
 export interface AdAccountInfo {

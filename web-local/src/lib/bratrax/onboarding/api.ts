@@ -102,6 +102,8 @@ const CRED_KEY_TO_PLATFORM: Record<string, string> = {
   tiktok_ads_credentials: "tiktok_ads",
   klaviyo_credentials: "klaviyo",
   bing_ads_credentials: "bing_ads",
+  taboola_credentials: "taboola",
+  outbrain_credentials: "outbrain",
   funnelish_credentials: "funnelish",
 };
 

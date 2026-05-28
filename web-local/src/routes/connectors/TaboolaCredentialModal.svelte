@@ -2,21 +2,20 @@
   export let open = false;
   export let loading = false;
   export let error = "";
-  export let onSubmit: (creds: { encodedAuth: string }) => void = () => {};
+  export let onSubmit: (creds: { clientId: string; clientSecret: string }) => void = () => {};
   export let onClose: () => void = () => {};
 
-  let username = "";
-  let password = "";
+  let clientId = "";
+  let clientSecret = "";
   let localError = "";
 
   function handleSubmit() {
-    if (!username.trim() || !password.trim()) {
-      localError = "Please enter both username and password";
+    if (!clientId.trim() || !clientSecret.trim()) {
+      localError = "Please enter both client_id and client_secret";
       return;
     }
     localError = "";
-    const encodedAuth = btoa(`${username}:${password}`);
-    onSubmit({ encodedAuth });
+    onSubmit({ clientId: clientId.trim(), clientSecret: clientSecret.trim() });
   }
 
   $: displayError = error || localError;
@@ -32,9 +31,9 @@
     >
       <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
-      <h2 class="mb-1 text-lg font-bold text-bratrax-text-headline">Connect Outbrain</h2>
+      <h2 class="mb-1 text-lg font-bold text-bratrax-text-headline">Connect Taboola</h2>
       <p class="mb-4 font-mono text-[11px] text-bratrax-text-muted">
-        Use the same username and password you use to sign in to Amplify.
+        Get these from your Taboola account manager — they are unique to your account.
       </p>
 
       <form on:submit|preventDefault={handleSubmit} class="flex flex-col gap-3">
@@ -45,14 +44,14 @@
         {/if}
 
         <div class="flex flex-col gap-1">
-          <label for="ob-user" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
-            Username
+          <label for="tab-client-id" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+            Client ID
           </label>
           <input
-            id="ob-user"
+            id="tab-client-id"
             type="text"
-            bind:value={username}
-            placeholder="your@email.com"
+            bind:value={clientId}
+            placeholder="Your Taboola client_id"
             class="border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
             disabled={loading}
             autocomplete="off"
@@ -60,14 +59,14 @@
         </div>
 
         <div class="flex flex-col gap-1">
-          <label for="ob-pass" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
-            Password
+          <label for="tab-client-secret" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+            Client Secret
           </label>
           <input
-            id="ob-pass"
+            id="tab-client-secret"
             type="password"
-            bind:value={password}
-            placeholder="Enter your password"
+            bind:value={clientSecret}
+            placeholder="Your Taboola client_secret"
             class="border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
             disabled={loading}
             autocomplete="off"

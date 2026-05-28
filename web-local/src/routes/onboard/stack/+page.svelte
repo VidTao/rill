@@ -16,6 +16,8 @@
   import FbUrlTagsConfirmModal from "../../connectors/FbUrlTagsConfirmModal.svelte";
   import ExternalPagesBuilderPickerModal from "../../connectors/ExternalPagesBuilderPickerModal.svelte";
   import FunnelishInstallModal from "../../connectors/FunnelishInstallModal.svelte";
+  import TaboolaCredentialModal from "../../connectors/TaboolaCredentialModal.svelte";
+  import OutbrainLoginModal from "../../connectors/OutbrainLoginModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
 
   // ---------------------------------------------------------------------------
@@ -45,7 +47,10 @@
   interface Platform {
     id: string;
     name: string;
-    type: "oauth" | "oauth_direct" | "client_sdk" | "selection" | "coming_soon";
+    // "credential_modal" opens an in-page form (Taboola, Outbrain) whose
+    // submit triggers a direct credential→token exchange on the backend,
+    // bypassing the OAuth redirect dance entirely.
+    type: "oauth" | "oauth_direct" | "client_sdk" | "selection" | "coming_soon" | "credential_modal";
     authUrlPath?: string;
     directAuthUrl?: string;
     color: string;
@@ -94,6 +99,18 @@
           type: "oauth",
           authUrlPath: "/bratrax/onboard/bing-ads/auth-url",
           color: "#00A4EF",
+        },
+        {
+          id: "taboola",
+          name: "Taboola",
+          type: "credential_modal",
+          color: "#1376DC",
+        },
+        {
+          id: "outbrain",
+          name: "Outbrain",
+          type: "credential_modal",
+          color: "#EE6E33",
         },
         {
           id: "pinterest_ads",
@@ -179,7 +196,7 @@
     externalBuilderIds.has(p),
   );
 
-  const adPlatformIds = new Set(["facebook_ads", "google_ads", "tiktok_ads", "bing_ads", "pinterest_ads", "amazon_ads"]);
+  const adPlatformIds = new Set(["facebook_ads", "google_ads", "tiktok_ads", "bing_ads", "taboola", "outbrain", "pinterest_ads", "amazon_ads"]);
 
   // Ids that behave as radio buttons (one-of-N selection) — distinct from
   // `type === "selection"`, which also includes the display-only Shopify card.
@@ -286,6 +303,19 @@
   let tiktokState = "";
   let klaviyoState = "";
   let bingAdsState = "";
+  let taboolaState = "";
+  let outbrainState = "";
+
+  // Credential-modal state (Taboola / Outbrain). Mirrors the pattern on
+  // /connectors — modal stays open on error so the user can retry without
+  // re-typing credentials, closes only on success.
+  let showTaboolaModal = false;
+  let taboolaModalLoading = false;
+  let taboolaModalError = "";
+
+  let showOutbrainModal = false;
+  let outbrainModalLoading = false;
+  let outbrainModalError = "";
 
   // Google Ads tracking_url_template confirmation modal — wedged between
   // /onboard/google/connect and /onboard/activate so each leaf customer gets
@@ -1226,12 +1256,30 @@
       const isTikTok = accountModalPlatform === "TikTok Ads";
       const isKlaviyo = accountModalPlatform === "Klaviyo";
       const isBingAds = accountModalPlatform === "Microsoft Bing Ads";
+      const isTaboola = accountModalPlatform === "Taboola";
+      const isOutbrain = accountModalPlatform === "Outbrain";
 
       let endpoint: string;
       let body: Record<string, unknown>;
       let connectedKey: string;
 
-      if (isBingAds) {
+      if (isTaboola) {
+        endpoint = `${host}/bratrax/onboard/taboola/connect`;
+        body = {
+          state: taboolaState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "taboola";
+      } else if (isOutbrain) {
+        endpoint = `${host}/bratrax/onboard/outbrain/connect`;
+        body = {
+          state: outbrainState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "outbrain";
+      } else if (isBingAds) {
         endpoint = `${host}/bratrax/onboard/bing-ads/connect`;
         body = {
           state: bingAdsState,
@@ -1326,6 +1374,8 @@
         sessionStorage.removeItem("bing_ads_oauth_state");
         bingAdsState = "";
       }
+      if (isTaboola) taboolaState = "";
+      if (isOutbrain) outbrainState = "";
 
       // Re-pull from the server so the card renders from the source of
       // truth. Also guarantees a fresh Set reference for Svelte reactivity.
@@ -1346,6 +1396,75 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Credential-modal flow (Taboola / Outbrain): the modal collects
+  // credentials, we POST them to /{platform}/accounts to get the listed
+  // accounts + a state token, then open AccountSelectionModal — which
+  // routes selection through handleAccountSelection above.
+  // ---------------------------------------------------------------------------
+  async function handleTaboolaCredentials(creds: { clientId: string; clientSecret: string }) {
+    taboolaModalError = "";
+    taboolaModalLoading = true;
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(`${host}/bratrax/onboard/taboola/accounts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          client_id: creds.clientId,
+          client_secret: creds.clientSecret,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as any).error || "Failed to list Taboola accounts");
+      }
+      taboolaState = (data as any).state;
+      accountModalAccounts = ((data as any).accounts || []).map((a: any) => ({
+        id: String(a.id),
+        name: a.name || a.id,
+      }));
+      accountModalPlatform = "Taboola";
+      showTaboolaModal = false;
+      showAccountModal = true;
+    } catch (e) {
+      taboolaModalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      taboolaModalLoading = false;
+    }
+  }
+
+  async function handleOutbrainCredentials(creds: { encodedAuth: string }) {
+    outbrainModalError = "";
+    outbrainModalLoading = true;
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(`${host}/bratrax/onboard/outbrain/accounts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ auth: creds.encodedAuth }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as any).error || "Failed to list Outbrain marketers");
+      }
+      outbrainState = (data as any).state;
+      accountModalAccounts = ((data as any).accounts || []).map((a: any) => ({
+        id: String(a.id),
+        name: a.name || a.id,
+      }));
+      accountModalPlatform = "Outbrain";
+      showOutbrainModal = false;
+      showAccountModal = true;
+    } catch (e) {
+      outbrainModalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      outbrainModalLoading = false;
+    }
+  }
+
   function handleCardClick(platform: Platform) {
     if (platform.type === "oauth") {
       handleOAuthConnect(platform);
@@ -1354,6 +1473,16 @@
     } else if (platform.type === "client_sdk") {
       if (platform.id === "google_ads") handleGoogleAdsConnect();
       else if (platform.id === "facebook_ads") handleFacebookConnect();
+    } else if (platform.type === "credential_modal") {
+      if (isConnected(platform.id)) return;
+      error = "";
+      if (platform.id === "taboola") {
+        taboolaModalError = "";
+        showTaboolaModal = true;
+      } else if (platform.id === "outbrain") {
+        outbrainModalError = "";
+        showOutbrainModal = true;
+      }
     } else if (platform.type === "coming_soon") {
       // Do nothing
     } else if (platform.id === "external_pages") {
@@ -1568,3 +1697,20 @@
     on:close={() => (showFunnelishModal = false)}
   />
 {/if}
+
+<TaboolaCredentialModal
+  open={showTaboolaModal}
+  loading={taboolaModalLoading}
+  error={taboolaModalError}
+  onSubmit={handleTaboolaCredentials}
+  onClose={() => { showTaboolaModal = false; taboolaModalError = ""; }}
+/>
+
+<OutbrainLoginModal
+  open={showOutbrainModal}
+  loading={outbrainModalLoading}
+  error={outbrainModalError}
+  onSubmit={handleOutbrainCredentials}
+  onClose={() => { showOutbrainModal = false; outbrainModalError = ""; }}
+/>
+
