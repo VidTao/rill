@@ -116,7 +116,7 @@
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Content class="max-w-4xl">
+  <Dialog.Content class="max-w-6xl">
     <Dialog.Header>
       <Dialog.Title>Attributed Orders</Dialog.Title>
       {#if subtitle}
