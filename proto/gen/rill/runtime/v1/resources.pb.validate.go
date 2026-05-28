@@ -2536,6 +2536,8 @@ func (m *ModelSpec) validate(all bool) error {
 
 	// no validation rules for DefinedAsSource
 
+	// no validation rules for External
+
 	if m.RetryAttempts != nil {
 		// no validation rules for RetryAttempts
 	}

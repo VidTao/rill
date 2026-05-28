@@ -46,6 +46,12 @@ type ModelYAML struct {
 	} `yaml:"tests"`
 	Materialize     *bool `yaml:"materialize"`
 	DefinedAsSource bool  `yaml:"defined_as_source"`
+	// External marks the model as a metadata-only reference to a pre-existing table
+	// on the output connector. When true, the reconciler skips the executor entirely
+	// (no CREATE / DROP / RENAME on the OLAP) and resolves the underlying table from
+	// `output.table`. Used by Bratrax to point Rill at ClickHouse tables that the
+	// bratrax compile + deploy pipeline owns end-to-end.
+	External *bool `yaml:"external"`
 }
 
 // ModelOutputYAML parses the `output:` property of a model.
@@ -166,6 +172,37 @@ func (p *Parser) parseModel(ctx context.Context, node *Node) error {
 		outputProps["materialize"] = *tmp.Materialize
 	}
 
+	// Validate `external: true` semantics. External models are metadata-only references
+	// to pre-existing tables on the output connector — no executor invocation, no
+	// materialization. They must specify `output.table` so the reconciler knows what
+	// to point at. Incompatible with incremental, partitions, stage, and tests.
+	external := tmp.External != nil && *tmp.External
+	if external {
+		if outputProps == nil {
+			return fmt.Errorf(`"external: true" requires "output.table" to be set`)
+		}
+		if _, ok := outputProps["table"]; !ok {
+			return fmt.Errorf(`"external: true" requires "output.table" to be set`)
+		}
+		if tmp.Incremental {
+			return fmt.Errorf(`"external: true" cannot be combined with "incremental"`)
+		}
+		if tmp.Partitions != nil || tmp.Splits != nil {
+			return fmt.Errorf(`"external: true" cannot be combined with "partitions"`)
+		}
+		if len(tmp.Stage.Properties) > 0 || tmp.Stage.Connector != "" {
+			return fmt.Errorf(`"external: true" cannot be combined with "stage"`)
+		}
+		if len(tmp.Tests) > 0 {
+			return fmt.Errorf(`"external: true" cannot be combined with "tests"`)
+		}
+		// Propagate the external marker into output_properties so the connector's
+		// executor can defensively refuse to run (belt-and-suspenders — the reconciler
+		// short-circuit should make this unreachable, but if it isn't, we want a loud
+		// error instead of a silent destructive overwrite).
+		outputProps["external"] = true
+	}
+
 	// Validate output details
 	var outputPropsPB *structpb.Struct
 	if len(outputProps) > 0 {
@@ -276,6 +313,8 @@ func (p *Parser) parseModel(ctx context.Context, node *Node) error {
 
 	r.ModelSpec.OutputConnector = outputConnector
 	r.ModelSpec.OutputProperties = outputPropsPB
+
+	r.ModelSpec.External = external
 
 	r.ModelSpec.Tests = modelTests
 

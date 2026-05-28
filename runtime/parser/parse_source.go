@@ -33,7 +33,12 @@ func (p *Parser) parseSource(ctx context.Context, node *Node) error {
 
 	tmp["type"] = "model"
 	tmp["defined_as_source"] = true
-	tmp["materialize"] = true
+	// Bratrax: respect `external: true` — when set, the source is a metadata-only
+	// reference to an existing table on the output connector. Do not force
+	// materialization; the reconciler short-circuits and skips the executor.
+	if external, _ := tmp["external"].(bool); !external {
+		tmp["materialize"] = true
+	}
 	if _, ok := tmp["output"]; !ok {
 		tmp["output"] = map[string]any{"connector": p.defaultOLAPConnector()}
 	}

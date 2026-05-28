@@ -203,6 +203,15 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, n *runtimev1.ResourceNa
 		return runtime.ReconcileResult{}
 	}
 
+	// External models: metadata-only references to pre-existing tables on the output
+	// connector. Skip the executor entirely (no CREATE / DROP / RENAME). Populate
+	// State.ResultConnector / ResultTable / ResultProperties from Spec.OutputConnector +
+	// Spec.OutputProperties.table and return clean. Bratrax uses this so Rill can point
+	// at ClickHouse tables that the bratrax compile + deploy pipeline owns end-to-end.
+	if model.Spec.External {
+		return r.reconcileExternal(ctx, self, model)
+	}
+
 	// Check refs - stop if any of them are invalid
 	err = checkRefs(ctx, r.C, self.Meta.Refs)
 	if err != nil {
@@ -419,6 +428,64 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, n *runtimev1.ResourceNa
 
 	// Return the next refresh time
 	return runtime.ReconcileResult{Retrigger: refreshOn}
+}
+
+// reconcileExternal handles a model marked `external: true`. The model is treated as a
+// metadata-only reference to a pre-existing table on Spec.OutputConnector; the executor
+// is never invoked, so nothing is created, dropped, or renamed on the OLAP. The state's
+// ResultConnector / ResultTable / ResultProperties are populated from the spec so that
+// downstream metrics views and models resolve the same way they would for a materialized
+// model.
+func (r *ModelReconciler) reconcileExternal(ctx context.Context, self *runtimev1.Resource, model *runtimev1.Model) runtime.ReconcileResult {
+	if model.Spec.OutputConnector == "" {
+		return runtime.ReconcileResult{Err: fmt.Errorf("external model requires output.connector to be set")}
+	}
+	if model.Spec.OutputProperties == nil {
+		return runtime.ReconcileResult{Err: fmt.Errorf("external model requires output.table to be set")}
+	}
+	outputProps := model.Spec.OutputProperties.AsMap()
+	tableVal, ok := outputProps["table"]
+	if !ok {
+		return runtime.ReconcileResult{Err: fmt.Errorf("external model requires output.table to be set")}
+	}
+	table, ok := tableVal.(string)
+	if !ok || table == "" {
+		return runtime.ReconcileResult{Err: fmt.Errorf("external model output.table must be a non-empty string")}
+	}
+
+	// Build a minimal result properties struct exposing the table so downstream resources
+	// (metrics views, models) resolve correctly via ModelState.ResultProperties.
+	resultProps, err := structpb.NewStruct(map[string]any{"table": table})
+	if err != nil {
+		return runtime.ReconcileResult{Err: fmt.Errorf("failed to build result properties: %w", err)}
+	}
+
+	model.State.ExecutorConnector = model.Spec.OutputConnector
+	model.State.ResultConnector = model.Spec.OutputConnector
+	model.State.ResultTable = table
+	model.State.ResultProperties = resultProps
+	model.State.RefreshedOn = timestamppb.Now()
+	model.State.LatestExecutionDurationMs = 0
+	model.State.TotalExecutionDurationMs = 0
+	model.State.TestHash = ""
+	model.State.TestErrors = nil
+	model.State.IncrementalState = nil
+	model.State.IncrementalStateSchema = nil
+	model.State.PartitionsHaveErrors = false
+
+	// Compute hashes so subsequent reconciles short-circuit unless the yaml changes.
+	// Non-fatal if either computation fails — we still want the resource to be IDLE.
+	if specHash, err := r.executionSpecHash(ctx, self.Meta.Refs, model.Spec); err == nil {
+		model.State.SpecHash = specHash
+	}
+	if refsHash, err := r.refsStateHash(ctx, self.Meta.Refs, model.Spec); err == nil {
+		model.State.RefsHash = refsHash
+	}
+
+	if err := r.C.UpdateState(ctx, self.Meta.Name, self); err != nil {
+		return runtime.ReconcileResult{Err: err}
+	}
+	return runtime.ReconcileResult{}
 }
 
 func (r *ModelReconciler) ResolveTransitiveAccess(ctx context.Context, claims *runtime.SecurityClaims, res *runtimev1.Resource) ([]*runtimev1.SecurityRule, error) {

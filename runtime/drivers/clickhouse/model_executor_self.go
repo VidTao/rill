@@ -22,6 +22,16 @@ func (e *selfToSelfExecutor) Concurrency(desired int) (int, bool) {
 }
 
 func (e *selfToSelfExecutor) Execute(ctx context.Context, opts *drivers.ModelExecuteOptions) (*drivers.ModelResult, error) {
+	// Defensive guard: external models are metadata-only references; the reconciler
+	// short-circuits them before the executor is ever invoked. If we somehow reach here
+	// for an external model (regression), fail loudly rather than silently dropping the
+	// referenced ClickHouse table at the `dropTable` call further down.
+	if ext, ok := opts.OutputProperties["external"]; ok {
+		if extBool, ok := ext.(bool); ok && extBool {
+			return nil, fmt.Errorf("clickhouse selfToSelf executor refused to execute model %q: external models must be handled by the reconciler short-circuit", opts.ModelName)
+		}
+	}
+
 	// Parse the input and output properties
 	inputProps := &ModelInputProperties{}
 	if err := mapstructure.WeakDecode(opts.InputProperties, inputProps); err != nil {

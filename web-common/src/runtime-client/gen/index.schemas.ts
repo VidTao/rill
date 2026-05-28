@@ -1883,6 +1883,12 @@ export interface V1ModelSpec {
   triggerPartitions?: boolean;
   /** defined_as_source is true if it was defined by user as a source but converted internally to a model. */
   definedAsSource?: boolean;
+  /** external is true if the model is a metadata-only reference to a pre-existing table
+on the output_connector. When true, the reconciler skips the executor entirely
+(no CREATE/DROP/RENAME), and populates ModelState.result_* directly from
+output_properties.table. Used by Bratrax to point Rill at ClickHouse tables that
+the bratrax compiler/deploy pipeline owns end-to-end. */
+  external?: boolean;
 }
 
 /**

@@ -1025,6 +1025,17 @@ export class ModelSpec extends Message<ModelSpec> {
    */
   definedAsSource = false;
 
+  /**
+   * external is true if the model is a metadata-only reference to a pre-existing table
+   * on the output_connector. When true, the reconciler skips the executor entirely
+   * (no CREATE/DROP/RENAME), and populates ModelState.result_* directly from
+   * output_properties.table. Used by Bratrax to point Rill at ClickHouse tables that
+   * the bratrax compiler/deploy pipeline owns end-to-end.
+   *
+   * @generated from field: bool external = 31;
+   */
+  external = false;
+
   constructor(data?: PartialMessage<ModelSpec>) {
     super();
     proto3.util.initPartial(data, this);
@@ -1058,6 +1069,7 @@ export class ModelSpec extends Message<ModelSpec> {
     { no: 22, name: "trigger_full", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
     { no: 30, name: "trigger_partitions", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
     { no: 23, name: "defined_as_source", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 31, name: "external", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ModelSpec {
