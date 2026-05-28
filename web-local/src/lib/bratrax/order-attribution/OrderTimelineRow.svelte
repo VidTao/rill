@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatOrderLabel } from "./api";
   import type { OrderTimelineRow } from "./types";
 
   export let row: OrderTimelineRow;
@@ -63,7 +64,7 @@
     {/if}
     {#if rowType === "conversion" && row.revenue != null}
       <div class="meta">
-        Order #{row.order_number ?? row.order_id} · {row.revenue.toLocaleString(
+        Order {formatOrderLabel(row.order_number, row.order_id)} · {row.revenue.toLocaleString(
           undefined,
           { style: "currency", currency: "USD" },
         )}

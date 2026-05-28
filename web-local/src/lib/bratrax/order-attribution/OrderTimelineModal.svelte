@@ -8,6 +8,7 @@
   import {
     buildOrderTimelineWhere,
     findWinner,
+    formatOrderLabel,
     ORDER_TIMELINE_METRICS_VIEW,
     sortTimelineRows,
   } from "./api";
@@ -118,7 +119,7 @@
   <Dialog.Content class="max-w-3xl">
     <Dialog.Header>
       <Dialog.Title>
-        Order #{summary?.order_number ?? orderId}
+        Order {formatOrderLabel(summary?.order_number, orderId)}
       </Dialog.Title>
       {#if summary}
         <Dialog.Description>

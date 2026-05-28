@@ -77,6 +77,27 @@ function pruneFilterToOrderTimeline(
   return expr;
 }
 
+// Truthy-fallback for the human-readable order label. The compiler emits
+// order_timeline_v1.order_number as a non-nullable Int64, so any NULL coming
+// out of the dim layer lands as a literal 0 in the row. JS nullish-coalescing
+// won't catch that (0 is not nullish), so we treat 0 / empty-string the same
+// as null and fall back to the raw order_id. Real Shopify order numbers get
+// a leading "#" to match the merchant's dashboard view.
+export function formatOrderLabel(
+  orderNumber: string | number | undefined | null,
+  orderId: string | undefined,
+): string {
+  // Treat all of {null, undefined, 0, "", "0"} as "missing".
+  const hasOrderNumber =
+    orderNumber !== null &&
+    orderNumber !== undefined &&
+    orderNumber !== 0 &&
+    orderNumber !== "" &&
+    orderNumber !== "0";
+  if (hasOrderNumber) return `#${orderNumber}`;
+  return orderId ?? "—";
+}
+
 // Modal 1 (orders list): scope to the winning attribution touchpoints matching
 // the clicked cell. We AND in the row_type + winner gates that are specific to
 // the drilldown, plus the pruned cell filter from the parent dashboard.

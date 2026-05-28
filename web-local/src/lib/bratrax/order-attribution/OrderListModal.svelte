@@ -10,6 +10,7 @@
     buildOrderListWhere,
     dedupeOrders,
     extractCellLabels,
+    formatOrderLabel,
     humanizeResolutionReason,
     ORDER_TIMELINE_METRICS_VIEW,
   } from "./api";
@@ -162,7 +163,7 @@
                   (e.key === "Enter" || e.key === " ") &&
                   onSelectOrder(o.order_id)}
               >
-                <td class="mono">{o.order_number ?? o.order_id}</td>
+                <td class="mono">{formatOrderLabel(o.order_number, o.order_id)}</td>
                 <td>{fmtDate(o.conversion_ts)}</td>
                 <td class="num">{fmtMoney(o.revenue)}</td>
                 <td class="num">{fmtWeight(o.last_touch_weight)}</td>
