@@ -193,11 +193,6 @@
     );
   }
 
-  function truncate(s: string | null, n = 80): string {
-    if (!s) return "";
-    return s.length > n ? s.slice(0, n) + "…" : s;
-  }
-
   // --- Multi-store handlers -------------------------------------------------
   function requestEnable(c: SuperadminClientRow, e: Event) {
     e.stopPropagation();
@@ -489,14 +484,6 @@
                   {stepGlyph(c.onboarding_step)}
                   {c.onboarding_step ?? "—"}
                 </span>
-                {#if c.error_message}
-                  <div
-                    class="mt-0.5 text-[10px] text-bratrax-tomato"
-                    title={c.error_message}
-                  >
-                    {truncate(c.error_message)}
-                  </div>
-                {/if}
               </td>
               <td class="px-2 py-2 align-top whitespace-nowrap">
                 {stuckLabel(c)}
@@ -514,7 +501,7 @@
                   <button
                     type="button"
                     on:click={(e) => requestEnable(c, e)}
-                    class="btn-bratrax btn-primary btn-compact"
+                    class="btn-bratrax btn-neutral btn-compact"
                   >
                     Enable multi-store
                   </button>

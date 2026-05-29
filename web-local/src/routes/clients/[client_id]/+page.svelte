@@ -169,12 +169,6 @@
             <dt class="inline text-bratrax-text-muted">Extraction:</dt>
             {extractionLabel}
           </div>
-          <div class="col-span-2 sm:col-span-3">
-            <dt class="inline text-bratrax-text-muted">Error:</dt>
-            <span class:text-bratrax-tomato={!!detail.onboarding.error_message}>
-              {detail.onboarding.error_message ?? "—"}
-            </span>
-          </div>
         </dl>
       </section>
 
