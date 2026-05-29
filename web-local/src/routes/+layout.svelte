@@ -160,7 +160,7 @@
                 class="bratrax-nav-link"
                 class:active={onOnboardPage}
               >
-                Return to onboarding
+                Onboarding
               </a>
               <a
                 href="/settings"
