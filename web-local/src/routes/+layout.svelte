@@ -28,7 +28,11 @@
   import type { LayoutData } from "./$types";
   import "@rilldata/web-common/app.css";
   import "../bratrax-theme.css";
-  import { bratraxUser } from "$lib/bratrax/auth-store";
+  import {
+    bratraxUser,
+    bratraxOnboarded,
+    bratraxOnboardResumeRoute,
+  } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
   import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
   import AddStoreButton from "$lib/bratrax/AddStoreButton.svelte";
@@ -90,12 +94,10 @@
   $: onSuperadminsPage = $page.url.pathname.startsWith("/superadmins");
   $: onClientsPage = $page.url.pathname.startsWith("/clients");
   $: onHelpPage = $page.url.pathname.startsWith("/help");
-  // Hide the top nav across the entire onboarding flow — none of those tabs
-  // lead anywhere useful for a user who hasn't completed onboarding yet
-  // (no Rill instance, no dashboards, settings would 404 mid-flow). The
-  // resume-onboarding logic in +layout.ts already bounces stray clicks
-  // back, but unmounting the nav avoids the brief flicker AND prevents
-  // users from clicking into half-built pages during /onboard/loading.
+  // Used to hide the "Add store" button during onboarding. The nav strip
+  // itself is no longer gated on this — $bratraxOnboarded (set by the
+  // +layout.ts guard from the onboarding step) drives the minimal-vs-full
+  // nav, so a mid-onboarding user still gets a Settings + Help strip.
   $: onOnboardPage = $page.url.pathname.startsWith("/onboard");
 
   // Role-based nav visibility. The DB-side enum is super_admin / admin / viewer.
@@ -112,49 +114,53 @@
 <QueryClientProvider client={queryClient}>
   <FileAndResourceWatcher {host} {instanceId}>
     <OrderDrilldownProvider>
-    <div class="body h-screen w-screen overflow-hidden absolute flex flex-col">
-      {#if $bratraxUser}
-        <BannerCenter />
-        <RepresentingUserBanner />
-        <ApplicationHeader
-          {mode}
-          externalUser={$bratraxUser}
-          onLogout={handleBratraxLogout}
-        >
-          <svelte:fragment slot="header-extras">
-            {#if isSuper || isMultiStore}
-              <ClientSwitcher />
-            {/if}
-            {#if isMultiStore && !isViewer && !onOnboardPage}
-              <AddStoreButton />
-            {/if}
-          </svelte:fragment>
-        </ApplicationHeader>
-        {#if !isViewer && !onOnboardPage}
-          <nav class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0">
-            <a
-              href="/developer"
-              class="bratrax-nav-link"
-              class:active={!onConnectorsPage && !onCostSettingsPage && !onSettingsPage && !onSuperadminsPage && !onClientsPage && !onHelpPage}
+      <div
+        class="body h-screen w-screen overflow-hidden absolute flex flex-col"
+      >
+        {#if $bratraxUser}
+          <BannerCenter />
+          <RepresentingUserBanner />
+          <ApplicationHeader
+            {mode}
+            externalUser={$bratraxUser}
+            onLogout={handleBratraxLogout}
+          >
+            <svelte:fragment slot="header-extras">
+              {#if isSuper || isMultiStore}
+                <ClientSwitcher />
+              {/if}
+              {#if isMultiStore && !isViewer && !onOnboardPage}
+                <AddStoreButton />
+              {/if}
+            </svelte:fragment>
+          </ApplicationHeader>
+          {#if isViewer}
+            <!-- Viewers never onboard; give them Help only (previously no nav). -->
+            <nav
+              class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0"
             >
-              Dashboards
-            </a>
-            {#if isAdminOrSuper}
               <a
-                href="/connectors"
+                href="/help"
                 class="bratrax-nav-link"
-                class:active={onConnectorsPage}
+                class:active={onHelpPage}
               >
-                Connectors
+                Help
               </a>
-            {/if}
-            {#if isAdminOrSuper}
+            </nav>
+          {:else if !$bratraxOnboarded}
+            <!-- Mid-onboarding (any step, including unpaid): the minimum nav is
+               Settings + Help. These are the only pages with no Rill-project
+               dependency, and +layout.ts exempts them from the resume-redirect
+               so the links actually resolve instead of bouncing back. -->
+            <nav
+              class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0"
+            >
               <a
-                href="/cost-settings"
+                href={$bratraxOnboardResumeRoute ?? "/developer"}
                 class="bratrax-nav-link"
-                class:active={onCostSettingsPage}
+                class:active={onOnboardPage}
               >
-                Cost Settings
+                Return to onboarding
               </a>
               <a
                 href="/settings"
@@ -163,36 +169,84 @@
               >
                 Settings
               </a>
-            {/if}
-            {#if isSuper}
               <a
-                href="/superadmins"
+                href="/help"
                 class="bratrax-nav-link"
-                class:active={onSuperadminsPage}
+                class:active={onHelpPage}
               >
-                Superadmins
+                Help
               </a>
-              <a
-                href="/clients"
-                class="bratrax-nav-link"
-                class:active={onClientsPage}
-              >
-                Clients
-              </a>
-            {/if}
-            <a
-              href="/help"
-              class="bratrax-nav-link"
-              class:active={onHelpPage}
+            </nav>
+          {:else}
+            <nav
+              class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0"
             >
-              Help
-            </a>
-          </nav>
+              <a
+                href="/developer"
+                class="bratrax-nav-link"
+                class:active={!onConnectorsPage &&
+                  !onCostSettingsPage &&
+                  !onSettingsPage &&
+                  !onSuperadminsPage &&
+                  !onClientsPage &&
+                  !onHelpPage}
+              >
+                Dashboards
+              </a>
+              {#if isAdminOrSuper}
+                <a
+                  href="/connectors"
+                  class="bratrax-nav-link"
+                  class:active={onConnectorsPage}
+                >
+                  Connectors
+                </a>
+              {/if}
+              {#if isAdminOrSuper}
+                <a
+                  href="/cost-settings"
+                  class="bratrax-nav-link"
+                  class:active={onCostSettingsPage}
+                >
+                  Cost Settings
+                </a>
+                <a
+                  href="/settings"
+                  class="bratrax-nav-link"
+                  class:active={onSettingsPage}
+                >
+                  Settings
+                </a>
+              {/if}
+              {#if isSuper}
+                <a
+                  href="/superadmins"
+                  class="bratrax-nav-link"
+                  class:active={onSuperadminsPage}
+                >
+                  Superadmins
+                </a>
+                <a
+                  href="/clients"
+                  class="bratrax-nav-link"
+                  class:active={onClientsPage}
+                >
+                  Clients
+                </a>
+              {/if}
+              <a
+                href="/help"
+                class="bratrax-nav-link"
+                class:active={onHelpPage}
+              >
+                Help
+              </a>
+            </nav>
+          {/if}
         {/if}
-      {/if}
 
-      <slot />
-    </div>
+        <slot />
+      </div>
     </OrderDrilldownProvider>
   </FileAndResourceWatcher>
 </QueryClientProvider>
@@ -236,7 +290,10 @@
     text-decoration: none;
     padding: 10px 12px;
     border-bottom: 2px solid transparent;
-    transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+    transition:
+      color 0.2s,
+      border-color 0.2s,
+      background-color 0.2s;
   }
 
   .bratrax-nav-link:hover {

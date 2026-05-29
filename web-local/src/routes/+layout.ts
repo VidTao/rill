@@ -4,7 +4,12 @@ import { redirect } from "@sveltejs/kit";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
 import { get } from "svelte/store";
 import { bratraxGetMe } from "$lib/bratrax/auth";
-import { bratraxUser, bratraxAuthChecked } from "$lib/bratrax/auth-store";
+import {
+  bratraxUser,
+  bratraxAuthChecked,
+  bratraxOnboarded,
+  bratraxOnboardResumeRoute,
+} from "$lib/bratrax/auth-store";
 import {
   onboardMe,
   getOnboardResumeRoute,
@@ -90,8 +95,24 @@ export async function load({ url, depends, untrack, fetch }) {
     "embed_pending",
     "created",
   ]);
+  // Settings and Help are reachable at every onboarding step — they have no
+  // Rill-project dependency, and a user stuck mid-onboarding (even unpaid)
+  // must be able to reach their account settings and help. The minimal nav in
+  // the root layout surfaces them; this exemption stops the resume-redirect
+  // below from bouncing the user straight back into /onboard/*.
+  const isAlwaysAllowed =
+    url.pathname.startsWith("/settings") || url.pathname.startsWith("/help");
+
   try {
     const me = await onboardMe();
+
+    // Surface onboarding completion to the layout's nav. "Onboarded" = no
+    // onboarding page left to resume to (step "ready", or no record at all
+    // for super-admins / cross-client users). The resume route also feeds the
+    // minimal nav's "Return to onboarding" link.
+    const resumeRoute = getOnboardResumeRoute(me?.step);
+    bratraxOnboarded.set(resumeRoute == null);
+    bratraxOnboardResumeRoute.set(resumeRoute);
 
     // Fully-onboarded users typing /onboard/* directly: bounce to the
     // workspace landing. Without this they'd land on stale onboarding
@@ -132,7 +153,7 @@ export async function load({ url, depends, untrack, fetch }) {
     }
 
     const target = getOnboardResumeRoute(me?.step);
-    if (target) {
+    if (target && !isAlwaysAllowed) {
       const isHardGate = me?.step ? HARD_GATE_STEPS.has(me.step) : false;
       if (isHardGate) {
         // Must be on the gate page exactly. Anything else bounces back.
