@@ -200,10 +200,131 @@ export interface SuperadminClientRow {
   is_paid_subscriber: boolean;
   // Parent's billing flag — present only when multi_client_id is set.
   multi_client_is_paid_subscriber: boolean | null;
+  // --- CRM fields (derived from rill_onboarding_state) ---------------------
+  signed_up_at: string | null;
+  admin_name: string | null;
+  user_count: number;
+  pending_invites: number;
+  onboarding_step: string | null;
+  step_age_hours: number | null;
+  template_name: string | null;
+  compile_status: string | null;
+  deploy_status: string | null;
+  error_message: string | null;
+  subscription_status: string | null;
+  shopify_embed_enabled: boolean;
+  connected_platform_count: number;
+  connected_platforms: string[];
+  updated_at: string | null;
 }
 
-export function listAllClients(): Promise<{ clients: SuperadminClientRow[] }> {
-  return apiFetch("/bratrax/superadmins/clients");
+export interface ClientFilters {
+  step?: string[];
+  subscription_status?: string[];
+  paid?: "true" | "false";
+  search?: string;
+  stuck_hours?: number;
+}
+
+function buildClientsQuery(filters?: ClientFilters): string {
+  if (!filters) return "";
+  const qs = new URLSearchParams();
+  filters.step?.forEach((s) => qs.append("step", s));
+  filters.subscription_status?.forEach((s) =>
+    qs.append("subscription_status", s),
+  );
+  if (filters.paid) qs.set("paid", filters.paid);
+  if (filters.search) qs.set("search", filters.search);
+  if (filters.stuck_hours != null)
+    qs.set("stuck_hours", String(filters.stuck_hours));
+  const s = qs.toString();
+  return s ? `?${s}` : "";
+}
+
+export function listAllClients(
+  filters?: ClientFilters,
+): Promise<{ clients: SuperadminClientRow[] }> {
+  return apiFetch(`/bratrax/superadmins/clients${buildClientsQuery(filters)}`);
+}
+
+// ---------------------------------------------------------------------------
+// CRM dashboard — summary tiles + per-client detail.
+// ---------------------------------------------------------------------------
+
+export interface ClientsSummary {
+  total: number;
+  active_paid: number;
+  stuck_over_24h: number;
+  in_error: number;
+  ready: number;
+  signed_up_this_week: number;
+}
+
+export function getClientsSummary(): Promise<ClientsSummary> {
+  return apiFetch("/bratrax/superadmins/clients/summary");
+}
+
+export interface ClientConnection {
+  platform: string;
+  account_id?: string;
+  account_name?: string;
+  connected_at?: string;
+}
+
+export interface ClientTeamMember {
+  id: number;
+  email: string;
+  name: string;
+  role: string;
+  created_at: string | null;
+}
+
+export interface ClientPendingInvite {
+  token: string;
+  email: string;
+  name: string;
+  role: string;
+  expires_at: string | null;
+  created_at: string | null;
+}
+
+export interface ClientDetail {
+  client_id: string;
+  company_name: string;
+  signed_up_at: string | null;
+  updated_at: string | null;
+  timezone: string | null;
+  clickhouse_db: string | null;
+  rill_project_id: string | null;
+  shopify_embed_enabled: boolean;
+  multi_client_id: string | null;
+  onboarding: {
+    step: string | null;
+    step_age_hours: number | null;
+    template_name: string | null;
+    compile_status: string | null;
+    deploy_status: string | null;
+    extraction_status: Record<string, unknown>;
+    connected_platforms: ClientConnection[];
+    stack_selections: Record<string, unknown>;
+    error_message: string | null;
+    updated_at: string | null;
+  };
+  subscription: {
+    is_paid_subscriber: boolean;
+    status: string | null;
+    lemon_subscription_id: string | null;
+    lemon_customer_id: string | null;
+  };
+  team: ClientTeamMember[];
+  pending_invitations: ClientPendingInvite[];
+  connected_platforms_oauth: string[];
+}
+
+export function getClientDetail(clientId: string): Promise<ClientDetail> {
+  return apiFetch(
+    `/bratrax/superadmins/clients/${encodeURIComponent(clientId)}`,
+  );
 }
 
 export interface EnableMultiStoreResult {
