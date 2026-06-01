@@ -14,9 +14,8 @@
 
   export let component: PivotCanvasComponent;
 
-  // Bratrax order-attribution drilldown bridge. The web-local provider sets
-  // this context when an earths_mushrooms user is logged in; otherwise it is
-  // undefined and cells stay inert.
+  // Bratrax attribution/profile drilldown bridge. The web-local provider
+  // sets this context; when it is absent, drilldown cells stay inert.
   const drilldown = getContext<OrderDrilldownContext | undefined>(
     ORDER_DRILLDOWN_CONTEXT,
   );
@@ -48,10 +47,10 @@
     dimension_filters,
   };
 
-  // Only wire the cell-click hook if the Bratrax provider is mounted AND the
-  // clicked measure is one we drill into. Currently scoped to
-  // metric_attributed_orders on campaign_deep_dive; widening means adding more
-  // names to DRILLDOWN_MEASURES.
+  // Only wire the cell-click hook if the Bratrax provider is mounted and
+  // the clicked cell is an enabled drilldown target. Campaign deep dive
+  // uses metric_attributed_orders; Profile Explorer uses profile identity
+  // dimensions.
   //
   // Column ids on the pivot are short aliases — `m0`, `m1`, ... indexing into
   // `config.measureNames`. For nested column dimensions the alias is prefixed

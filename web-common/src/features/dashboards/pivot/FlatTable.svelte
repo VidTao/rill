@@ -99,6 +99,16 @@
     //  Every third column is the last in its group
     return (measureIndex + 1) % 3 === 0;
   }
+
+  function isDrilldownCell(cell: Cell<PivotDataRow, unknown>): boolean {
+    return (
+      !!isClickableColumn?.(cell.column.id) &&
+      cell.getValue() !== undefined &&
+      cell.getValue() !== null &&
+      cell.getValue() !== "" &&
+      cell.getValue() !== "Total"
+    );
+  }
 </script>
 
 <div
@@ -195,14 +205,13 @@
               ? cell.column.columnDef.cell(cell.getContext())
               : cell.column.columnDef.cell}
           {@const isActive = isCellActive(cell)}
+          {@const isDrilldown = isDrilldownCell(cell)}
           <td
             class="ui-copy-number cell truncate"
             class:active-cell={isActive}
-            class:interactive-cell={(canShowDataViewer ||
-              isClickableColumn?.(cell.column.id)) &&
+            class:interactive-cell={(canShowDataViewer || isDrilldown) &&
               cell.getValue() !== undefined}
-            class:drilldown-link-cell={isClickableColumn?.(cell.column.id) &&
-              cell.getValue() !== undefined}
+            class:drilldown-link-cell={isDrilldown}
             class:text-right={getMeasureColumn(cell.column)}
             class:border-r={hasBorderRight(cell.column.id)}
             class:total-label={cell.getValue() === "Total"}
@@ -219,7 +228,17 @@
                 {assembled}
               />
             {:else if typeof result === "string" || typeof result === "number"}
-              {result}
+              {#if isDrilldown}
+                <button
+                  type="button"
+                  class="drilldown-link"
+                  aria-label="Open profile graph for {result}"
+                >
+                  {result}
+                </button>
+              {:else}
+                {result}
+              {/if}
             {:else}
               <svelte:component
                 this={flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -321,16 +340,31 @@
   .active-cell.cell {
     @apply bg-primary-50;
   }
-  /* Bratrax order-attribution drilldown: blue + underlined value so it reads
-     as a hyperlink, distinct from the generic interactive-cell affordance. */
+  /* Bratrax profile drilldown: render the identity itself as a clear link. */
   .drilldown-link-cell {
+    cursor: pointer;
+  }
+  .drilldown-link {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
     color: #2563eb;
     text-decoration: underline;
+    text-underline-offset: 2px;
+    text-align: left;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .drilldown-link-cell:hover {
+  .drilldown-link:hover {
     color: #1d4ed8;
   }
-  .drilldown-link-cell :global(*) {
-    color: inherit;
+  .drilldown-link:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
   }
 </style>
