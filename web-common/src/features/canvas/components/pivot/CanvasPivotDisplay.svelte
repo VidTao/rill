@@ -61,7 +61,15 @@
   // `config.measureNames`. For nested column dimensions the alias is prefixed
   // with `c<i>v<j>_…m<k>`. We pull the trailing `m<k>` off the alias and
   // translate it back to the measure's real name via config.measureNames.
-  const DRILLDOWN_MEASURES = new Set(["metric_attributed_orders"]);
+  const DRILLDOWN_MEASURES = new Set(["metric_attributed_orders", "profiles"]);
+  const PROFILE_DRILLDOWN_DIMENSIONS = new Set(["display_name", "profile_id"]);
+
+  function isProfileDrilldownDimension(columnId: string): boolean {
+    return (
+      tableSpec.metrics_view === "profile_directory_metrics" &&
+      PROFILE_DRILLDOWN_DIMENSIONS.has(columnId)
+    );
+  }
 
   function resolveMeasureName(
     columnId: string,
@@ -77,6 +85,7 @@
   $: isClickableColumn =
     drilldown && $config
       ? (columnId: string) => {
+          if (isProfileDrilldownDimension(columnId)) return true;
           const name = resolveMeasureName(columnId, $config!.measureNames);
           return !!name && DRILLDOWN_MEASURES.has(name);
         }
@@ -91,7 +100,13 @@
           columnId,
           pivotConfig.measureNames,
         );
-        if (!measureName || !DRILLDOWN_MEASURES.has(measureName)) return;
+        const profileDimensionClick = isProfileDrilldownDimension(columnId);
+        if (
+          !profileDimensionClick &&
+          (!measureName || !DRILLDOWN_MEASURES.has(measureName))
+        ) {
+          return;
+        }
         const { filters: cellFilters, timeRange } = getFiltersForCell(
           pivotConfig,
           rowId,
@@ -101,14 +116,14 @@
         );
         // eslint-disable-next-line no-console
         console.log("[order-drilldown] open", {
-          measureName,
+          measureName: profileDimensionClick ? "profiles" : measureName,
           rowId,
           columnId,
           filters: cellFilters,
           timeRange,
         });
         drilldown.open({
-          measureName,
+          measureName: profileDimensionClick ? "profiles" : measureName!,
           filters: cellFilters,
           timeRange: { start: timeRange.start, end: timeRange.end },
         });

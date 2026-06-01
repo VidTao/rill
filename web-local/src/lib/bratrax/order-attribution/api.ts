@@ -20,9 +20,9 @@ export const ORDER_TIMELINE_METRICS_VIEW = "order_timeline_metrics";
 // parent dashboard (cross_metrics) can reference dimensions this view doesn't
 // expose — most notably `attribution_model`, which only lives on cross_metrics.
 // We strip those leaves before forwarding, otherwise the runtime rejects the
-// query with `invalid dimension reference`. The attribution_model filter is
-// implicitly handled: order_timeline_v1's is_attribution_winner flag is
-// hardcoded to last_touch_weight > 0, so the modal is always last-touch.
+// query with `invalid dimension reference`. The dashboard's attribution_model
+// filter is translated by buildOrderListWhere into a filter on the right
+// per-model `is_*_winner` flag (see MODEL_WINNER_COL).
 const ORDER_TIMELINE_DIMENSIONS = new Set([
   "activity_id",
   "ad",
@@ -39,6 +39,11 @@ const ORDER_TIMELINE_DIMENSIONS = new Set([
   "event_type",
   "is_attribution_touchpoint",
   "is_attribution_winner",
+  "is_first_touch_winner",
+  "is_last_touch_winner",
+  "is_linear_winner",
+  "is_time_decay_winner",
+  "is_position_winner",
   "is_conversion",
   "medium",
   "order_id",
@@ -51,6 +56,30 @@ const ORDER_TIMELINE_DIMENSIONS = new Set([
   "source",
   "url",
 ]);
+
+// Per-model "this touchpoint won" flag. The order_timeline_v1 view carries a
+// boolean column for each supported attribution model; we filter Modal 1 on
+// the one matching the dashboard's current model so the drilldown reflects
+// the same view of the world. Default last_touch when the cell filter doesn't
+// pin a model (matches the dashboard's default filter).
+const MODEL_WINNER_COL: Record<string, string> = {
+  first_touch: "is_first_touch_winner",
+  last_touch: "is_last_touch_winner",
+  linear: "is_linear_winner",
+  time_decay: "is_time_decay_winner",
+  position: "is_position_winner",
+};
+
+export function winnerColumnFor(model: string | undefined): string {
+  return MODEL_WINNER_COL[model ?? ""] ?? "is_last_touch_winner";
+}
+
+// "last_touch" → "last-touch" for human-readable header text. Falls back to
+// the raw model string if it's not one we recognise.
+export function formatAttributionModel(model: string | undefined): string {
+  if (!model) return "last-touch";
+  return model.replace(/_/g, "-");
+}
 
 // Walk a filter tree and keep only IN-leaves whose dimension exists on
 // order_timeline_metrics. Returns undefined when nothing survives.
@@ -99,14 +128,19 @@ export function formatOrderLabel(
 }
 
 // Modal 1 (orders list): scope to the winning attribution touchpoints matching
-// the clicked cell. We AND in the row_type + winner gates that are specific to
-// the drilldown, plus the pruned cell filter from the parent dashboard.
+// the clicked cell. We AND in the row_type gate, the per-model winner gate
+// (selected from the dashboard's attribution_model filter), and the pruned
+// cell filter from the parent dashboard. attribution_model lives on
+// cross_metrics but not on order_timeline_metrics, so we pull its value out
+// BEFORE pruning and translate it to the matching is_*_winner column here.
 export function buildOrderListWhere(
   cellFilters: V1Expression | undefined,
 ): V1Expression {
+  const labels = extractCellLabels(cellFilters);
+  const winnerCol = winnerColumnFor(labels["attribution_model"]);
   const exprs: V1Expression[] = [
     createInExpression("row_type", ["attribution_touchpoint"]),
-    createInExpression("is_attribution_winner", [1]),
+    createInExpression(winnerCol, [1]),
   ];
   const pruned = pruneFilterToOrderTimeline(cellFilters);
   if (pruned) exprs.push(pruned);
@@ -134,6 +168,7 @@ export function dedupeOrders(
     const next: OrderListRow = {
       order_id: r.order_id,
       order_number: r.order_number,
+      email: r.email,
       conversion_ts: r.conversion_ts,
       revenue: r.revenue,
       last_touch_weight: r.last_touch_weight,
@@ -178,13 +213,18 @@ export function sortTimelineRows(
   });
 }
 
-// Pull the winning touchpoint out of a timeline for the header banner.
+// Pull the winning touchpoint out of a timeline for the header banner. The
+// "winner" is model-specific — the same order has different winning rows
+// under first_touch vs last_touch — so the caller passes the attribution
+// model from the dashboard and we pick the row flagged for that model.
 export function findWinner(
   rows: OrderTimelineRow[] | undefined,
+  attributionModel?: string,
 ): WinnerSummary | null {
   if (!rows) return null;
+  const col = winnerColumnFor(attributionModel) as keyof OrderTimelineRow;
   const winner = rows.find(
-    (r) => r.row_type === "attribution_touchpoint" && r.is_attribution_winner,
+    (r) => r.row_type === "attribution_touchpoint" && r[col],
   );
   if (!winner) return null;
   return {

@@ -10,6 +10,7 @@
     buildOrderListWhere,
     dedupeOrders,
     extractCellLabels,
+    formatAttributionModel,
     formatOrderLabel,
     humanizeResolutionReason,
     ORDER_TIMELINE_METRICS_VIEW,
@@ -86,6 +87,7 @@
   $: subtitleParts = ["channel_group", "campaign", "adset", "ad"]
     .map((dim) => cellLabels[dim])
     .filter((v): v is string => !!v);
+  $: modelLabel = formatAttributionModel(cellLabels["attribution_model"]);
   $: subtitle = subtitleParts.length > 0 ? subtitleParts.join(" / ") : null;
 
   function fmtDate(iso: string | undefined): string {
@@ -121,8 +123,10 @@
       <Dialog.Title>Attributed Orders</Dialog.Title>
       {#if subtitle}
         <Dialog.Description>
-          {subtitle} · last-touch
+          {subtitle} · {modelLabel}
         </Dialog.Description>
+      {:else}
+        <Dialog.Description>{modelLabel}</Dialog.Description>
       {/if}
     </Dialog.Header>
 
@@ -146,6 +150,7 @@
           <thead>
             <tr>
               <th>Order</th>
+              <th>Email</th>
               <th>Date</th>
               <th class="num">Revenue</th>
               <th class="num">Weight</th>
@@ -164,6 +169,7 @@
                   onSelectOrder(o.order_id)}
               >
                 <td class="mono">{formatOrderLabel(o.order_number, o.order_id)}</td>
+                <td class="email">{o.email ?? "—"}</td>
                 <td>{fmtDate(o.conversion_ts)}</td>
                 <td class="num">{fmtMoney(o.revenue)}</td>
                 <td class="num">{fmtWeight(o.last_touch_weight)}</td>
@@ -242,6 +248,12 @@
   }
   .mono {
     font-family: "Space Mono", "JetBrains Mono", monospace;
+  }
+  .email {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .reason {
     max-width: 240px;

@@ -8,6 +8,7 @@
   import {
     buildOrderTimelineWhere,
     findWinner,
+    formatAttributionModel,
     formatOrderLabel,
     ORDER_TIMELINE_METRICS_VIEW,
     sortTimelineRows,
@@ -17,6 +18,10 @@
 
   export let open = false;
   export let orderId: string;
+  // Attribution model from the parent cell — picks which `is_*_winner` flag
+  // selects the winning touchpoint for the banner. Defaults to last_touch
+  // to match the dashboard's default filter.
+  export let attributionModel: string | undefined = undefined;
 
   $: ({ instanceId } = $runtime);
 
@@ -40,7 +45,8 @@
     | V1MetricsViewRowsResponseDataItem[]
     | undefined) as TimelineRow[] | undefined;
   $: rows = sortTimelineRows(rawRows);
-  $: winner = findWinner(rawRows);
+  $: winner = findWinner(rawRows, attributionModel);
+  $: modelLabel = formatAttributionModel(attributionModel);
 
   function errorMessage(err: unknown): string {
     if (!err) return "unknown error";
@@ -125,6 +131,9 @@
         <Dialog.Description>
           {fmtDateTime(summary.conversion_ts)} · {fmtMoney(summary.revenue)}
         </Dialog.Description>
+        {#if summary.email}
+          <Dialog.Description>{summary.email}</Dialog.Description>
+        {/if}
       {/if}
     </Dialog.Header>
 
@@ -139,7 +148,7 @@
     {:else}
       {#if winner}
         <div class="winner-banner">
-          <div class="banner-label">Winner (last-touch)</div>
+          <div class="banner-label">Winner ({modelLabel})</div>
           <div class="banner-body">
             <div class="banner-line">
               <strong>{winner.channel_group ?? "—"}</strong>

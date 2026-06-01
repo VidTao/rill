@@ -36,6 +36,11 @@ export interface OrderTimelineRow extends V1MetricsViewRowsResponseDataItem {
   is_conversion?: 0 | 1;
   is_attribution_touchpoint?: 0 | 1;
   is_attribution_winner?: 0 | 1;
+  is_first_touch_winner?: 0 | 1;
+  is_last_touch_winner?: 0 | 1;
+  is_linear_winner?: 0 | 1;
+  is_time_decay_winner?: 0 | 1;
+  is_position_winner?: 0 | 1;
   resolution_status?: string;
   resolution_reason?: string;
   resolution_confidence?: string;
@@ -51,6 +56,7 @@ export interface OrderTimelineRow extends V1MetricsViewRowsResponseDataItem {
 export interface OrderListRow {
   order_id: string;
   order_number: string | number | undefined;
+  email: string | undefined;
   conversion_ts: string | undefined;
   revenue: number | undefined;
   last_touch_weight: number | undefined;
