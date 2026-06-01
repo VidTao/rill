@@ -51,16 +51,16 @@
   // the clicked cell is an enabled drilldown target. Campaign deep dive
   // uses metric_attributed_orders; Profile Explorer uses the profiles measure.
   //
-  // Column ids on the pivot are short aliases — `m0`, `m1`, ... indexing into
-  // `config.measureNames`. For nested column dimensions the alias is prefixed
-  // with `c<i>v<j>_…m<k>`. We pull the trailing `m<k>` off the alias and
-  // translate it back to the measure's real name via config.measureNames.
+  // Column ids are either real measure names (`profiles`) or short aliases
+  // (`m0`, `m1`, ...). For nested column dimensions the alias can be prefixed
+  // with `c<i>v<j>_...m<k>`, so we also resolve the trailing measure index.
   const DRILLDOWN_MEASURES = new Set(["metric_attributed_orders", "profiles"]);
 
   function resolveMeasureName(
     columnId: string,
     measureNames: string[],
   ): string | null {
+    if (measureNames.includes(columnId)) return columnId;
     const m = columnId.match(/m(\d+)$/);
     if (!m) return null;
     return measureNames[Number(m[1])] ?? null;
@@ -78,6 +78,23 @@
     );
   }
 
+  function isProfileDirectory(): boolean {
+    return tableSpec.metrics_view === "profile_directory_metrics";
+  }
+
+  function getCellFilters(rowId: string, columnId: string) {
+    const pivotConfig = $config;
+    const dataStore = $pivotDataStore;
+    if (!pivotConfig || !dataStore) return undefined;
+    return getFiltersForCell(pivotConfig, rowId, columnId, {}, dataStore.data);
+  }
+
+  function isProfileLeafCell(rowId: string, columnId: string): boolean {
+    if (!isProfileDirectory()) return false;
+    const cell = getCellFilters(rowId, columnId);
+    return expressionIncludesDimension(cell?.filters, "profile_id");
+  }
+
   // Predicate used by the renderer to visually mark clickable cells (cursor
   // pointer + hover tint). Without this, cells stay visually inert.
   $: isClickableColumn =
@@ -87,6 +104,29 @@
           return !!name && DRILLDOWN_MEASURES.has(name);
         }
       : undefined;
+
+  $: isClickableCell = drilldown
+    ? (
+        rowId: string,
+        columnId: string,
+        rowHeader: boolean,
+        _rowData?: Record<string, unknown>,
+      ) => rowHeader && isProfileLeafCell(rowId, columnId)
+    : undefined;
+
+  $: onRowHeaderClick = drilldown
+    ? (rowId: string, columnId: string, _rowData?: Record<string, unknown>) => {
+        if (!isProfileLeafCell(rowId, columnId)) return false;
+        const cell = getCellFilters(rowId, columnId);
+        if (!cell) return false;
+        drilldown.open({
+          measureName: "profiles",
+          filters: cell.filters,
+          timeRange: { start: cell.timeRange.start, end: cell.timeRange.end },
+        });
+        return true;
+      }
+    : undefined;
 
   $: onMeasureCellClick = drilldown
     ? (_rowId: string, columnId: string, _rowData?: Record<string, unknown>) => {
@@ -100,13 +140,9 @@
         if (!measureName || !DRILLDOWN_MEASURES.has(measureName)) {
           return;
         }
-        const { filters: rawCellFilters, timeRange } = getFiltersForCell(
-          pivotConfig,
-          _rowId,
-          columnId,
-          {},
-          dataStore.data,
-        );
+        const cell = getCellFilters(_rowId, columnId);
+        if (!cell) return;
+        const { filters: rawCellFilters, timeRange } = cell;
         if (
           measureName === "profiles" &&
           !expressionIncludesDimension(rawCellFilters, "profile_id")
@@ -166,5 +202,7 @@
   pivotConfig={config}
   {pivotState}
   {onMeasureCellClick}
+  {onRowHeaderClick}
   {isClickableColumn}
+  {isClickableCell}
 />

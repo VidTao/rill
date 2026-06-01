@@ -68,12 +68,23 @@
   export let onMeasureCellClick:
     | ((rowId: string, columnId: string, rowData?: Record<string, unknown>) => void)
     | undefined = undefined;
+  export let onRowHeaderClick:
+    | ((rowId: string, columnId: string, rowData?: Record<string, unknown>) => boolean)
+    | undefined = undefined;
   // Optional predicate that marks specific measure columns as clickable. Cells
   // matching get the existing interactive-cell styling (pointer cursor + hover
   // tint) so users can see the drilldown affordance. Without this, cells stay
   // visually inert even when onMeasureCellClick is wired.
   export let isClickableColumn: ((columnId: string) => boolean) | undefined =
     undefined;
+  export let isClickableCell:
+    | ((
+        rowId: string,
+        columnId: string,
+        rowHeader: boolean,
+        rowData?: Record<string, unknown>,
+      ) => boolean)
+    | undefined = undefined;
 
   const options: Readable<TableOptions<PivotDataRow>> = derived(
     [pivotDataStore, pivotState],
@@ -250,6 +261,7 @@
     }
 
     if (rowHeader) {
+      if (onRowHeaderClick?.(rowId, columnId, row.original)) return;
       if (row.getCanExpand()) row.getToggleExpandedHandler()();
     } else {
       if (setPivotActiveCell && canShowDataViewer) {
@@ -338,6 +350,7 @@
       {totalRowSize}
       {canShowDataViewer}
       {isClickableColumn}
+      {isClickableCell}
       {hasMeasureContextColumns}
       activeCell={$pivotState.activeCell}
       {assembled}
@@ -362,6 +375,7 @@
       {measures}
       {canShowDataViewer}
       {isClickableColumn}
+      {isClickableCell}
       activeCell={$pivotState.activeCell}
       {assembled}
       {scrollLeft}

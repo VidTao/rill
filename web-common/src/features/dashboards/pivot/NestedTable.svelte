@@ -37,6 +37,14 @@
   // drilldown handler has a visible cursor/hover affordance.
   export let isClickableColumn: ((columnId: string) => boolean) | undefined =
     undefined;
+  export let isClickableCell:
+    | ((
+        rowId: string,
+        columnId: string,
+        rowHeader: boolean,
+        rowData?: Record<string, unknown>,
+      ) => boolean)
+    | undefined = undefined;
   export let activeCell: { rowId: string; columnId: string } | null | undefined;
 
   // Table props
@@ -341,17 +349,20 @@
               ? cell.column.columnDef.cell(cell.getContext())
               : cell.column.columnDef.cell}
           {@const isActive = isCellActive(cell)}
+          {@const rowHeader = i === 0}
+          {@const isDrilldownCell =
+            isClickableCell?.(cell.row.id, cell.column.id, rowHeader, cell.row.original) ||
+            (!rowHeader && isClickableColumn?.(cell.column.id))}
           <td
             class="ui-copy-number cell truncate group/cell"
             class:active-cell={isActive}
-            class:interactive-cell={canShowDataViewer ||
-              isClickableColumn?.(cell.column.id)}
-            class:drilldown-link-cell={isClickableColumn?.(cell.column.id)}
+            class:interactive-cell={canShowDataViewer || isDrilldownCell}
+            class:drilldown-link-cell={isDrilldownCell}
             class:border-r={shouldShowRightBorder(i)}
             data-value={cell.getValue()}
             data-rowid={cell.row.id}
             data-columnid={cell.column.id}
-            data-rowheader={i === 0 || undefined}
+            data-rowheader={rowHeader || undefined}
             class:totals-column={i > 0 && i <= measureCount}
             on:mouseover={() => cellInspectorStore.updateValue(cell.getValue())}
             on:focus={() => cellInspectorStore.updateValue(cell.getValue())}
