@@ -147,7 +147,7 @@
                 Help
               </a>
             </nav>
-          {:else if !$bratraxOnboarded}
+          {:else if !$bratraxOnboarded && !isSuper}
             <!-- Mid-onboarding (any step, including unpaid): the minimum nav is
                Settings + Help. These are the only pages with no Rill-project
                dependency, and +layout.ts exempts them from the resume-redirect
