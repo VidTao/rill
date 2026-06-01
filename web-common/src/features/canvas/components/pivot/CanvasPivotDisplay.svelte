@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PivotCanvasComponent } from "@rilldata/web-common/features/canvas/components/pivot";
-  import { createInExpression } from "@rilldata/web-common/features/dashboards/stores/filter-utils";
   import { getFiltersForCell } from "@rilldata/web-common/features/dashboards/pivot/pivot-utils";
+  import type { V1Expression } from "@rilldata/web-common/runtime-client";
   import { getContext } from "svelte";
   import ComponentHeader from "../../ComponentHeader.svelte";
   import CanvasPivotRenderer from "./CanvasPivotRenderer.svelte";
@@ -49,22 +49,13 @@
 
   // Only wire the cell-click hook if the Bratrax provider is mounted and
   // the clicked cell is an enabled drilldown target. Campaign deep dive
-  // uses metric_attributed_orders; Profile Explorer uses profile identity
-  // dimensions.
+  // uses metric_attributed_orders; Profile Explorer uses the profiles measure.
   //
   // Column ids on the pivot are short aliases — `m0`, `m1`, ... indexing into
   // `config.measureNames`. For nested column dimensions the alias is prefixed
   // with `c<i>v<j>_…m<k>`. We pull the trailing `m<k>` off the alias and
   // translate it back to the measure's real name via config.measureNames.
   const DRILLDOWN_MEASURES = new Set(["metric_attributed_orders", "profiles"]);
-  const PROFILE_DRILLDOWN_DIMENSIONS = new Set(["display_name", "profile_id"]);
-
-  function isProfileDrilldownDimension(columnId: string): boolean {
-    return (
-      tableSpec.metrics_view === "profile_directory_metrics" &&
-      PROFILE_DRILLDOWN_DIMENSIONS.has(columnId)
-    );
-  }
 
   function resolveMeasureName(
     columnId: string,
@@ -75,19 +66,30 @@
     return measureNames[Number(m[1])] ?? null;
   }
 
+  function expressionIncludesDimension(
+    expression: V1Expression | undefined,
+    dimensionName: string,
+  ): boolean {
+    if (!expression?.cond?.exprs?.length) return false;
+    const [left] = expression.cond.exprs;
+    if (left?.ident === dimensionName) return true;
+    return expression.cond.exprs.some((expr) =>
+      expressionIncludesDimension(expr, dimensionName),
+    );
+  }
+
   // Predicate used by the renderer to visually mark clickable cells (cursor
   // pointer + hover tint). Without this, cells stay visually inert.
   $: isClickableColumn =
     drilldown && $config
       ? (columnId: string) => {
-          if (isProfileDrilldownDimension(columnId)) return true;
           const name = resolveMeasureName(columnId, $config!.measureNames);
           return !!name && DRILLDOWN_MEASURES.has(name);
         }
       : undefined;
 
   $: onMeasureCellClick = drilldown
-    ? (rowId: string, columnId: string, rowData?: Record<string, unknown>) => {
+    ? (_rowId: string, columnId: string, _rowData?: Record<string, unknown>) => {
         const pivotConfig = $config;
         const dataStore = $pivotDataStore;
         if (!pivotConfig || !dataStore) return;
@@ -95,29 +97,25 @@
           columnId,
           pivotConfig.measureNames,
         );
-        const profileDimensionClick = isProfileDrilldownDimension(columnId);
-        if (
-          !profileDimensionClick &&
-          (!measureName || !DRILLDOWN_MEASURES.has(measureName))
-        ) {
+        if (!measureName || !DRILLDOWN_MEASURES.has(measureName)) {
           return;
         }
         const { filters: rawCellFilters, timeRange } = getFiltersForCell(
           pivotConfig,
-          rowId,
+          _rowId,
           columnId,
           {},
           dataStore.data,
         );
-        const profileId =
-          typeof rowData?.profile_id === "string" ? rowData.profile_id : undefined;
-        const cellFilters =
-          profileDimensionClick && profileId
-            ? createInExpression("profile_id", [profileId])
-            : rawCellFilters;
+        if (
+          measureName === "profiles" &&
+          !expressionIncludesDimension(rawCellFilters, "profile_id")
+        ) {
+          return;
+        }
         drilldown.open({
-          measureName: profileDimensionClick ? "profiles" : measureName!,
-          filters: cellFilters,
+          measureName,
+          filters: rawCellFilters,
           timeRange: { start: timeRange.start, end: timeRange.end },
         });
       }
