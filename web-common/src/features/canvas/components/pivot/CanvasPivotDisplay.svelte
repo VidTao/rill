@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PivotCanvasComponent } from "@rilldata/web-common/features/canvas/components/pivot";
+  import { createInExpression } from "@rilldata/web-common/features/dashboards/stores/filter-utils";
   import { getFiltersForCell } from "@rilldata/web-common/features/dashboards/pivot/pivot-utils";
   import { getContext } from "svelte";
   import ComponentHeader from "../../ComponentHeader.svelte";
@@ -18,11 +19,6 @@
   // undefined and cells stay inert.
   const drilldown = getContext<OrderDrilldownContext | undefined>(
     ORDER_DRILLDOWN_CONTEXT,
-  );
-  // eslint-disable-next-line no-console
-  console.log(
-    "[order-drilldown] CanvasPivotDisplay init, context present:",
-    !!drilldown,
   );
 
   $: ({
@@ -92,7 +88,7 @@
       : undefined;
 
   $: onMeasureCellClick = drilldown
-    ? (rowId: string, columnId: string) => {
+    ? (rowId: string, columnId: string, rowData?: Record<string, unknown>) => {
         const pivotConfig = $config;
         const dataStore = $pivotDataStore;
         if (!pivotConfig || !dataStore) return;
@@ -107,21 +103,19 @@
         ) {
           return;
         }
-        const { filters: cellFilters, timeRange } = getFiltersForCell(
+        const { filters: rawCellFilters, timeRange } = getFiltersForCell(
           pivotConfig,
           rowId,
           columnId,
           {},
           dataStore.data,
         );
-        // eslint-disable-next-line no-console
-        console.log("[order-drilldown] open", {
-          measureName: profileDimensionClick ? "profiles" : measureName,
-          rowId,
-          columnId,
-          filters: cellFilters,
-          timeRange,
-        });
+        const profileId =
+          typeof rowData?.profile_id === "string" ? rowData.profile_id : undefined;
+        const cellFilters =
+          profileDimensionClick && profileId
+            ? createInExpression("profile_id", [profileId])
+            : rawCellFilters;
         drilldown.open({
           measureName: profileDimensionClick ? "profiles" : measureName!,
           filters: cellFilters,

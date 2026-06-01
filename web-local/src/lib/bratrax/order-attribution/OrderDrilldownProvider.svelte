@@ -46,9 +46,6 @@
 
   setContext(ORDER_DRILLDOWN_CONTEXT, drilldownContext);
 
-  // eslint-disable-next-line no-console
-  console.log("[order-drilldown] provider mounted, context set");
-
   function handleOrderSelect(orderId: string) {
     selectedOrderId = orderId;
     selectedAttributionModel = cellContext

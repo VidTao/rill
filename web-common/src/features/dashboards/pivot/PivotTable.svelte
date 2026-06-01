@@ -66,7 +66,7 @@
   // open a modal scoped to the clicked cell. Receives the same (rowId, columnId)
   // the active-cell pathway uses.
   export let onMeasureCellClick:
-    | ((rowId: string, columnId: string) => void)
+    | ((rowId: string, columnId: string, rowData?: Record<string, unknown>) => void)
     | undefined = undefined;
   // Optional predicate that marks specific measure columns as clickable. Cells
   // matching get the existing interactive-cell styling (pointer cursor + hover
@@ -255,7 +255,7 @@
       if (setPivotActiveCell && canShowDataViewer) {
         setPivotActiveCell(rowId, columnId);
       }
-      onMeasureCellClick?.(rowId, columnId);
+      onMeasureCellClick?.(rowId, columnId, row.original);
     }
   }
 

@@ -21,7 +21,7 @@
   export let pivotState: Writable<PivotState>;
   export let hasHeader = false;
   export let onMeasureCellClick:
-    | ((rowId: string, columnId: string) => void)
+    | ((rowId: string, columnId: string, rowData?: Record<string, unknown>) => void)
     | undefined = undefined;
   export let isClickableColumn: ((columnId: string) => boolean) | undefined =
     undefined;
