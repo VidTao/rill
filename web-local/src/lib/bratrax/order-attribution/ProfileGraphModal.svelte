@@ -151,93 +151,103 @@
       <Dialog.Description>{profile?.display_name ?? profileId ?? "Select a single profile row"}</Dialog.Description>
     </Dialog.Header>
 
-    {#if !profileId}
-      <div class="state">Click a row that includes Profile ID to open a single profile graph.</div>
-    {:else if $profileQuery.isLoading || $edgesQuery.isLoading || $timelineQuery.isLoading}
-      <div class="state">Loading profile...</div>
-    {:else if $profileQuery.isError}
-      <div class="state error">Couldn't load profile: {errorMessage($profileQuery.error)}</div>
-    {:else if $edgesQuery.isError}
-      <div class="state error">Couldn't load identity edges: {errorMessage($edgesQuery.error)}</div>
-    {:else if $timelineQuery.isError}
-      <div class="state error">Couldn't load timeline: {errorMessage($timelineQuery.error)}</div>
-    {:else}
-      <section class="summary">
-        <div><span>Type</span><strong>{value(profile?.profile_type)}</strong></div>
-        <div><span>Segment</span><strong>{value(profile?.segment)}</strong></div>
-        <div><span>Revenue</span><strong>{fmtMoney(profile?.revenue)}</strong></div>
-        <div><span>Orders</span><strong>{value(profile?.order_count)}</strong></div>
-        <div><span>Acquisition</span><strong>{value(profile?.acquisition_channel)}</strong></div>
-        <div><span>Confidence</span><strong>{value(profile?.acquisition_confidence)}</strong></div>
-      </section>
+    <div class="body">
+      {#if !profileId}
+        <div class="state">Click a row that includes Profile ID to open a single profile graph.</div>
+      {:else if $profileQuery.isLoading || $edgesQuery.isLoading || $timelineQuery.isLoading}
+        <div class="state">Loading profile...</div>
+      {:else if $profileQuery.isError}
+        <div class="state error">Couldn't load profile: {errorMessage($profileQuery.error)}</div>
+      {:else if $edgesQuery.isError}
+        <div class="state error">Couldn't load identity edges: {errorMessage($edgesQuery.error)}</div>
+      {:else if $timelineQuery.isError}
+        <div class="state error">Couldn't load timeline: {errorMessage($timelineQuery.error)}</div>
+      {:else}
+        <section class="summary">
+          <div><span>Type</span><strong>{value(profile?.profile_type)}</strong></div>
+          <div><span>Segment</span><strong>{value(profile?.segment)}</strong></div>
+          <div><span>Revenue</span><strong>{fmtMoney(profile?.revenue)}</strong></div>
+          <div><span>Orders</span><strong>{value(profile?.order_count)}</strong></div>
+          <div><span>Acquisition</span><strong>{value(profile?.acquisition_channel)}</strong></div>
+          <div><span>Confidence</span><strong>{value(profile?.acquisition_confidence)}</strong></div>
+        </section>
 
-      <section class="panel">
-        <div class="panel-title">Recommended Action</div>
-        <div class="action">{value(profile?.recommended_action)}</div>
-        <div class="muted">{value(profile?.product_interest)} / {value(profile?.acquisition_campaign)}</div>
-      </section>
-
-      <div class="columns">
         <section class="panel">
-          <div class="panel-title">Identity Edges</div>
-          {#if edges.length === 0}
-            <div class="empty">No deterministic identity edges for this profile.</div>
+          <div class="panel-title">Recommended Action</div>
+          <div class="action">{value(profile?.recommended_action)}</div>
+          <div class="muted">{value(profile?.product_interest)} / {value(profile?.acquisition_campaign)}</div>
+        </section>
+
+        <div class="columns">
+          <section class="panel">
+            <div class="panel-title">Identity Edges</div>
+            {#if edges.length === 0}
+              <div class="empty">No deterministic identity edges for this profile.</div>
+            {:else}
+              <div class="edge-list">
+                {#each edges as edge, i (i)}
+                  <div class="edge">
+                    <div class="mono">{value(edge.from_identifier_type)}:{value(edge.from_identifier_value)}</div>
+                    <div class="arrow">-&gt;</div>
+                    <div class="mono">{value(edge.to_identifier_type)}:{value(edge.to_identifier_value)}</div>
+                    <div class="meta">{value(edge.edge_source)} / {value(edge.confidence)}</div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">Activity</div>
+            <div class="metrics">
+              <div><span>Views</span><strong>{value(profile?.product_views)}</strong></div>
+              <div><span>Cart</span><strong>{value(profile?.add_to_carts)}</strong></div>
+              <div><span>Checkout</span><strong>{value(profile?.checkout_events)}</strong></div>
+              <div><span>Email Clicks</span><strong>{value(profile?.email_clicked)}</strong></div>
+              <div><span>Evidence Gaps</span><strong>{value(profile?.evidence_gap_orders)}</strong></div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-title">Timeline</div>
+          {#if timeline.length === 0}
+            <div class="empty">No timeline events for this profile.</div>
           {:else}
-            <div class="edge-list">
-              {#each edges as edge, i (i)}
-                <div class="edge">
-                  <div class="mono">{value(edge.from_identifier_type)}:{value(edge.from_identifier_value)}</div>
-                  <div class="arrow">-&gt;</div>
-                  <div class="mono">{value(edge.to_identifier_type)}:{value(edge.to_identifier_value)}</div>
-                  <div class="meta">{value(edge.edge_source)} / {value(edge.confidence)}</div>
+            <div class="timeline">
+              {#each timeline as row, i (i)}
+                <div class="event">
+                  <div class="event-time">{fmtDate(row.event_ts)}</div>
+                  <div class="event-body">
+                    <div class="event-head">
+                      <span class="badge">{value(row.row_type)}</span>
+                      <strong>{row.row_type === "conversion" ? formatOrderLabel(row.order_number, row.order_id) : value(row.title || row.event_type)}</strong>
+                      {#if row.revenue}
+                        <span class="money">{fmtMoney(row.revenue)}</span>
+                      {/if}
+                    </div>
+                    <div class="event-detail">{value(row.detail || row.campaign || row.source || row.url || row.resolution_reason)}</div>
+                    <div class="meta">{value(row.event_source)} / {value(row.channel_group)} / {value(row.resolution_confidence)}</div>
+                  </div>
                 </div>
               {/each}
             </div>
           {/if}
         </section>
-
-        <section class="panel">
-          <div class="panel-title">Activity</div>
-          <div class="metrics">
-            <div><span>Views</span><strong>{value(profile?.product_views)}</strong></div>
-            <div><span>Cart</span><strong>{value(profile?.add_to_carts)}</strong></div>
-            <div><span>Checkout</span><strong>{value(profile?.checkout_events)}</strong></div>
-            <div><span>Email Clicks</span><strong>{value(profile?.email_clicked)}</strong></div>
-            <div><span>Evidence Gaps</span><strong>{value(profile?.evidence_gap_orders)}</strong></div>
-          </div>
-        </section>
-      </div>
-
-      <section class="panel timeline-panel">
-        <div class="panel-title">Timeline</div>
-        {#if timeline.length === 0}
-          <div class="empty">No timeline events for this profile.</div>
-        {:else}
-          <div class="timeline">
-            {#each timeline as row, i (i)}
-              <div class="event">
-                <div class="event-time">{fmtDate(row.event_ts)}</div>
-                <div class="event-body">
-                  <div class="event-head">
-                    <span class="badge">{value(row.row_type)}</span>
-                    <strong>{row.row_type === "conversion" ? formatOrderLabel(row.order_number, row.order_id) : value(row.title || row.event_type)}</strong>
-                    {#if row.revenue}
-                      <span class="money">{fmtMoney(row.revenue)}</span>
-                    {/if}
-                  </div>
-                  <div class="event-detail">{value(row.detail || row.campaign || row.source || row.url || row.resolution_reason)}</div>
-                  <div class="meta">{value(row.event_source)} / {value(row.channel_group)} / {value(row.resolution_confidence)}</div>
-                </div>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </section>
-    {/if}
+      {/if}
+    </div>
   </Dialog.Content>
 </Dialog.Root>
 
 <style>
+  /* Scrollable body — caps the modal at 70vh so the dialog never grows past
+     the viewport. Padding/scrollbar live here so the dialog header stays
+     pinned and the inner sections all scroll together. */
+  .body {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
   .state {
     padding: 32px 8px;
     text-align: center;
@@ -247,17 +257,21 @@
   .state.error {
     color: #b91c1c;
   }
+  /* Use color-mix on currentColor to derive surface/border tones from the
+     dialog's own text color — works on both light and dark themes without
+     hardcoded fallbacks that strand the panels at white when the bratrax
+     CSS vars aren't loaded. */
   .summary {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 1px;
-    border: 1px solid var(--color-bratrax-border, #e5e7eb);
-    background: var(--color-bratrax-border, #e5e7eb);
+    border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+    background: color-mix(in srgb, currentColor 12%, transparent);
     margin-bottom: 12px;
   }
   .summary > div,
   .panel {
-    background: var(--color-bratrax-surface, #fff);
+    background: color-mix(in srgb, currentColor 4%, transparent);
   }
   .summary > div {
     padding: 12px;
@@ -268,7 +282,7 @@
   .meta,
   .event-time,
   .empty {
-    color: var(--color-text-muted, #6b7280);
+    color: color-mix(in srgb, currentColor 65%, transparent);
     font-size: 12px;
   }
   strong {
@@ -278,7 +292,7 @@
     white-space: nowrap;
   }
   .panel {
-    border: 1px solid var(--color-bratrax-border, #e5e7eb);
+    border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
     padding: 12px;
     margin-bottom: 12px;
   }
@@ -288,7 +302,7 @@
     font-weight: 700;
     letter-spacing: 1px;
     text-transform: uppercase;
-    color: var(--color-text-muted, #6b7280);
+    color: color-mix(in srgb, currentColor 65%, transparent);
     margin-bottom: 8px;
   }
   .action {
@@ -311,7 +325,7 @@
     grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
     gap: 8px;
     align-items: center;
-    border-bottom: 1px solid var(--color-bratrax-border-faint, #f3f4f6);
+    border-bottom: 1px solid color-mix(in srgb, currentColor 8%, transparent);
     padding-bottom: 8px;
   }
   .edge .meta {
@@ -319,7 +333,7 @@
   }
   .arrow {
     text-align: center;
-    color: var(--color-text-muted, #6b7280);
+    color: color-mix(in srgb, currentColor 65%, transparent);
   }
   .mono {
     font-family: "Space Mono", "JetBrains Mono", monospace;
@@ -335,10 +349,6 @@
   .metrics strong {
     font-size: 18px;
   }
-  .timeline-panel {
-    max-height: 48vh;
-    overflow: auto;
-  }
   .timeline {
     display: grid;
     gap: 10px;
@@ -348,7 +358,7 @@
     grid-template-columns: 150px minmax(0, 1fr);
     gap: 12px;
     padding-bottom: 10px;
-    border-bottom: 1px solid var(--color-bratrax-border-faint, #f3f4f6);
+    border-bottom: 1px solid color-mix(in srgb, currentColor 8%, transparent);
   }
   .event-head {
     display: flex;
@@ -359,13 +369,17 @@
   .event-head strong {
     display: inline;
   }
+  /* Theme-agnostic badge: tint of currentColor instead of hardcoded
+     acid-dim on near-black text, which on dark theme reads as a beige
+     pill with invisible text. */
   .badge {
     font-family: "Space Mono", "JetBrains Mono", monospace;
     font-size: 10px;
     text-transform: uppercase;
-    background: var(--color-acid-dim, #f5f5dc);
+    background: color-mix(in srgb, currentColor 18%, transparent);
+    color: inherit;
     padding: 2px 6px;
-    color: var(--color-text, #111827);
+    border-radius: 2px;
   }
   .money {
     margin-left: auto;
