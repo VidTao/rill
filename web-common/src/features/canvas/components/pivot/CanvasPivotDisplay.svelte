@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { PivotCanvasComponent } from "@rilldata/web-common/features/canvas/components/pivot";
   import { getFiltersForCell } from "@rilldata/web-common/features/dashboards/pivot/pivot-utils";
-  import type { V1Expression } from "@rilldata/web-common/runtime-client";
   import { getContext } from "svelte";
   import ComponentHeader from "../../ComponentHeader.svelte";
   import CanvasPivotRenderer from "./CanvasPivotRenderer.svelte";
@@ -66,18 +65,6 @@
     return measureNames[Number(m[1])] ?? null;
   }
 
-  function expressionIncludesDimension(
-    expression: V1Expression | undefined,
-    dimensionName: string,
-  ): boolean {
-    if (!expression?.cond?.exprs?.length) return false;
-    const [left] = expression.cond.exprs;
-    if (left?.ident === dimensionName) return true;
-    return expression.cond.exprs.some((expr) =>
-      expressionIncludesDimension(expr, dimensionName),
-    );
-  }
-
   function getCellFilters(rowId: string, columnId: string) {
     const pivotConfig = $config;
     const dataStore = $pivotDataStore;
@@ -110,12 +97,6 @@
         const cell = getCellFilters(_rowId, columnId);
         if (!cell) return;
         const { filters: rawCellFilters, timeRange } = cell;
-        if (
-          measureName === "profiles" &&
-          !expressionIncludesDimension(rawCellFilters, "profile_id")
-        ) {
-          return;
-        }
         drilldown.open({
           measureName,
           filters: rawCellFilters,
