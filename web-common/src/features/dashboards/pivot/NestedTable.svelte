@@ -37,14 +37,6 @@
   // drilldown handler has a visible cursor/hover affordance.
   export let isClickableColumn: ((columnId: string) => boolean) | undefined =
     undefined;
-  export let isClickableCell:
-    | ((
-        rowId: string,
-        columnId: string,
-        rowHeader: boolean,
-        rowData?: Record<string, unknown>,
-      ) => boolean)
-    | undefined = undefined;
   export let activeCell: { rowId: string; columnId: string } | null | undefined;
 
   // Table props
@@ -350,9 +342,7 @@
               : cell.column.columnDef.cell}
           {@const isActive = isCellActive(cell)}
           {@const rowHeader = i === 0}
-          {@const isDrilldownCell =
-            isClickableCell?.(cell.row.id, cell.column.id, rowHeader, cell.row.original) ||
-            (!rowHeader && isClickableColumn?.(cell.column.id))}
+          {@const isDrilldownCell = !rowHeader && isClickableColumn?.(cell.column.id)}
           <td
             class="ui-copy-number cell truncate group/cell"
             class:active-cell={isActive}

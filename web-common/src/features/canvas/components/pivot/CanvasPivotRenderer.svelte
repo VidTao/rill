@@ -25,14 +25,6 @@
     | undefined = undefined;
   export let isClickableColumn: ((columnId: string) => boolean) | undefined =
     undefined;
-  export let isClickableCell:
-    | ((
-        rowId: string,
-        columnId: string,
-        rowHeader: boolean,
-        rowData?: Record<string, unknown>,
-      ) => boolean)
-    | undefined = undefined;
 
   $: pivotColumns = splitPivotChips($pivotState.columns);
 
@@ -66,7 +58,6 @@
         {pivotState}
         {onMeasureCellClick}
         {isClickableColumn}
-        {isClickableCell}
         setPivotExpanded={(expanded) => {
           pivotState.update((state) => ({
             ...state,

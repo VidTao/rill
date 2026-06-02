@@ -74,14 +74,6 @@
   // visually inert even when onMeasureCellClick is wired.
   export let isClickableColumn: ((columnId: string) => boolean) | undefined =
     undefined;
-  export let isClickableCell:
-    | ((
-        rowId: string,
-        columnId: string,
-        rowHeader: boolean,
-        rowData?: Record<string, unknown>,
-      ) => boolean)
-    | undefined = undefined;
 
   const options: Readable<TableOptions<PivotDataRow>> = derived(
     [pivotDataStore, pivotState],
@@ -346,7 +338,6 @@
       {totalRowSize}
       {canShowDataViewer}
       {isClickableColumn}
-      {isClickableCell}
       {hasMeasureContextColumns}
       activeCell={$pivotState.activeCell}
       {assembled}
@@ -371,7 +362,6 @@
       {measures}
       {canShowDataViewer}
       {isClickableColumn}
-      {isClickableCell}
       activeCell={$pivotState.activeCell}
       {assembled}
       {scrollLeft}

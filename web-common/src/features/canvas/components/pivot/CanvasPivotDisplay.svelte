@@ -78,21 +78,11 @@
     );
   }
 
-  function isProfileDirectory(): boolean {
-    return tableSpec.metrics_view === "profile_directory_metrics";
-  }
-
   function getCellFilters(rowId: string, columnId: string) {
     const pivotConfig = $config;
     const dataStore = $pivotDataStore;
     if (!pivotConfig || !dataStore) return undefined;
     return getFiltersForCell(pivotConfig, rowId, columnId, {}, dataStore.data);
-  }
-
-  function isProfileLeafCell(rowId: string, columnId: string): boolean {
-    if (!isProfileDirectory()) return false;
-    const cell = getCellFilters(rowId, columnId);
-    return expressionIncludesDimension(cell?.filters, "profile_id");
   }
 
   // Predicate used by the renderer to visually mark clickable cells (cursor
@@ -104,21 +94,6 @@
           return !!name && DRILLDOWN_MEASURES.has(name);
         }
       : undefined;
-
-  $: isClickableCell = drilldown && $config
-    ? (
-        rowId: string,
-        columnId: string,
-        rowHeader: boolean,
-        _rowData?: Record<string, unknown>,
-      ) => {
-        if (rowHeader) return false;
-        const measureName = resolveMeasureName(columnId, $config!.measureNames);
-        if (!measureName || !DRILLDOWN_MEASURES.has(measureName)) return false;
-        if (measureName === "profiles") return isProfileLeafCell(rowId, columnId);
-        return true;
-      }
-    : undefined;
 
   $: onMeasureCellClick = drilldown
     ? (_rowId: string, columnId: string, _rowData?: Record<string, unknown>) => {
@@ -195,5 +170,4 @@
   {pivotState}
   {onMeasureCellClick}
   {isClickableColumn}
-  {isClickableCell}
 />
