@@ -23,9 +23,6 @@
   export let onMeasureCellClick:
     | ((rowId: string, columnId: string, rowData?: Record<string, unknown>) => void)
     | undefined = undefined;
-  export let onRowHeaderClick:
-    | ((rowId: string, columnId: string, rowData?: Record<string, unknown>) => boolean)
-    | undefined = undefined;
   export let isClickableColumn: ((columnId: string) => boolean) | undefined =
     undefined;
   export let isClickableCell:
@@ -68,7 +65,6 @@
         config={pivotConfig}
         {pivotState}
         {onMeasureCellClick}
-        {onRowHeaderClick}
         {isClickableColumn}
         {isClickableCell}
         setPivotExpanded={(expanded) => {

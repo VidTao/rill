@@ -105,25 +105,17 @@
         }
       : undefined;
 
-  $: isClickableCell = drilldown
+  $: isClickableCell = drilldown && $config
     ? (
         rowId: string,
         columnId: string,
         rowHeader: boolean,
         _rowData?: Record<string, unknown>,
-      ) => rowHeader && isProfileLeafCell(rowId, columnId)
-    : undefined;
-
-  $: onRowHeaderClick = drilldown
-    ? (rowId: string, columnId: string, _rowData?: Record<string, unknown>) => {
-        if (!isProfileLeafCell(rowId, columnId)) return false;
-        const cell = getCellFilters(rowId, columnId);
-        if (!cell) return false;
-        drilldown.open({
-          measureName: "profiles",
-          filters: cell.filters,
-          timeRange: { start: cell.timeRange.start, end: cell.timeRange.end },
-        });
+      ) => {
+        if (rowHeader) return false;
+        const measureName = resolveMeasureName(columnId, $config!.measureNames);
+        if (!measureName || !DRILLDOWN_MEASURES.has(measureName)) return false;
+        if (measureName === "profiles") return isProfileLeafCell(rowId, columnId);
         return true;
       }
     : undefined;
@@ -202,7 +194,6 @@
   pivotConfig={config}
   {pivotState}
   {onMeasureCellClick}
-  {onRowHeaderClick}
   {isClickableColumn}
   {isClickableCell}
 />
