@@ -12,8 +12,9 @@
     formatOrderLabel,
     ORDER_TIMELINE_METRICS_VIEW,
     sortTimelineRows,
+    winnerColumnFor,
   } from "./api";
-  import OrderTimelineRow from "./OrderTimelineRow.svelte";
+  import OrderPathGraph from "./OrderPathGraph.svelte";
   import type { OrderTimelineRow as TimelineRow } from "./types";
 
   export let open = false;
@@ -41,9 +42,9 @@
     },
   );
 
-  $: rawRows = ($rowsQuery.data?.data as
+  $: rawRows = $rowsQuery.data?.data as
     | V1MetricsViewRowsResponseDataItem[]
-    | undefined) as TimelineRow[] | undefined;
+    | undefined as TimelineRow[] | undefined;
   $: rows = sortTimelineRows(rawRows);
   $: winner = findWinner(rawRows, attributionModel);
   $: modelLabel = formatAttributionModel(attributionModel);
@@ -77,26 +78,6 @@
   // First conversion row carries the order summary (number, revenue, ts).
   $: summary = rows.find((r) => r.row_type === "conversion") ?? rows[0];
 
-  // Group resolver_evidence rows under their parent touchpoint by activity_id
-  // (resolver_evidence.activity_id maps to attribution_touchpoint.activity_id).
-  // Touchpoint rows without matching evidence get an empty array.
-  $: evidenceByTouchpoint = (() => {
-    const map = new Map<string, TimelineRow[]>();
-    for (const r of rows) {
-      if (r.row_type === "resolver_evidence" && r.activity_id) {
-        const arr = map.get(r.activity_id) ?? [];
-        arr.push(r);
-        map.set(r.activity_id, arr);
-      }
-    }
-    return map;
-  })();
-
-  // Visible timeline rows: behavior_events, touchpoints, conversion.
-  // Resolver evidence is hidden from the top level and surfaced under its
-  // parent touchpoint.
-  $: visibleRows = rows.filter((r) => r.row_type !== "resolver_evidence");
-
   function fmtDateTime(iso: string | undefined): string {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -122,7 +103,7 @@
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Content class="max-w-3xl">
+  <Dialog.Content class="w-[92vw] max-w-[1500px]">
     <Dialog.Header>
       <Dialog.Title>
         Order {formatOrderLabel(summary?.order_number, orderId)}
@@ -182,18 +163,7 @@
         </div>
       {/if}
 
-      <div class="timeline-wrap">
-        <ul class="timeline">
-          {#each visibleRows as row (row.row_type + ":" + (row.activity_id ?? "") + ":" + (row.event_ts ?? "") + ":" + (row.event_type ?? ""))}
-            <OrderTimelineRow
-              {row}
-              evidence={row.row_type === "attribution_touchpoint" && row.activity_id
-                ? (evidenceByTouchpoint.get(row.activity_id) ?? [])
-                : []}
-            />
-          {/each}
-        </ul>
-      </div>
+      <OrderPathGraph {rows} winnerColumn={winnerColumnFor(attributionModel)} />
     {/if}
   </Dialog.Content>
 </Dialog.Root>
@@ -277,15 +247,5 @@
   .sep {
     margin: 0 2px;
     color: var(--color-text-muted, #9ca3af);
-  }
-  .timeline-wrap {
-    max-height: 55vh;
-    overflow-y: auto;
-    padding-right: 4px;
-  }
-  .timeline {
-    margin: 0;
-    padding: 0;
-    list-style: none;
   }
 </style>
