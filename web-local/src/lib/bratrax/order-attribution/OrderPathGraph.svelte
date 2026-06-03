@@ -10,6 +10,7 @@
   import "@xyflow/svelte/dist/base.css";
   import { themeControl } from "@rilldata/web-common/features/themes/theme-control";
   import { writable } from "svelte/store";
+  import OrderEventDetailModal from "./OrderEventDetailModal.svelte";
   import OrderPathLane from "./OrderPathLane.svelte";
   import OrderPathNode from "./OrderPathNode.svelte";
   import { buildOrderPathLayout, type PathNodeData } from "./order-path-layout";
@@ -18,6 +19,20 @@
   export let rows: OrderTimelineRow[] = [];
   // The `is_*_winner` column for the active attribution model.
   export let winnerColumn = "is_last_touch_winner";
+
+  // Click-through detail modal (Modal 3): clicking a node card opens the full
+  // row. Lane-label nodes carry no row and are inert.
+  let detailRow: OrderTimelineRow | null = null;
+  let detailOpen = false;
+
+  function handleNodeClick(
+    e: CustomEvent<{ node: Node<PathNodeData>; event: MouseEvent | TouchEvent }>,
+  ) {
+    const row = e.detail?.node?.data?.row;
+    if (!row) return;
+    detailRow = row;
+    detailOpen = true;
+  }
 
   // Match SvelteFlow's chrome (controls, edges, pane) to the app theme.
   $: colorMode = ($themeControl === "dark" ? "dark" : "light") as
@@ -70,6 +85,7 @@
         panOnDrag
         preventScrolling
         onlyRenderVisibleElements={false}
+        on:nodeclick={handleNodeClick}
       >
         <Background gap={20} />
         <Controls showLock={false} position="bottom-right" />
@@ -77,6 +93,8 @@
     {/key}
   </div>
 {/if}
+
+<OrderEventDetailModal bind:open={detailOpen} row={detailRow} />
 
 <style>
   .graph {

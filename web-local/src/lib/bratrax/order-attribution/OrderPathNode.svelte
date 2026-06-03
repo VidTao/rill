@@ -98,6 +98,14 @@
     flex-direction: column;
     gap: 3px;
     overflow: hidden;
+    cursor: pointer;
+    transition:
+      box-shadow 120ms ease,
+      transform 120ms ease;
+  }
+  .pnode:hover {
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+    transform: translateY(-1px);
   }
   .pnode.conversion {
     border-left-color: #16a34a;

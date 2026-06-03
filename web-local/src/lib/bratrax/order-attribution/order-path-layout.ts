@@ -34,6 +34,9 @@ export interface PathNodeData {
   laneIndex: number;
   // Lane-label nodes only: how many steps are in this lane.
   laneCount?: number;
+  // The underlying timeline row, for the click-through detail modal. Absent on
+  // lane-label nodes (they aren't clickable).
+  row?: OrderTimelineRow;
 }
 
 export interface OrderPathLayout {
@@ -135,6 +138,7 @@ function nodeDataFor(
       ts: row.event_ts,
       isWinner,
       laneIndex,
+      row,
     };
   }
   // behavior_event
@@ -147,6 +151,7 @@ function nodeDataFor(
     ts: row.event_ts,
     isWinner: false,
     laneIndex,
+    row,
   };
 }
 
@@ -271,6 +276,7 @@ export function buildOrderPathLayout(
         ts: conversion.event_ts ?? conversion.conversion_ts,
         isWinner: false,
         laneIndex: -1,
+        row: conversion,
       },
     });
   }

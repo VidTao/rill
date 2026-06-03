@@ -12,8 +12,9 @@ enabled clients.
 ## Flow
 
 ```
-Attributed Orders cell ──click──▶ Modal 1 (OrderListModal)   list of orders
-        order row       ──click──▶ Modal 2 (OrderTimelineModal) touchpoint paths
+Attributed Orders cell ──click──▶ Modal 1 (OrderListModal)        list of orders
+        order row       ──click──▶ Modal 2 (OrderTimelineModal)    touchpoint paths
+        node card       ──click──▶ Modal 3 (OrderEventDetailModal) full row detail
 
 Profiles cell (grouped) ──click──▶ ProfileListModal           list of profiles
 Profiles cell (single)  ──click──▶ ProfileGraphModal          identity graph
@@ -71,6 +72,12 @@ Built on `@xyflow/svelte` (SvelteFlow) + `@dagrejs/dagre`:
 - `OrderPathNode.svelte` — the touchpoint / behavior / conversion card.
 - `OrderPathLane.svelte` — the per-source label at the left of each lane.
 - `OrderPathGraph.svelte` — the SvelteFlow canvas wrapper (zoom/pan + Controls).
+  Listens for `on:nodeclick` and opens Modal 3 with the clicked node's row.
+- `OrderEventDetailModal.svelte` — Modal 3. Clicking any node card opens the
+  full underlying `order_timeline_metrics` row, grouped into sections (Event,
+  Channel & campaign, Page, Order, Resolution, Attribution weights, Raw params).
+  The full row rides on each node via `PathNodeData.row` (lane-label nodes carry
+  no row and are inert).
 
 ### Gotchas
 
@@ -99,6 +106,7 @@ Built on `@xyflow/svelte` (SvelteFlow) + `@dagrejs/dagre`:
 | `OrderPathGraph.svelte`       | SvelteFlow canvas for the path graph             |
 | `OrderPathNode.svelte`        | Touchpoint / behavior / conversion node card     |
 | `OrderPathLane.svelte`        | Per-source lane label                            |
+| `OrderEventDetailModal.svelte`| Modal 3 — full row detail for a clicked node     |
 | `order-path-layout.ts`        | Swimlane layout (dagre) + source label/color maps |
 | `OrderTimelineRow.svelte`     | Legacy flat-list row (no longer used by Modal 2) |
 | `ProfileListModal.svelte`     | Profiles drilldown — list                        |
