@@ -125,8 +125,13 @@ function createColumnDefinitionForDimensions(
   }
 
   // Construct column def for Row Totals
+  // (Bratrax fork: skipped when config.hideTotals is set — see PivotDataStoreConfig)
   let rowTotalsColumns: ColumnDef<PivotDataRow>[] = [];
-  if (config.rowDimensionNames.length && config.colDimensionNames.length) {
+  if (
+    config.rowDimensionNames.length &&
+    config.colDimensionNames.length &&
+    !config.hideTotals
+  ) {
     rowTotalsColumns = colDimensions.reverse().reduce((acc, dimension) => {
       const { name } = dimension;
 

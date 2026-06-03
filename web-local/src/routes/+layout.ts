@@ -45,14 +45,16 @@ export async function load({ url, depends, untrack, fetch }) {
     return { initialized: false };
   }
 
-  // /login, /signup, /accept-invite, and the legal pages are reachable without
-  // authentication. Every other path (including /onboard) requires an
-  // authenticated session; unauthenticated visitors are bounced to /login
-  // with the original destination preserved as a ?redirect= param.
+  // /login, /signup, /accept-invite, password-reset, and the legal pages are
+  // reachable without authentication. Every other path (including /onboard)
+  // requires an authenticated session; unauthenticated visitors are bounced
+  // to /login with the original destination preserved as a ?redirect= param.
   const isPublicRoute =
     url.pathname.startsWith("/login") ||
     url.pathname.startsWith("/signup") ||
     url.pathname.startsWith("/accept-invite") ||
+    url.pathname.startsWith("/forgot-password") ||
+    url.pathname.startsWith("/reset-password") ||
     url.pathname.startsWith("/privacy-policy") ||
     url.pathname.startsWith("/terms-of-service") ||
     url.pathname.startsWith("/vs/") ||

@@ -25,6 +25,16 @@ import type {
 import CanvasPivotDisplay from "./CanvasPivotDisplay.svelte";
 import { createPivotConfig, usePivotForCanvas } from "./util";
 
+// Bratrax-fork extension: an optional initial sort so a canvas table/pivot can
+// LAND pre-sorted by a measure (or dimension) instead of always opening on the
+// anchor dimension ascending. `field` is a measure or dimension name; `dir`
+// defaults to "desc". For nested pivots this sorts the anchor dimension (and
+// every expanded level) by the measure — see getSortForAccessor in pivot-utils.
+export interface PivotSortSpec {
+  field: string;
+  dir?: "asc" | "desc";
+}
+
 export interface PivotSpec
   extends ComponentCommonProperties,
     ComponentFilterProperties {
@@ -32,6 +42,11 @@ export interface PivotSpec
   measures: string[];
   row_dimensions?: string[];
   col_dimensions?: string[];
+  sort?: PivotSortSpec;
+  // Hide the leading "row totals" column that sums a measure across all
+  // col_dimension values. Set true for model-comparison pivots where the column
+  // dimension is attribution_model (a sum across models is meaningless).
+  hide_totals?: boolean;
 }
 
 export interface TableSpec
@@ -39,6 +54,7 @@ export interface TableSpec
     ComponentFilterProperties {
   metrics_view: string;
   columns: string[];
+  sort?: PivotSortSpec;
 }
 
 export { default as Pivot } from "./CanvasPivotDisplay.svelte";
@@ -86,7 +102,16 @@ export class PivotCanvasComponent extends BaseCanvasComponent<
 
     this.type = type;
 
-    this.pivotState = writable(this.getInitPivotState(type));
+    // Seed the initial sort from the YAML `sort:` property (if any) so the
+    // table lands pre-sorted rather than on the anchor dimension ascending.
+    const initialSort = (
+      resource.component?.state?.validSpec?.rendererProperties as
+        | PivotSpec
+        | TableSpec
+        | undefined
+    )?.sort;
+
+    this.pivotState = writable(this.getInitPivotState(type, initialSort));
 
     this.config = createPivotConfig(
       this.parent,
@@ -102,12 +127,18 @@ export class PivotCanvasComponent extends BaseCanvasComponent<
     );
   }
 
-  getInitPivotState(type: "pivot" | "table"): PivotState {
+  getInitPivotState(
+    type: "pivot" | "table",
+    sort?: PivotSortSpec,
+  ): PivotState {
+    const sorting = sort?.field
+      ? [{ id: sort.field, desc: sort.dir !== "asc" }]
+      : [];
     return {
       columns: [],
       rows: [],
       expanded: {},
-      sorting: [],
+      sorting,
       columnPage: 1,
       rowPage: 1,
       enableComparison: false,
@@ -190,7 +221,9 @@ export class PivotCanvasComponent extends BaseCanvasComponent<
 
     this.type = newTableType;
 
-    this.pivotState.set(this.getInitPivotState(newTableType));
+    this.pivotState.set(
+      this.getInitPivotState(newTableType, get(this.specStore).sort),
+    );
 
     const parentPath = this.pathInYAML.slice(0, -1);
     const parseDocumentStore = this.parent.parsedContent;

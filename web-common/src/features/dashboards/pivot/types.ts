@@ -104,6 +104,11 @@ export interface PivotDataStoreConfig {
   comparisonTime: TimeRangeString | undefined;
   searchText: string | undefined;
   isFlat: boolean;
+  // Bratrax-fork extension: when true, suppress the leading "row totals" column
+  // that sums a measure across all column-dimension values. Meaningless (and
+  // confusing) when the column dimension is attribution_model — summing the same
+  // revenue across 5 models inflates it ~5x. Only the canvas pivot sets this.
+  hideTotals?: boolean;
 }
 
 export interface PivotAxesData {

@@ -146,6 +146,7 @@ export function processPivot(
     whereFilter: where ?? createAndExpression([]),
     searchText: "",
     isFlat: false,
+    hideTotals: $tableSpec?.hide_totals,
     pivot: $pivotState,
     enableComparison,
     comparisonTime: {

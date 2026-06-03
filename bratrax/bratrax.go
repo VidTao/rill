@@ -87,6 +87,25 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	observability.MuxHandle(mux, "GET /bratrax/auth/config",
 		observability.Middleware("bratrax", logger, http.HandlerFunc(authSvc.HandleAuthConfig)))
 
+	// Password-reset endpoints — Flask-side handlers, public on purpose
+	// (the token is the auth). Proxied straight through WITHOUT the auth
+	// mapper, otherwise the /forgot-password page would 401 on an
+	// unauthenticated visitor — the entire point is they can't log in.
+	observability.MuxHandle(mux, "POST /bratrax/auth/password-reset-request",
+		observability.Middleware("bratrax", logger, proxy))
+	observability.MuxHandle(mux, "POST /bratrax/auth/password-reset",
+		observability.Middleware("bratrax", logger, proxy))
+
+	// Lifecycle-email footer "Pause these emails" link. Sits OUTSIDE the
+	// /bratrax/ prefix because the URL is baked into customer-facing emails
+	// and we don't want /bratrax/ in those URLs. Public by design — the
+	// HMAC token in `?t=` is the auth, no login possible (the whole point
+	// is reaching customers who can't log in). The proxy's prefix-stripper
+	// leaves non-/bratrax paths unchanged, so /email/pause passes through
+	// to Flask's email_pause_routes blueprint verbatim.
+	observability.MuxHandle(mux, "GET /email/pause",
+		observability.Middleware("bratrax", logger, proxy))
+
 	// Super_admin client-switcher endpoints. Both auth themselves via the
 	// JWT cookie + role check; not behind the AuthMapper proxy middleware.
 	switchSvc := NewClientSwitchService(authMapper, store, clientStore, logger, cfg.SecureCookie)
