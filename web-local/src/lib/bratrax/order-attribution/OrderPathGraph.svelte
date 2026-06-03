@@ -8,6 +8,7 @@
     type NodeTypes,
   } from "@xyflow/svelte";
   import "@xyflow/svelte/dist/base.css";
+  import { themeControl } from "@rilldata/web-common/features/themes/theme-control";
   import { writable } from "svelte/store";
   import OrderPathLane from "./OrderPathLane.svelte";
   import OrderPathNode from "./OrderPathNode.svelte";
@@ -17,6 +18,11 @@
   export let rows: OrderTimelineRow[] = [];
   // The `is_*_winner` column for the active attribution model.
   export let winnerColumn = "is_last_touch_winner";
+
+  // Match SvelteFlow's chrome (controls, edges, pane) to the app theme.
+  $: colorMode = ($themeControl === "dark" ? "dark" : "light") as
+    | "dark"
+    | "light";
 
   const nodesStore = writable<Node<PathNodeData>[]>([]);
   const edgesStore = writable<Edge[]>([]);
@@ -49,6 +55,7 @@
         nodes={nodesStore}
         edges={edgesStore}
         {nodeTypes}
+        {colorMode}
         proOptions={{ hideAttribution: true }}
         fitView
         fitViewOptions={{ padding: 0.15, maxZoom: 1.1, duration: 0 }}
@@ -79,6 +86,10 @@
     border-radius: 6px;
     overflow: hidden;
     background: var(--color-surface-subtle, #fafafa);
+  }
+  :global(.dark) .graph {
+    border-color: #2e2e2e;
+    background: #0f0f0f;
   }
   .empty {
     padding: 32px 8px;

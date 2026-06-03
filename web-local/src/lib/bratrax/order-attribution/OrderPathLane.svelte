@@ -83,4 +83,12 @@
     font-size: 10px;
     color: var(--color-text-muted, #9ca3af);
   }
+  /* Dashboard themes can pin --color-* to light values inside the canvas, so
+     set readable lane-label colors explicitly in dark mode. */
+  :global(.dark) .name {
+    color: #ece7dd;
+  }
+  :global(.dark) .count {
+    color: #a39d90;
+  }
 </style>

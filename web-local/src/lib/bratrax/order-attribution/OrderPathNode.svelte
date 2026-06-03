@@ -104,6 +104,18 @@
     border-color: #16a34a;
     background: color-mix(in srgb, #16a34a 6%, #ffffff);
   }
+  /* Dashboard themes can pin --color-* to their light values inside the
+     canvas, so the raw-var fallbacks aren't reliable in dark mode. Set
+     readable colors explicitly when the app is in dark mode. */
+  :global(.dark) .pnode {
+    background: #161616;
+    border-color: color-mix(in srgb, var(--accent) 55%, #2a2a2a);
+  }
+  :global(.dark) .pnode.conversion {
+    background: color-mix(in srgb, #16a34a 16%, #141414);
+    border-color: #3fbf64;
+    border-left-color: #3fbf64;
+  }
   .pnode.winner {
     border-color: var(--color-acid, #d4ff00);
     box-shadow: 0 0 0 2px rgba(181, 159, 0, 0.45);
@@ -158,6 +170,15 @@
     font-family: "Space Mono", "JetBrains Mono", monospace;
     font-size: 10px;
     color: var(--color-text-muted, #9ca3af);
+  }
+  :global(.dark) .title {
+    color: #ece7dd;
+  }
+  :global(.dark) .sub {
+    color: #c2bcb0;
+  }
+  :global(.dark) .ts {
+    color: #a39d90;
   }
   :global(.svelte-flow__handle) {
     width: 6px;
