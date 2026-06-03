@@ -125,7 +125,7 @@
 </script>
 
 <div class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12">
-  <div class="w-full max-w-6xl px-4">
+  <div class="w-full max-w-[1400px] px-4">
     <a href="/superadmins" class="font-mono text-[11px] text-bratrax-acid hover:underline">
       ← Super-admin
     </a>
@@ -182,7 +182,6 @@
               <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Sent</th>
               <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Recipient</th>
               <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Template</th>
-              <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Kind</th>
               <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Sequence</th>
               <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Status</th>
               <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Opens</th>
@@ -197,8 +196,10 @@
               >
                 <td class="py-2 pr-3 text-bratrax-text-primary">{fmt(e.sent_at)}</td>
                 <td class="py-2 pr-3 text-bratrax-text-primary">{e.recipient_email}</td>
-                <td class="py-2 pr-3 text-bratrax-text-primary">{e.template_key}</td>
-                <td class="py-2 pr-3 text-bratrax-text-muted">{e.kind}</td>
+                <td class="py-2 pr-3">
+                  <div class="text-bratrax-text-primary">{e.template_key}</div>
+                  <div class="text-[10px] text-bratrax-text-muted">{e.kind}</div>
+                </td>
                 <td class="py-2 pr-3 text-bratrax-text-muted">{e.sequence_id ?? "—"}</td>
                 <td class="py-2 pr-3 font-bold {statusClass(e.status)}">{e.status}</td>
                 <td class="py-2 pr-3 text-bratrax-text-primary">{e.open_count}</td>
