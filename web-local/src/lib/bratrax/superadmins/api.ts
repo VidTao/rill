@@ -341,3 +341,210 @@ export function enableMultiStoreForClient(
     { method: "POST" },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Email log + sequence enrollment (Phase 4c)
+// ---------------------------------------------------------------------------
+
+export type EmailKind = "transactional" | "lifecycle";
+
+export type EmailStatus =
+  | "queued"
+  | "sent"
+  | "delivered"
+  | "opened"
+  | "clicked"
+  | "bounced"
+  | "dropped"
+  | "unsubscribed"
+  | "spamreport"
+  | "failed";
+
+export interface EmailLogEntry {
+  id: number;
+  client_id: string | null;
+  invitation_token: string | null;
+  recipient_email: string;
+  template_key: string;
+  sendgrid_template_id: string | null;
+  kind: EmailKind;
+  sequence_id: string | null;
+  enrollment_id: number | null;
+  subject: string | null;
+  status: EmailStatus;
+  sent_at: string | null;
+  delivered_at: string | null;
+  first_opened_at: string | null;
+  last_opened_at: string | null;
+  open_count: number;
+  first_clicked_at: string | null;
+  click_count: number;
+  bounce_reason: string | null;
+  error: string | null;
+  template_variables: Record<string, unknown>;
+}
+
+export interface EmailLogResponse {
+  emails: EmailLogEntry[];
+  limit: number;
+  offset: number;
+  total?: number;
+}
+
+export interface EmailLogFilters {
+  kind?: EmailKind;
+  sequence_id?: string;
+  template_key?: string;
+  status?: EmailStatus;
+  recipient_search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function listClientEmails(
+  clientId: string,
+  params: { limit?: number; offset?: number } = {},
+): Promise<EmailLogResponse> {
+  const qs = new URLSearchParams();
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  if (params.offset != null) qs.set("offset", String(params.offset));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<EmailLogResponse>(
+    `/bratrax/superadmins/clients/${encodeURIComponent(clientId)}/emails${suffix}`,
+  );
+}
+
+export function getEmail(emailLogId: number): Promise<EmailLogEntry> {
+  return apiFetch<EmailLogEntry>(`/bratrax/superadmins/emails/${emailLogId}`);
+}
+
+export function listEmailLog(
+  filters: EmailLogFilters = {},
+): Promise<EmailLogResponse> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) {
+    if (v != null && v !== "") qs.set(k, String(v));
+  }
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<EmailLogResponse>(`/bratrax/superadmins/email-log${suffix}`);
+}
+
+export type EnrollmentStatus = "active" | "paused" | "completed" | "stopped";
+
+export interface SequenceEnrollment {
+  id: number;
+  subject_type: "client" | "invitation";
+  subject_id: string;
+  sequence_id: string;
+  sequence_display_name: string;
+  status: EnrollmentStatus;
+  stopped_reason: string | null;
+  next_email_index: number;
+  next_email_due_at: string | null;
+  total_emails: number;
+  emails_sent_count: number;
+  entered_at: string | null;
+  last_event_at: string | null;
+  enrolled_manually_by: number | null;
+}
+
+export interface EnrollmentsResponse {
+  enrollments: SequenceEnrollment[];
+}
+
+export function listClientEnrollments(
+  clientId: string,
+): Promise<EnrollmentsResponse> {
+  return apiFetch<EnrollmentsResponse>(
+    `/bratrax/superadmins/clients/${encodeURIComponent(clientId)}/enrollments`,
+  );
+}
+
+export function listInvitationEnrollments(
+  token: string,
+): Promise<EnrollmentsResponse> {
+  return apiFetch<EnrollmentsResponse>(
+    `/bratrax/superadmins/invitations/${encodeURIComponent(token)}/enrollments`,
+  );
+}
+
+export interface EnrollResult {
+  enrollment_id: number;
+  status: EnrollmentStatus;
+  reset: boolean;
+  forced: boolean;
+}
+
+export function enrollClient(
+  clientId: string,
+  sequenceId: string,
+  force = false,
+): Promise<EnrollResult> {
+  return apiFetch<EnrollResult>(
+    `/bratrax/superadmins/clients/${encodeURIComponent(clientId)}/enrollments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sequence_id: sequenceId, force }),
+    },
+  );
+}
+
+export type EnrollmentAction = "pause" | "resume" | "cancel" | "send_next_now";
+
+export function patchEnrollment(
+  enrollmentId: number,
+  action: EnrollmentAction,
+): Promise<{ enrollment: SequenceEnrollment }> {
+  return apiFetch<{ enrollment: SequenceEnrollment }>(
+    `/bratrax/superadmins/enrollments/${enrollmentId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    },
+  );
+}
+
+export interface SequenceStep {
+  index: number;
+  delay_hours: number;
+  template_key: string;
+}
+
+export interface SequenceMeta {
+  sequence_id: string;
+  display_name: string;
+  subject_type: "client" | "invitation";
+  allow_reentry: boolean;
+  steps: SequenceStep[];
+}
+
+export function listSequences(): Promise<{ sequences: SequenceMeta[] }> {
+  return apiFetch<{ sequences: SequenceMeta[] }>(
+    "/bratrax/superadmins/sequences",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Public password-reset endpoints (Phase 2 — wired here for convenience)
+// ---------------------------------------------------------------------------
+
+export function requestPasswordReset(email: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/bratrax/auth/password-reset-request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/bratrax/auth/password-reset", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+}

@@ -59,6 +59,12 @@
     </div>
 
     <form on:submit|preventDefault={handleSubmit} class="flex flex-col gap-4">
+      {#if $page.url.searchParams.get("reset") === "1"}
+        <div class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-text-primary">
+          Password updated. Sign in with your new password.
+        </div>
+      {/if}
+
       {#if error}
         <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
           {error}
@@ -81,9 +87,14 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label for="password" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
-          Password
-        </label>
+        <div class="flex items-baseline justify-between">
+          <label for="password" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+            Password
+          </label>
+          <a href="/forgot-password" class="font-mono text-[11px] text-bratrax-acid hover:underline">
+            Forgot password?
+          </a>
+        </div>
         <input
           id="password"
           type="password"

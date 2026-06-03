@@ -6,6 +6,8 @@
     type ClientDetail,
     type ClientConnection,
   } from "$lib/bratrax/superadmins/api";
+  import ClientEmailAutomations from "$lib/bratrax/superadmins/ClientEmailAutomations.svelte";
+  import ClientEmailHistory from "$lib/bratrax/superadmins/ClientEmailHistory.svelte";
 
   const clientId = $page.params.client_id;
 
@@ -283,17 +285,9 @@
         </ul>
       </section>
 
-      <!-- Email history (Project B placeholder) -->
-      <section class="mt-4 border border-bratrax-border bg-bratrax-surface p-5">
-        <h2
-          class="mb-2 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
-        >
-          Email history
-        </h2>
-        <p class="font-mono text-[11px] text-bratrax-text-muted">
-          No email log yet.
-        </p>
-      </section>
+      <!-- Email automations + Email history (Phase 4c sections) -->
+      <ClientEmailAutomations {clientId} />
+      <ClientEmailHistory {clientId} />
     {/if}
   </div>
 </div>

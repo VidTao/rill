@@ -11,17 +11,24 @@
     listAccessRequests,
     approveAccessRequest,
     dismissAccessRequest,
+    listInvitationEnrollments,
     type SuperadminListResponse,
     type SuperadminMember,
     type SuperadminPendingInvite,
     type SignupPendingInvite,
     type AccessRequest,
+    type SequenceEnrollment,
   } from "$lib/bratrax/superadmins/api";
   import { bratraxUser } from "$lib/bratrax/auth-store";
 
   let data: SuperadminListResponse = { members: [], pending: [] };
   let signupPending: SignupPendingInvite[] = [];
   let accessRequests: AccessRequest[] = [];
+  // token → first matching invitation_expiry enrollment (or null when
+  // no enrollment yet — most invites are >48h from expiry, ticker hasn't
+  // fired for them). Populated alongside signupPending; the loop is
+  // bounded by the typical pending-invites count (<50).
+  let inviteExpiryByToken = new Map<string, SequenceEnrollment | null>();
   let topError = "";
 
   // Invite modal state (super_admin)
@@ -83,9 +90,44 @@
       data = superadmins;
       signupPending = signups.pending;
       accessRequests = requests.pending;
+      void loadInviteExpiryEnrollments();
     } catch (e: any) {
       topError = e?.message ?? "Failed to load superadmins";
     }
+  }
+
+  // Fan out one /superadmins/invitations/<token>/enrollments call per pending
+  // invite to surface the invitation_expiry sequence status in the table.
+  // Non-blocking — the column populates after the main render. Individual
+  // failures fall back to "—".
+  async function loadInviteExpiryEnrollments() {
+    const next = new Map<string, SequenceEnrollment | null>();
+    await Promise.all(
+      signupPending.map(async (p) => {
+        try {
+          const { enrollments } = await listInvitationEnrollments(p.token);
+          const expiry = enrollments.find(
+            (e) => e.sequence_id === "invitation_expiry",
+          );
+          next.set(p.token, expiry ?? null);
+        } catch {
+          next.set(p.token, null);
+        }
+      }),
+    );
+    inviteExpiryByToken = next;
+  }
+
+  function expiryBadgeLabel(status: string | undefined | null): string {
+    if (!status) return "—";
+    return status;
+  }
+
+  function expiryBadgeClass(status: string | undefined | null): string {
+    if (status === "active") return "text-bratrax-acid";
+    if (status === "paused") return "text-yellow-400";
+    if (status === "stopped") return "text-bratrax-tomato";
+    return "text-bratrax-text-muted";
   }
 
   function openInvite() {
@@ -489,6 +531,10 @@
                 </div>
                 <div class="truncate font-mono text-[10px] text-bratrax-text-muted">
                   Signup link · expires {formatDate(p.expires_at)}
+                  · expiry-reminder
+                  <span class="font-bold {expiryBadgeClass(inviteExpiryByToken.get(p.token)?.status)}">
+                    {expiryBadgeLabel(inviteExpiryByToken.get(p.token)?.status)}
+                  </span>
                 </div>
               </div>
               <button
