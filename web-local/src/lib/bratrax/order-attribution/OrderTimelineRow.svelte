@@ -4,6 +4,8 @@
 
   export let row: OrderTimelineRow;
   export let evidence: OrderTimelineRow[] = [];
+  // Clicking the row opens the event-detail modal (same as a graph node card).
+  export let onSelect: (row: OrderTimelineRow) => void = () => {};
 
   let evidenceOpen = false;
 
@@ -40,6 +42,15 @@
   class:touchpoint={rowType === "attribution_touchpoint"}
   class:conversion={rowType === "conversion"}
   class:winner={isWinner}
+  role="button"
+  tabindex="0"
+  on:click={() => onSelect(row)}
+  on:keydown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect(row);
+    }
+  }}
 >
   <span class="dot" aria-hidden="true" />
   <div class="body">
@@ -77,7 +88,7 @@
       <button
         type="button"
         class="evidence-toggle"
-        on:click={() => (evidenceOpen = !evidenceOpen)}
+        on:click|stopPropagation={() => (evidenceOpen = !evidenceOpen)}
         aria-expanded={evidenceOpen}
       >
         {evidenceOpen ? "Hide" : "Show"} evidence ({evidence.length})
@@ -107,8 +118,18 @@
     position: relative;
     display: flex;
     gap: 10px;
-    padding: 8px 0;
+    padding: 8px 6px;
+    margin: 0 -6px;
+    border-radius: 6px;
     list-style: none;
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+  .timeline-row:hover {
+    background: var(--color-surface-subtle, #f5f5f4);
+  }
+  :global(.dark) .timeline-row:hover {
+    background: rgba(255, 255, 255, 0.05);
   }
   .dot {
     flex-shrink: 0;
@@ -227,5 +248,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* The dashboard theme boundary pins --color-* to light values inside the
+     dialog, so force readable colors in dark mode (same as the graph nodes). */
+  :global(.dark) .kind,
+  :global(.dark) .ev-kind {
+    color: #ece7dd;
+  }
+  :global(.dark) .ts,
+  :global(.dark) .src,
+  :global(.dark) .meta,
+  :global(.dark) .ev-source,
+  :global(.dark) .ev-reason,
+  :global(.dark) .ev-url,
+  :global(.dark) .evidence-toggle {
+    color: #a39d90;
   }
 </style>

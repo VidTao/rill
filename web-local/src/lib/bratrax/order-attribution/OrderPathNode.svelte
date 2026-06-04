@@ -47,6 +47,9 @@
 
   $: accent = sourceColor(data.source);
   $: isConversion = data.kind === "conversion";
+  // Behavior events + collapsed runs render as small chips in compact mode.
+  $: isChip = data.compact === true;
+  $: isCollapsed = data.kind === "collapsed";
 
   function fmtTime(iso: string | undefined): string {
     if (!iso) return "";
@@ -61,29 +64,100 @@
   }
 </script>
 
-<div
-  class="pnode"
-  class:winner={data.isWinner}
-  class:conversion={isConversion}
-  style:--accent={accent}
->
-  <Handle type="target" position={Position.Left} isConnectable={false} />
-  <Handle type="source" position={Position.Right} isConnectable={false} />
-
-  <div class="row-top">
-    <span class="src-tag">{data.sourceLabel}</span>
-    {#if data.isWinner}<span class="winner-badge">winner</span>{/if}
+{#if isChip}
+  <div
+    class="chip"
+    class:collapsed={isCollapsed}
+    style:--accent={accent}
+    title={data.subtitle || data.title}
+  >
+    <Handle type="target" position={Position.Left} isConnectable={false} />
+    <Handle type="source" position={Position.Right} isConnectable={false} />
+    <span class="chip-dot" />
+    <span class="chip-title">{data.title}</span>
+    {#if isCollapsed}<span class="chip-expand">expand</span>{/if}
   </div>
-  <div class="title" title={data.title}>{data.title}</div>
-  {#if data.subtitle}
-    <div class="sub" title={data.subtitle}>{data.subtitle}</div>
-  {/if}
-  {#if data.ts}
-    <div class="ts">{fmtTime(data.ts)}</div>
-  {/if}
-</div>
+{:else}
+  <div
+    class="pnode"
+    class:winner={data.isWinner}
+    class:conversion={isConversion}
+    style:--accent={accent}
+  >
+    <Handle type="target" position={Position.Left} isConnectable={false} />
+    <Handle type="source" position={Position.Right} isConnectable={false} />
+
+    <div class="row-top">
+      <span class="src-tag">{data.sourceLabel}</span>
+      {#if data.isWinner}<span class="winner-badge">winner</span>{/if}
+    </div>
+    <div class="title" title={data.title}>{data.title}</div>
+    {#if data.subtitle}
+      <div class="sub" title={data.subtitle}>{data.subtitle}</div>
+    {/if}
+    {#if data.ts}
+      <div class="ts">{fmtTime(data.ts)}</div>
+    {/if}
+  </div>
+{/if}
 
 <style>
+  /* Compact chip — behavior events + collapsed runs. */
+  .chip {
+    box-sizing: border-box;
+    width: 158px;
+    height: 46px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 23px;
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--color-surface, #ffffff);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+      box-shadow 120ms ease,
+      transform 120ms ease;
+  }
+  .chip:hover {
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.16);
+    transform: translateY(-1px);
+  }
+  .chip.collapsed {
+    border-style: dashed;
+    border-width: 1.5px;
+  }
+  .chip-dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--accent);
+  }
+  .chip-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--color-text, #1a1a18);
+  }
+  .chip-expand {
+    flex-shrink: 0;
+    font-family: "Space Mono", "JetBrains Mono", monospace;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    opacity: 0.8;
+  }
+
   .pnode {
     box-sizing: border-box;
     width: 248px;
@@ -115,9 +189,13 @@
   /* Dashboard themes can pin --color-* to their light values inside the
      canvas, so the raw-var fallbacks aren't reliable in dark mode. Set
      readable colors explicitly when the app is in dark mode. */
-  :global(.dark) .pnode {
+  :global(.dark) .pnode,
+  :global(.dark) .chip {
     background: #161616;
     border-color: color-mix(in srgb, var(--accent) 55%, #2a2a2a);
+  }
+  :global(.dark) .chip-title {
+    color: #ece7dd;
   }
   :global(.dark) .pnode.conversion {
     background: color-mix(in srgb, #16a34a 16%, #141414);

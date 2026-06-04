@@ -14,7 +14,9 @@
     sortTimelineRows,
     winnerColumnFor,
   } from "./api";
+  import OrderEventDetailModal from "./OrderEventDetailModal.svelte";
   import OrderPathGraph from "./OrderPathGraph.svelte";
+  import OrderTimelineRowComponent from "./OrderTimelineRow.svelte";
   import type { OrderTimelineRow as TimelineRow } from "./types";
 
   export let open = false;
@@ -23,6 +25,19 @@
   // selects the winning touchpoint for the banner. Defaults to last_touch
   // to match the dashboard's default filter.
   export let attributionModel: string | undefined = undefined;
+
+  // Two ways to read the same data: the swimlane path graph (default) and the
+  // original chronological list. Users pick via the tab strip.
+  let view: "graph" | "timeline" = "graph";
+
+  // Modal 3 (event detail) is owned here so both views open the same one — the
+  // graph reports clicks via its onSelectRow callback, timeline rows via theirs.
+  let detailRow: TimelineRow | null = null;
+  let detailOpen = false;
+  function openDetail(row: TimelineRow) {
+    detailRow = row;
+    detailOpen = true;
+  }
 
   $: ({ instanceId } = $runtime);
 
@@ -77,6 +92,22 @@
 
   // First conversion row carries the order summary (number, revenue, ts).
   $: summary = rows.find((r) => r.row_type === "conversion") ?? rows[0];
+
+  // Timeline view: group resolver_evidence rows under their parent touchpoint
+  // by activity_id; surface behavior/touchpoint/conversion at the top level.
+  $: evidenceByTouchpoint = (() => {
+    const map = new Map<string, TimelineRow[]>();
+    for (const r of rows) {
+      if (r.row_type === "resolver_evidence" && r.activity_id) {
+        const arr = map.get(r.activity_id) ?? [];
+        arr.push(r);
+        map.set(r.activity_id, arr);
+      }
+    }
+    return map;
+  })();
+
+  $: visibleRows = rows.filter((r) => r.row_type !== "resolver_evidence");
 
   function fmtDateTime(iso: string | undefined): string {
     if (!iso) return "—";
@@ -163,10 +194,56 @@
         </div>
       {/if}
 
-      <OrderPathGraph {rows} winnerColumn={winnerColumnFor(attributionModel)} />
+      <div class="tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          class:active={view === "graph"}
+          aria-selected={view === "graph"}
+          on:click={() => (view = "graph")}
+        >
+          Path graph
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          class:active={view === "timeline"}
+          aria-selected={view === "timeline"}
+          on:click={() => (view = "timeline")}
+        >
+          Timeline
+        </button>
+      </div>
+
+      {#if view === "graph"}
+        <OrderPathGraph
+          {rows}
+          winnerColumn={winnerColumnFor(attributionModel)}
+          onSelectRow={openDetail}
+        />
+      {:else}
+        <div class="timeline-wrap">
+          <ul class="timeline">
+            {#each visibleRows as row (row.row_type + ":" + (row.activity_id ?? "") + ":" + (row.event_ts ?? "") + ":" + (row.event_type ?? ""))}
+              <OrderTimelineRowComponent
+                {row}
+                evidence={row.row_type === "attribution_touchpoint" &&
+                row.activity_id
+                  ? (evidenceByTouchpoint.get(row.activity_id) ?? [])
+                  : []}
+                onSelect={openDetail}
+              />
+            {/each}
+          </ul>
+        </div>
+      {/if}
     {/if}
   </Dialog.Content>
 </Dialog.Root>
+
+<OrderEventDetailModal bind:open={detailOpen} row={detailRow} />
 
 <style>
   .state {
@@ -247,5 +324,63 @@
   .sep {
     margin: 0 2px;
     color: var(--color-text-muted, #9ca3af);
+  }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin: 10px 0 0 0;
+    border-bottom: 1px solid var(--color-bratrax-border, #e5e7eb);
+  }
+  .tab {
+    appearance: none;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 6px 12px;
+    font-family: "Space Mono", "JetBrains Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--color-text-muted, #6b7280);
+    cursor: pointer;
+  }
+  .tab:hover {
+    color: var(--color-text, #1a1a18);
+  }
+  .tab.active {
+    color: var(--color-text, #1a1a18);
+    border-bottom-color: var(--color-acid, #d4ff00);
+  }
+  .timeline-wrap {
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 4px;
+    margin-top: 8px;
+  }
+  .timeline {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  :global(.dark) .tabs {
+    border-bottom-color: #2e2e2e;
+  }
+  :global(.dark) .tab {
+    color: #a39d90;
+  }
+  :global(.dark) .tab:hover,
+  :global(.dark) .tab.active {
+    color: #ece7dd;
+  }
+  /* Banner text: same dialog theme-boundary pinning as the nodes/timeline. */
+  :global(.dark) .banner-line {
+    color: #ece7dd;
+  }
+  :global(.dark) .banner-label,
+  :global(.dark) .banner-sub,
+  :global(.dark) .reason {
+    color: #a39d90;
   }
 </style>

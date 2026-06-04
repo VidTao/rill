@@ -11,13 +11,24 @@
 // ordering and edge routing; we then snap each node's Y into its source's lane
 // band so the sources read as parallel swimlanes. The conversion node is pinned
 // to the far right, vertically centered across the lanes.
+//
+// Compact mode (the default): low-signal noise is collapsed so a long journey
+// stays readable. Runs of >= 2 consecutive behavior events in a lane fold into
+// one "x N views" chip (click to expand); behavior events render as small chips
+// while touchpoints and the conversion stay full cards. Passing compact=false
+// reproduces the original "every row is a full card" layout.
 
 import { graphlib, layout as dagreLayout } from "@dagrejs/dagre";
 import { Position, type Edge, type Node } from "@xyflow/svelte";
 import { formatOrderLabel } from "./api";
 import type { OrderTimelineRow } from "./types";
 
-export type PathNodeKind = "behavior" | "touchpoint" | "conversion" | "lane";
+export type PathNodeKind =
+  | "behavior"
+  | "touchpoint"
+  | "conversion"
+  | "collapsed"
+  | "lane";
 
 export interface PathNodeData {
   // Index signature required by @xyflow/svelte's Node<T extends Record<...>>.
@@ -32,10 +43,16 @@ export interface PathNodeData {
   ts?: string;
   isWinner: boolean;
   laneIndex: number;
+  // Render this node as a small chip rather than a full card.
+  compact?: boolean;
   // Lane-label nodes only: how many steps are in this lane.
   laneCount?: number;
+  // Collapsed nodes only: the folded rows + a stable id used to expand them.
+  count?: number;
+  rows?: OrderTimelineRow[];
+  runId?: string;
   // The underlying timeline row, for the click-through detail modal. Absent on
-  // lane-label nodes (they aren't clickable).
+  // lane-label and collapsed nodes (which expand instead of opening detail).
   row?: OrderTimelineRow;
 }
 
@@ -44,12 +61,26 @@ export interface OrderPathLayout {
   edges: Edge[];
   width: number;
   height: number;
+  // Nodes the initial view should frame (winner + conversion). Lets the graph
+  // land readable on the decisive end of a long journey instead of fitting all.
+  focusNodeIds: string[];
+  // Count of real (non lane-label) nodes — drives the fit-all vs focus choice.
+  nodeCount: number;
+}
+
+export interface BuildLayoutOptions {
+  // Collapse low-signal runs + render behavior events as chips. Default true.
+  compact?: boolean;
+  // Run ids the user has expanded back into individual nodes.
+  expandedRuns?: Set<string>;
 }
 
 // Node + lane geometry. Kept here (not in the component) so Dagre and the
 // rendered nodes agree on sizing.
 const NODE_W = 248;
 const NODE_H = 104;
+const CHIP_W = 158;
+const CHIP_H = 46;
 const LANE_V_GAP = 44;
 const LANE_BAND = NODE_H + LANE_V_GAP;
 const LABEL_W = 160;
@@ -115,43 +146,73 @@ function fmtMoney(n: number | undefined): string | undefined {
   });
 }
 
-function nodeDataFor(
+function touchpointNodeData(
   row: OrderTimelineRow,
   source: string,
   laneIndex: number,
   isWinner: boolean,
 ): PathNodeData {
-  const sourceLabel = humanizeSource(source);
-  if (row.row_type === "attribution_touchpoint") {
-    const subtitle =
-      [row.channel_group, row.campaign, row.adset, row.ad]
-        .filter((v): v is string => !!v && v.length > 0)
-        .join(" / ") ||
-      row.referrer ||
-      undefined;
-    return {
-      kind: "touchpoint",
-      source,
-      sourceLabel,
-      title: row.channel_group || row.event_type || "Touchpoint",
-      subtitle,
-      ts: row.event_ts,
-      isWinner,
-      laneIndex,
-      row,
-    };
-  }
-  // behavior_event
+  const subtitle =
+    [row.channel_group, row.campaign, row.adset, row.ad]
+      .filter((v): v is string => !!v && v.length > 0)
+      .join(" / ") ||
+    row.referrer ||
+    undefined;
+  return {
+    kind: "touchpoint",
+    source,
+    sourceLabel: humanizeSource(source),
+    title: row.channel_group || row.event_type || "Touchpoint",
+    subtitle,
+    ts: row.event_ts,
+    isWinner,
+    laneIndex,
+    row,
+  };
+}
+
+function behaviorNodeData(
+  row: OrderTimelineRow,
+  source: string,
+  laneIndex: number,
+  compact: boolean,
+): PathNodeData {
   return {
     kind: "behavior",
     source,
-    sourceLabel,
+    sourceLabel: humanizeSource(source),
     title: row.event_type || "Event",
     subtitle: row.url || row.referrer || undefined,
     ts: row.event_ts,
     isWinner: false,
     laneIndex,
+    compact,
     row,
+  };
+}
+
+function collapsedNodeData(
+  run: OrderTimelineRow[],
+  runId: string,
+  source: string,
+  laneIndex: number,
+): PathNodeData {
+  const types = new Set(
+    run.map((r) => r.event_type).filter((t): t is string => !!t),
+  );
+  const noun = types.size === 1 ? [...types][0] : "events";
+  return {
+    kind: "collapsed",
+    source,
+    sourceLabel: humanizeSource(source),
+    title: `${run.length} × ${noun}`,
+    ts: run[0].event_ts,
+    isWinner: false,
+    laneIndex,
+    compact: true,
+    count: run.length,
+    rows: run,
+    runId,
   };
 }
 
@@ -168,17 +229,62 @@ function makeEdge(source: string, target: string, winner: boolean): Edge {
   } as Edge;
 }
 
+// One emitted step in a lane: either a single row or a collapsed run.
+type LaneItem =
+  | { row: OrderTimelineRow }
+  | { run: OrderTimelineRow[]; runId: string };
+
+// Walk a lane's rows and decide which become individual nodes vs collapsed
+// runs. Non-compact mode never collapses; compact mode folds maximal runs of
+// >= 2 consecutive behavior events (unless the user expanded that run).
+function laneItems(
+  lane: OrderTimelineRow[],
+  laneIndex: number,
+  compact: boolean,
+  expandedRuns: Set<string>,
+): LaneItem[] {
+  if (!compact) return lane.map((row) => ({ row }));
+  const items: LaneItem[] = [];
+  let i = 0;
+  while (i < lane.length) {
+    if (lane[i].row_type !== "behavior_event") {
+      items.push({ row: lane[i] });
+      i++;
+      continue;
+    }
+    let j = i;
+    const run: OrderTimelineRow[] = [];
+    while (j < lane.length && lane[j].row_type === "behavior_event") {
+      run.push(lane[j]);
+      j++;
+    }
+    const runId = `run:${laneIndex}:${run[0].event_ts ?? ""}:${run.length}`;
+    if (run.length >= 2 && !expandedRuns.has(runId)) {
+      items.push({ run, runId });
+    } else {
+      for (const r of run) items.push({ row: r });
+    }
+    i = j;
+  }
+  return items;
+}
+
 /**
  * Build the SvelteFlow nodes/edges for one order's touchpoint paths.
  *
  * @param rows         Timeline rows for the order, already sorted chronologically.
  * @param winnerColumn The `is_*_winner` column matching the active attribution
  *                     model; the touchpoint flagged in that column is the winner.
+ * @param opts         compact (default true) + the set of expanded run ids.
  */
 export function buildOrderPathLayout(
   rows: OrderTimelineRow[],
   winnerColumn: string,
+  opts: BuildLayoutOptions = {},
 ): OrderPathLayout {
+  const compact = opts.compact ?? true;
+  const expandedRuns = opts.expandedRuns ?? new Set<string>();
+
   // Behavior events + touchpoints become path steps; resolver_evidence is
   // omitted and the single conversion row becomes the terminal node.
   const content = rows.filter(
@@ -218,28 +324,48 @@ export function buildOrderPathLayout(
   const nodes: Node<PathNodeData>[] = [];
   const edges: Edge[] = [];
   let idCounter = 0;
+  let winnerNodeId: string | null = null;
 
   laneOrder.forEach((source, laneIndex) => {
     const lane = laneRows.get(source)!;
     let prevId: string | null = null;
     let prevWinner = false;
 
-    for (const row of lane) {
-      const id = `${row.row_type}:${row.activity_id ?? ""}:${row.event_ts ?? ""}:${idCounter++}`;
-      const isWinner =
-        row.row_type === "attribution_touchpoint" &&
-        !!(row as Record<string, unknown>)[winnerColumn];
+    for (const item of laneItems(lane, laneIndex, compact, expandedRuns)) {
+      let id: string;
+      let data: PathNodeData;
+      let isWinner = false;
 
-      g.setNode(id, { width: NODE_W, height: NODE_H });
+      if ("run" in item) {
+        id = item.runId;
+        data = collapsedNodeData(item.run, item.runId, source, laneIndex);
+      } else {
+        const row = item.row;
+        isWinner =
+          row.row_type === "attribution_touchpoint" &&
+          !!(row as Record<string, unknown>)[winnerColumn];
+        data =
+          row.row_type === "attribution_touchpoint"
+            ? touchpointNodeData(row, source, laneIndex, isWinner)
+            : behaviorNodeData(row, source, laneIndex, compact);
+        id = `${row.row_type}:${row.activity_id ?? ""}:${row.event_ts ?? ""}:${idCounter++}`;
+        if (isWinner) winnerNodeId = id;
+      }
+
+      const isCard = data.kind === "touchpoint";
+      const w = isCard ? NODE_W : CHIP_W;
+      const h = isCard ? NODE_H : CHIP_H;
+
+      g.setNode(id, { width: w, height: h });
       nodes.push({
         id,
         type: NODE_TYPE,
         position: { x: 0, y: 0 },
-        width: NODE_W,
-        height: NODE_H,
+        width: w,
+        height: h,
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
-        data: nodeDataFor(row, source, laneIndex, isWinner),
+        data,
       });
 
       if (prevId) {
@@ -281,18 +407,24 @@ export function buildOrderPathLayout(
     });
   }
 
+  const nodeCount = nodes.length;
+
   dagreLayout(g);
 
   // Keep Dagre's X (step ordering) but snap Y into lane bands so the sources
-  // render as parallel swimlanes.
+  // render as parallel swimlanes. Chips are shorter than cards, so center each
+  // node vertically within its band.
   let contentMaxX = 0;
   let contentMinX = Number.POSITIVE_INFINITY;
   for (const n of nodes) {
     if (n.id === CONVERSION_ID) continue;
     const dn = g.node(n.id);
-    const x = (dn?.x ?? 0) - NODE_W / 2;
-    n.position = { x, y: n.data.laneIndex * LANE_BAND };
-    contentMaxX = Math.max(contentMaxX, x + NODE_W);
+    const w = n.width ?? NODE_W;
+    const h = n.height ?? NODE_H;
+    const x = (dn?.x ?? 0) - w / 2;
+    const y = n.data.laneIndex * LANE_BAND + (NODE_H - h) / 2;
+    n.position = { x, y };
+    contentMaxX = Math.max(contentMaxX, x + w);
     contentMinX = Math.min(contentMinX, x);
   }
   if (!Number.isFinite(contentMinX)) contentMinX = 0;
@@ -328,6 +460,10 @@ export function buildOrderPathLayout(
     });
   });
 
+  const focusNodeIds = [winnerNodeId, conversion ? CONVERSION_ID : null].filter(
+    (id): id is string => !!id,
+  );
+
   const rightEdge = conversionNode
     ? conversionNode.position.x + NODE_W
     : contentMaxX;
@@ -336,5 +472,7 @@ export function buildOrderPathLayout(
     edges,
     width: rightEdge - labelX,
     height: Math.max(LANE_BAND, laneOrder.length * LANE_BAND),
+    focusNodeIds,
+    nodeCount,
   };
 }
