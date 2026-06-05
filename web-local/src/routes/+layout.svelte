@@ -135,10 +135,18 @@
             </svelte:fragment>
           </ApplicationHeader>
           {#if isViewer}
-            <!-- Viewers never onboard; give them Help only (previously no nav). -->
+            <!-- Viewers never onboard. Dashboards + Help only, so a viewer who
+                 clicks into Help can navigate back to their dashboards. -->
             <nav
               class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0"
             >
+              <a
+                href="/developer"
+                class="bratrax-nav-link"
+                class:active={!onHelpPage}
+              >
+                Dashboards
+              </a>
               <a
                 href="/help"
                 class="bratrax-nav-link"

@@ -58,6 +58,8 @@
 
   // Bratrax: only super_admin sees the Canvas configurations panel.
   $: isSuperAdmin = $bratraxUser?.role === "super_admin";
+  // Bratrax: viewers can open dashboards but must not rename them.
+  $: isViewer = $bratraxUser?.role === "viewer";
   $: isCanvasWorkspace = workspace === CanvasWorkspace;
 
   $: resourceQuery = getResource(queryClient, instanceId);
@@ -103,7 +105,11 @@
     {#if $generatingCanvas}
       <GeneratingMessage title="Generating your Canvas dashboard..." />
     {:else if isCanvasWorkspace}
-      <CanvasWorkspace {fileArtifact} showPageEditor={isSuperAdmin} />
+      <CanvasWorkspace
+        {fileArtifact}
+        showPageEditor={isSuperAdmin}
+        editable={!isViewer}
+      />
     {:else if workspace}
       <svelte:component this={workspace} {fileArtifact} />
     {:else}

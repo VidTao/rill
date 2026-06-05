@@ -28,6 +28,9 @@
   // Bratrax: pass-through for the page-level Canvas configurations panel
   // visibility (set false for non-super_admin in web-local).
   export let showPageEditor: boolean = true;
+  // Bratrax: pass-through to disable the rename pencil in the header
+  // (set false for viewers in web-local).
+  export let editable: boolean = true;
 
   let canvasName: string;
   let selectedView: "split" | "code" | "viz";
@@ -94,6 +97,7 @@
       <WorkspaceHeader
         slot="header"
         {filePath}
+        {editable}
         resource={data}
         hasUnsavedChanges={$hasUnsavedChanges}
         titleInput={fileName}

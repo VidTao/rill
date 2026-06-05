@@ -10,10 +10,7 @@
   import ChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/ChatToggle.svelte";
   import { themeControl } from "@rilldata/web-common/features/themes/theme-control";
   import { getBreadcrumbOptions } from "@rilldata/web-common/features/dashboards/dashboard-utils";
-  import {
-    useValidCanvases,
-    useValidExplores,
-  } from "@rilldata/web-common/features/dashboards/selectors.js";
+  import { useValidCanvases } from "@rilldata/web-common/features/dashboards/selectors.js";
   import ExplorePreviewCTAs from "@rilldata/web-common/features/explores/ExplorePreviewCTAs.svelte";
   import { featureFlags } from "@rilldata/web-common/features/feature-flags.ts";
   import { useProjectTitle } from "@rilldata/web-common/features/project/selectors";
@@ -50,17 +47,17 @@
   $: onDeployPage = isDeployPage($page);
   $: showDeveloperChat = $developerChat && !onDeployPage;
 
-  $: exploresQuery = useValidExplores(instanceId);
   $: canvasQuery = useValidCanvases(instanceId);
   $: projectTitleQuery = useProjectTitle(instanceId);
 
   $: projectTitle = $projectTitleQuery?.data ?? "Untitled Bratrax Project";
 
-  $: explores = $exploresQuery?.data ?? [];
   $: canvases = $canvasQuery?.data ?? [];
 
+  // Bratrax: "Dashboards" means Canvas dashboards only. Auto-generated Explore
+  // dashboards are excluded from the Preview breadcrumb dropdown.
   $: dashboardOptions = {
-    options: getBreadcrumbOptions(explores, canvases),
+    options: getBreadcrumbOptions([], canvases),
     carryOverSearchParams: $stickyDashboardState,
   } satisfies PathOptions;
 
@@ -97,7 +94,7 @@
     <Tag text={roleLabel ?? mode} color="gray"></Tag>
 
     {#if mode === "Preview"}
-      {#if $exploresQuery?.data}
+      {#if $canvasQuery?.data}
         <Breadcrumbs {pathParts} {currentPath} />
       {/if}
     {/if}
@@ -108,7 +105,7 @@
       {#if route.id?.includes("explore")}
         <ExplorePreviewCTAs exploreName={dashboardName} />
       {:else if route.id?.includes("canvas")}
-        <CanvasPreviewCTAs canvasName={dashboardName} />
+        <CanvasPreviewCTAs />
       {/if}
     {:else if showDeveloperChat}
       <slot name="header-extras" />
