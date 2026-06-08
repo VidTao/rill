@@ -90,7 +90,6 @@
             <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Sent</th>
             <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Template</th>
             <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Kind</th>
-            <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Subject</th>
             <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Status</th>
             <th class="py-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Opens</th>
             <th class="py-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px]">Clicks</th>
@@ -105,7 +104,6 @@
               <td class="py-2 pr-3 text-bratrax-text-primary">{fmt(e.sent_at)}</td>
               <td class="py-2 pr-3 text-bratrax-text-primary">{e.template_key}</td>
               <td class="py-2 pr-3 text-bratrax-text-muted">{e.kind}</td>
-              <td class="py-2 pr-3 text-bratrax-text-primary">{e.subject || "—"}</td>
               <td class="py-2 pr-3 font-bold {statusBadge(e.status)}">{e.status}</td>
               <td class="py-2 pr-3 text-bratrax-text-primary">{e.open_count}</td>
               <td class="py-2 text-bratrax-text-primary">{e.click_count}</td>
