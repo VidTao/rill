@@ -485,7 +485,21 @@ func (r *ModelReconciler) reconcileExternal(ctx context.Context, self *runtimev1
 	if err := r.C.UpdateState(ctx, self.Meta.Name, self); err != nil {
 		return runtime.ReconcileResult{Err: err}
 	}
-	return runtime.ReconcileResult{}
+
+	// External models reference a table Bratrax owns and refreshes out-of-band
+	// (hourly ClickHouse refreshable MVs). Without a retrigger the resource goes
+	// IDLE forever, so State.RefreshedOn — and the metrics-view time-range cache
+	// keyed on it — freezes at the value computed when Rill last reconciled. That
+	// pins dashboard relative ranges ("Today", "Last 7 days") to startup time. If
+	// the model declares a refresh schedule, re-reconcile on it: each run stamps a
+	// fresh RefreshedOn above, which cascades to recompute the watermark. When no
+	// schedule is set, nextRefreshTime returns a zero time and behaviour is
+	// unchanged (reconcile once, then IDLE).
+	refreshOn, err := nextRefreshTime(model.State.RefreshedOn.AsTime(), model.Spec.RefreshSchedule)
+	if err != nil {
+		return runtime.ReconcileResult{Err: err}
+	}
+	return runtime.ReconcileResult{Retrigger: refreshOn}
 }
 
 func (r *ModelReconciler) ResolveTransitiveAccess(ctx context.Context, claims *runtime.SecurityClaims, res *runtimev1.Resource) ([]*runtimev1.SecurityRule, error) {
