@@ -17,7 +17,7 @@ import {
   getOnboardResumeRoute,
   getOnboardRouteIndex,
 } from "$lib/bratrax/onboarding/api";
-import { getChecklist, hasIncompleteSetup } from "$lib/bratrax/onboarding/checklist";
+import { getChecklist } from "$lib/bratrax/onboarding/checklist";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient.js";
 import {
   getRuntimeServiceListFilesQueryKey,
@@ -189,33 +189,20 @@ export async function load({ url, depends, untrack, fetch }) {
 
     // -------- Onboarding checklist (Project C) --------
     // Sits on top of the funnel: only relevant once step === 'ready'.
-    if (me?.step === "ready") {
-      const isAdminRole = user.role === "admin" || user.role === "super_admin";
-      // Admins land on the checklist when setup is unfinished and not dismissed.
-      // Gated on the default post-login landing (/developer) ONLY — so clicking
-      // a checklist action that navigates to /settings, /connectors, /cost-
-      // settings, or a dashboard is never bounced back into the checklist.
-      if (isAdminRole && url.pathname === "/developer") {
-        try {
-          const checklist = await getChecklist();
-          if (!checklist.checklist_dismissed && hasIncompleteSetup(checklist)) {
-            throw redirect(307, "/onboarding");
-          }
-        } catch (err) {
-          if (err && typeof err === "object" && "status" in err && "location" in err) {
-            throw err; // propagate the redirect
-          }
-          // Checklist fetch failed — don't block the landing.
-        }
-      }
+    //
+    // NOTE: admins are deliberately NOT auto-redirected to /onboarding. The
+    // checklist is opt-in — reachable via the "Continue setup" user-menu link
+    // and surfaced by the dashboards banner (only when data isn't flowing).
+    // A forced redirect hijacked every already-`ready` workspace on login,
+    // because optional items (COGS, Anthropic key, Klaviyo, …) are perpetually
+    // `todo`; that was wrong.
+    if (me?.step === "ready" && isViewer) {
       // Viewers see a one-time welcome-card overlay (no redirect).
-      if (isViewer) {
-        try {
-          const checklist = await getChecklist();
-          bratraxShowWelcomeCard.set(!checklist.welcome_card_dismissed);
-        } catch {
-          bratraxShowWelcomeCard.set(false);
-        }
+      try {
+        const checklist = await getChecklist();
+        bratraxShowWelcomeCard.set(!checklist.welcome_card_dismissed);
+      } catch {
+        bratraxShowWelcomeCard.set(false);
       }
     }
   } catch (e) {

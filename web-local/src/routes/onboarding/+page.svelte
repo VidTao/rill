@@ -116,7 +116,13 @@
 
 <style>
   .page {
-    min-height: 100vh;
+    /* The root layout renders this inside a `h-screen overflow-hidden
+       flex flex-col` container. Take the remaining vertical space and scroll
+       internally (min-height:0 lets a flex child shrink below content size so
+       overflow-y actually engages). */
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
     background: var(--color-bg);
     padding: 40px 24px 80px;
   }

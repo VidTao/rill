@@ -119,31 +119,40 @@ export function dismissWelcome(): Promise<{ ok: boolean }> {
 // Shared derivations used by the page, banner, and routing guard.
 // ---------------------------------------------------------------------------
 
-/** Section keys that make up "Sections 1+2" (gate the dashboards banner). */
-const CORE_SECTION_KEYS = ["connect_data", "configure_business"];
-
-/** Section keys 1–3 (gate the auto-redirect to /onboarding for admins). */
-const SETUP_SECTION_KEYS = ["connect_data", "configure_business", "paid_media_tracking"];
+// Items whose absence means data genuinely isn't flowing yet. EVERYTHING else
+// on the checklist (COGS, timezone, Anthropic key, Klaviyo, shipping, expenses,
+// tracking templates, the "first look" items, invite teammate) is
+// finish-at-leisure and lives on the checklist page — it must NOT nag an
+// already-`ready` workspace via the dashboards banner. Without this scoping the
+// banner fired for every established client, because optional items are
+// perpetually `todo`.
+const DATA_BLOCKING_KEYS = ["connect_shopify"];
 
 function itemIsResolved(item: ChecklistItem): boolean {
   // Skipped and done both count as "no longer outstanding".
   return item.status === "done" || item.status === "skipped";
 }
 
-function sectionsIncomplete(result: ChecklistResult, sectionKeys: string[]): boolean {
-  return result.sections
-    .filter((s) => sectionKeys.includes(s.key))
-    .some((s) => s.items.some((i) => !itemIsResolved(i)));
+function itemsByKey(result: ChecklistResult): Map<string, ChecklistItem> {
+  const map = new Map<string, ChecklistItem>();
+  for (const section of result.sections) {
+    for (const item of section.items) map.set(item.key, item);
+  }
+  return map;
 }
 
-/** True when any Section 1–3 item is still outstanding (admin redirect rule). */
-export function hasIncompleteSetup(result: ChecklistResult): boolean {
-  return sectionsIncomplete(result, SETUP_SECTION_KEYS);
-}
-
-/** True when Sections 1+2 aren't both fully resolved (dashboards banner rule). */
+/**
+ * True only when a data-blocking item (e.g. Shopify not connected) is
+ * outstanding. Gates the dashboards banner. A fully-onboarded (`ready`)
+ * workspace has Shopify connected, so this is false for them — the banner
+ * never nags about optional polish.
+ */
 export function coreSetupIncomplete(result: ChecklistResult): boolean {
-  return sectionsIncomplete(result, CORE_SECTION_KEYS);
+  const byKey = itemsByKey(result);
+  return DATA_BLOCKING_KEYS.some((key) => {
+    const item = byKey.get(key);
+    return !!item && !itemIsResolved(item);
+  });
 }
 
 /** Count of resolved vs total items across all sections (progress bar). */
