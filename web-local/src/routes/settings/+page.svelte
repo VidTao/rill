@@ -449,6 +449,12 @@
 
   // ---------------------------------------------------------------------------
   onMount(async () => {
+    // Honor ?tab= deep-links (e.g. the onboarding checklist links here with
+    // ?tab=ai / ?tab=team / ?tab=account).
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && TABS.some((t) => t.id === requested)) {
+      activeTab = requested as TabId;
+    }
     await Promise.all([loadAccount(), loadTeam(), loadBilling(), loadAI(), loadMCP()]);
   });
 </script>

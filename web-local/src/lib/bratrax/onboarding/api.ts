@@ -5,7 +5,7 @@ function getBaseUrl(): string {
   return get(runtime).host;
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${getBaseUrl()}${path}`, {
     credentials: "include",
     ...init,

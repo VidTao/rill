@@ -32,11 +32,16 @@
     bratraxUser,
     bratraxOnboarded,
     bratraxOnboardResumeRoute,
+    bratraxShowWelcomeCard,
+    bratraxViewerMidOnboarding,
   } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
   import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
   import AddStoreButton from "$lib/bratrax/AddStoreButton.svelte";
   import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
+  import ChecklistBanner from "$lib/bratrax/onboarding/ChecklistBanner.svelte";
+  import WelcomeCard from "$lib/bratrax/onboarding/WelcomeCard.svelte";
+  import MidOnboardingViewer from "$lib/bratrax/onboarding/MidOnboardingViewer.svelte";
 
   export let data: LayoutData;
 
@@ -124,6 +129,9 @@
             {mode}
             externalUser={$bratraxUser}
             onLogout={handleBratraxLogout}
+            onboardingLink={isViewer
+              ? { href: "/onboarding", label: "First things to try" }
+              : { href: "/onboarding", label: "Continue setup" }}
           >
             <svelte:fragment slot="header-extras">
               {#if isSuper || isMultiStore}
@@ -251,9 +259,15 @@
               </a>
             </nav>
           {/if}
+
+          <ChecklistBanner />
         {/if}
 
-        <slot />
+        {#if $bratraxViewerMidOnboarding && !onHelpPage}
+          <MidOnboardingViewer />
+        {:else}
+          <slot />
+        {/if}
       </div>
     </OrderDrilldownProvider>
   </FileAndResourceWatcher>
@@ -278,6 +292,10 @@
 {/if}
 
 <NotificationCenter />
+
+{#if $bratraxShowWelcomeCard}
+  <WelcomeCard />
+{/if}
 
 <style>
   /* Prevent trackpad navigation (like other code editors, like vscode.dev). */

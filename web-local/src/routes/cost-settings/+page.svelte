@@ -101,7 +101,15 @@
     }
   }
 
-  onMount(loadAll);
+  onMount(() => {
+    // Honor ?tab= deep-links (the onboarding checklist links here with
+    // ?tab=cogs / ?tab=shipping / ?tab=expenses).
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && tabs.some((t) => t.id === requested)) {
+      activeTab = requested as CostTab;
+    }
+    void loadAll();
+  });
 
   // --- COGS handlers ---
 

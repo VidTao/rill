@@ -23,6 +23,7 @@
   export let mode: string;
   export let externalUser: { email: string; name: string; role?: string } | null = null;
   export let onLogout: (() => void) | null = null;
+  export let onboardingLink: { href: string; label: string } | null = null;
 
   // If externalUser has a role, show a friendly role label instead of the dev/preview mode.
   $: roleLabel =
@@ -134,7 +135,7 @@
       </button>
       <ChatToggle />
     {/if}
-    <LocalAvatarButton {externalUser} {onLogout} />
+    <LocalAvatarButton {externalUser} {onLogout} {onboardingLink} />
   </div>
 </header>
 

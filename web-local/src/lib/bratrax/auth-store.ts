@@ -12,3 +12,10 @@ export const bratraxOnboarded = writable<boolean>(true);
 // onboarded). Lets the minimal nav offer a "Return to onboarding" link so
 // Settings/Help aren't a dead-end mid-flow.
 export const bratraxOnboardResumeRoute = writable<string | null>(null);
+// Viewer-only: render the one-time welcome-card overlay (set by the layout
+// guard when role === 'viewer' and the card hasn't been dismissed yet).
+export const bratraxShowWelcomeCard = writable<boolean>(false);
+// Viewer-only: their workspace is still mid-onboarding (step !== 'ready').
+// The layout renders a placeholder instead of dashboards; viewers can't fix
+// anything themselves, so they must never be sent into the /onboard/* funnel.
+export const bratraxViewerMidOnboarding = writable<boolean>(false);

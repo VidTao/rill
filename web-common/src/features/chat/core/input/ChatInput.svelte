@@ -10,6 +10,40 @@
   import type { ChatConfig } from "@rilldata/web-common/features/chat/core/types.ts";
   import Button from "@rilldata/web-common/components/button/Button.svelte";
   import { ArrowUp } from "lucide-svelte";
+  import { get } from "svelte/store";
+  import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+
+  // Bratrax onboarding checklist (Section 4): mark "Ask the AI a question" the
+  // first time the user sends a chat message. Best-effort, fires once per
+  // browser; no-ops harmlessly on non-Bratrax deployments (404 swallowed).
+  function markAskedAi(): void {
+    const guard = "bratrax_automark_asked_ai_a_question";
+    try {
+      if (localStorage.getItem(guard)) return;
+    } catch {
+      // localStorage unavailable; fall through.
+    }
+    try {
+      void fetch(`${get(runtime).host}/bratrax/onboard/checklist/auto-mark`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_key: "asked_ai_a_question" }),
+      })
+        .then(() => {
+          try {
+            localStorage.setItem(guard, "1");
+          } catch {
+            // ignore
+          }
+        })
+        .catch(() => {
+          // best-effort
+        });
+    } catch {
+      // best-effort
+    }
+  }
 
   export let conversationManager: ConversationManager;
   export let onSend: (() => void) | undefined = undefined;
@@ -49,6 +83,7 @@
         onStreamStart: () => editor.commands.setContent(""),
       });
       onSend?.();
+      markAskedAi();
     } catch (error) {
       console.error("Failed to send message:", error);
     }

@@ -18,9 +18,16 @@
   import OrderPathGraph from "./OrderPathGraph.svelte";
   import OrderTimelineRowComponent from "./OrderTimelineRow.svelte";
   import type { OrderTimelineRow as TimelineRow } from "./types";
+  import { autoMarkOnce } from "$lib/bratrax/onboarding/checklist";
 
   export let open = false;
   export let orderId: string;
+
+  // Onboarding checklist (Section 4): mark "Drill into one order's customer
+  // journey" the first time this modal opens for an order. Best-effort, once.
+  $: if (open && orderId) {
+    autoMarkOnce("drilled_into_customer_journey");
+  }
   // Attribution model from the parent cell — picks which `is_*_winner` flag
   // selects the winning touchpoint for the banner. Defaults to last_touch
   // to match the dashboard's default filter.

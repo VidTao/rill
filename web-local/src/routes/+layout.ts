@@ -9,12 +9,15 @@ import {
   bratraxAuthChecked,
   bratraxOnboarded,
   bratraxOnboardResumeRoute,
+  bratraxShowWelcomeCard,
+  bratraxViewerMidOnboarding,
 } from "$lib/bratrax/auth-store";
 import {
   onboardMe,
   getOnboardResumeRoute,
   getOnboardRouteIndex,
 } from "$lib/bratrax/onboarding/api";
+import { getChecklist, hasIncompleteSetup } from "$lib/bratrax/onboarding/checklist";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient.js";
 import {
   getRuntimeServiceListFilesQueryKey,
@@ -142,7 +145,12 @@ export async function load({ url, depends, untrack, fetch }) {
     //   ready users get bounced to /developer mid-OAuth and the
     //   AccountSelectionModal never opens. See the full new-connector
     //   cascade in docs/lite/CLAUDE.md ("Adding a new OAuth connector").
-    if (me?.step === "ready" && url.pathname.startsWith("/onboard")) {
+    // NOTE: the post-funnel checklist lives at /onboarding, which also matches
+    // startsWith("/onboard"). Scope the funnel bounce to the real funnel paths
+    // (/onboard/*) so a ready admin isn't kicked off their checklist.
+    const isOnboardFunnel =
+      url.pathname === "/onboard" || url.pathname.startsWith("/onboard/");
+    if (me?.step === "ready" && isOnboardFunnel) {
       const isOAuthCallbackBounce =
         (url.pathname.startsWith("/onboard/shopify") ||
           url.pathname.startsWith("/onboard/embed") ||
@@ -154,8 +162,16 @@ export async function load({ url, depends, untrack, fetch }) {
       }
     }
 
+    const isViewer = user.role === "viewer";
+
+    // Viewers never get pushed into the /onboard/* funnel — they can't action
+    // any of it. A mid-onboarding viewer sees a placeholder instead (rendered
+    // by the root layout, gated on this store flag); a ready viewer falls
+    // through to the welcome-card logic below.
+    bratraxViewerMidOnboarding.set(isViewer && me?.step !== "ready");
+
     const target = getOnboardResumeRoute(me?.step);
-    if (target && !isAlwaysAllowed) {
+    if (target && !isAlwaysAllowed && !isViewer) {
       const isHardGate = me?.step ? HARD_GATE_STEPS.has(me.step) : false;
       if (isHardGate) {
         // Must be on the gate page exactly. Anything else bounces back.
@@ -167,6 +183,38 @@ export async function load({ url, depends, untrack, fetch }) {
         const currentIdx = getOnboardRouteIndex(url.pathname);
         if (currentIdx === -1 || currentIdx < targetIdx) {
           throw redirect(307, target);
+        }
+      }
+    }
+
+    // -------- Onboarding checklist (Project C) --------
+    // Sits on top of the funnel: only relevant once step === 'ready'.
+    if (me?.step === "ready") {
+      const isAdminRole = user.role === "admin" || user.role === "super_admin";
+      // Admins land on the checklist when setup is unfinished and not dismissed.
+      // Gated on the default post-login landing (/developer) ONLY — so clicking
+      // a checklist action that navigates to /settings, /connectors, /cost-
+      // settings, or a dashboard is never bounced back into the checklist.
+      if (isAdminRole && url.pathname === "/developer") {
+        try {
+          const checklist = await getChecklist();
+          if (!checklist.checklist_dismissed && hasIncompleteSetup(checklist)) {
+            throw redirect(307, "/onboarding");
+          }
+        } catch (err) {
+          if (err && typeof err === "object" && "status" in err && "location" in err) {
+            throw err; // propagate the redirect
+          }
+          // Checklist fetch failed — don't block the landing.
+        }
+      }
+      // Viewers see a one-time welcome-card overlay (no redirect).
+      if (isViewer) {
+        try {
+          const checklist = await getChecklist();
+          bratraxShowWelcomeCard.set(!checklist.welcome_card_dismissed);
+        } catch {
+          bratraxShowWelcomeCard.set(false);
         }
       }
     }

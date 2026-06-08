@@ -152,6 +152,15 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, n *runtimev1.ResourceNa
 
 	// Handle deletion
 	if self.Meta.DeletedOn != nil {
+		// External models reference a table owned and managed by an out-of-band
+		// pipeline (e.g. the bratrax compile + deploy pipeline owns the ClickHouse
+		// table). Deleting the Rill resource must NEVER drop the underlying table:
+		// State.ResultConnector is populated for external models too, so prevManager
+		// is non-nil and the Delete below would otherwise DROP a table Rill does not
+		// own. Just forget the Rill resource and leave the OLAP untouched.
+		if model.Spec.External {
+			return runtime.ReconcileResult{}
+		}
 		if prevManager != nil {
 			err := r.execSem.Acquire(ctx, 1)
 			if err != nil {
@@ -173,7 +182,10 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, n *runtimev1.ResourceNa
 
 	// Handle renames
 	if self.Meta.RenamedFrom != nil {
-		if prevManager != nil {
+		// External models: the OLAP table name is fixed by output.table, not the Rill
+		// resource name, so a Rill rename must never RENAME the underlying table. Fall
+		// through to reconcileExternal below, which re-points metadata only.
+		if prevManager != nil && !model.Spec.External {
 			// Using a nested scope to ensure the execSem is safely acquired and released.
 			func() {
 				err := r.execSem.Acquire(ctx, 1)

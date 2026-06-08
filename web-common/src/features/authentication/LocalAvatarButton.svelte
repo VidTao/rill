@@ -14,6 +14,9 @@
 
   export let externalUser: { email: string; name: string } | null = null;
   export let onLogout: (() => void) | null = null;
+  // Optional Bratrax onboarding-checklist link (e.g. "Continue setup"). Passed
+  // down from the app layout, which knows the user's role; null hides it.
+  export let onboardingLink: { href: string; label: string } | null = null;
 
   $: user = createLocalServiceGetCurrentUser({
     query: {
@@ -93,6 +96,13 @@
         <div class="px-3 py-1.5 text-xs text-gray-500">
           {externalUser.email}
         </div>
+        <DropdownMenu.Separator />
+      {/if}
+
+      {#if externalUser && onboardingLink}
+        <DropdownMenu.Item href={onboardingLink.href}>
+          {onboardingLink.label}
+        </DropdownMenu.Item>
         <DropdownMenu.Separator />
       {/if}
 
