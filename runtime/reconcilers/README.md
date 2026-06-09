@@ -28,6 +28,17 @@
 - The controller does not call `Reconcile` for resources with cyclic refs. Instead, it immediately sets an error on them. 
 - The controller schedules reconciles of deleted and renamed resources, and waits for them to finish, before scheduling new regular reconciles. It does so in two phases, first letting all deletes finish (resources with `deleted_on != nil`), second letting all renames finish (resources with `renamed_from != nil`).
 
+## External models (`external: true`)
+
+An external model is a metadata-only reference to a pre-existing table on its output connector. Rill does **not** own the table; an out-of-band pipeline (e.g. Bratrax's compile + deploy) creates and refreshes it. `reconcileExternal` only populates `State.ResultConnector` / `ResultTable` / `ResultProperties` from the spec and returns; it never invokes the executor, so no `CREATE` / `DROP` / `RENAME` is issued against the OLAP.
+
+Because `State.ResultConnector` is populated for external models, `prevManager` is non-nil for them just like for materialized models. The deletion (`.Meta.DeletedOn`) and rename (`.Meta.RenamedFrom`) branches in `ModelReconciler.Reconcile` therefore **must** guard on `model.Spec.External`:
+
+- On delete: forget the Rill resource only; never call `prevManager.Delete` (that would `DROP` a table Rill does not own).
+- On rename: never call `prevManager.Rename`; the table name is fixed by `output.table`, not the Rill resource name. Fall through to `reconcileExternal`, which re-points metadata.
+
+Removing these guards makes Rill `DROP`/`RENAME` externally-owned tables whenever a parse marks the resource deleted or renamed (which a routine redeploy can do if a project file is briefly absent or retyped). This caused a production data-loss incident on 2026-06-08, where activity_stream tables were dropped for 7 clients during a deploy.
+
 ## Principles for reconciler development
 
 - The implementation of `Reconcile` should be idempotent
