@@ -40,12 +40,14 @@
   }
 
   onMount(async () => {
-    const role = $bratraxUser?.role ?? null;
-    if (role === "super_admin" || !data.initialized) {
+    if (!data.initialized) {
       redirectChecked = true;
       return;
     }
     // Wait one tick for the canvas query to settle, then redirect.
+    // Every role (super_admin / admin / viewer) lands on the first canvas in
+    // preview mode — same surface they'd reach after onboarding. Edit mode
+    // is reachable from the "Edit" button on the preview header.
     let attempts = 0;
     while (attempts < 20 && $canvasQuery.isLoading) {
       await new Promise((r) => setTimeout(r, 100));
@@ -53,7 +55,7 @@
     }
     const name = firstCanvasName();
     if (name) {
-      await goto(`/files/dashboards/${name}.yaml`);
+      await goto(`/canvas/${name}`);
     } else {
       noDashboardsForRole = true;
       redirectChecked = true;
@@ -65,8 +67,9 @@
   <title>Bratrax Developer</title>
 </svelte:head>
 
-{#if !redirectChecked && $bratraxUser && $bratraxUser.role !== "super_admin" && data.initialized}
-  <!-- Brief hold while we resolve the first dashboard for non-super_admin users. -->
+{#if !redirectChecked && $bratraxUser && data.initialized}
+  <!-- Brief hold while we resolve the first dashboard. Every role lands on
+       /canvas/<name>; this loading state covers the canvas-query tick. -->
   <div class="grid h-full place-items-center text-bratrax-text-muted font-mono text-xs">
     Loading…
   </div>

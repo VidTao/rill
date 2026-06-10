@@ -1,24 +1,15 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import Breadcrumbs from "@rilldata/web-common/components/navigation/breadcrumbs/Breadcrumbs.svelte";
-  import type {
-    PathOption,
-    PathOptions,
-  } from "@rilldata/web-common/components/navigation/breadcrumbs/types";
   import LocalAvatarButton from "@rilldata/web-common/features/authentication/LocalAvatarButton.svelte";
   import CanvasPreviewCTAs from "@rilldata/web-common/features/canvas/CanvasPreviewCTAs.svelte";
   import ChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/ChatToggle.svelte";
   import { themeControl } from "@rilldata/web-common/features/themes/theme-control";
-  import { getBreadcrumbOptions } from "@rilldata/web-common/features/dashboards/dashboard-utils";
-  import { useValidCanvases } from "@rilldata/web-common/features/dashboards/selectors.js";
   import ExplorePreviewCTAs from "@rilldata/web-common/features/explores/ExplorePreviewCTAs.svelte";
   import { featureFlags } from "@rilldata/web-common/features/feature-flags.ts";
-  import { useProjectTitle } from "@rilldata/web-common/features/project/selectors";
   import { isDeployPage } from "@rilldata/web-common/layout/navigation/route-utils";
-  import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import Tag from "../components/tag/Tag.svelte";
 
-  const { developerChat, stickyDashboardState } = featureFlags;
+  const { developerChat } = featureFlags;
 
   export let mode: string;
   export let externalUser: { email: string; name: string; role?: string } | null = null;
@@ -35,7 +26,9 @@
           ? "Viewer"
           : null;
 
-  $: ({ instanceId } = $runtime);
+  // Drives the Edit button in CanvasPreviewCTAs. Viewers don't see it.
+  $: isAdminOrSuper =
+    externalUser?.role === "admin" || externalUser?.role === "super_admin";
 
   $: ({
     params: { name: dashboardName },
@@ -47,34 +40,6 @@
   $: themePreference = themeControl.preference;
   $: onDeployPage = isDeployPage($page);
   $: showDeveloperChat = $developerChat && !onDeployPage;
-
-  $: canvasQuery = useValidCanvases(instanceId);
-  $: projectTitleQuery = useProjectTitle(instanceId);
-
-  $: projectTitle = $projectTitleQuery?.data ?? "Untitled Bratrax Project";
-
-  $: canvases = $canvasQuery?.data ?? [];
-
-  // Bratrax: "Dashboards" means Canvas dashboards only. Auto-generated Explore
-  // dashboards are excluded from the Preview breadcrumb dropdown.
-  $: dashboardOptions = {
-    options: getBreadcrumbOptions([], canvases),
-    carryOverSearchParams: $stickyDashboardState,
-  } satisfies PathOptions;
-
-  $: projectPath = <PathOption>{
-    label: projectTitle,
-    section: "project",
-    depth: -1,
-    href: "/",
-  };
-
-  $: pathParts = [
-    { options: new Map([[projectTitle.toLowerCase(), projectPath]]) },
-    dashboardOptions,
-  ];
-
-  $: currentPath = [projectTitle, dashboardName?.toLowerCase()];
 </script>
 
 <header class:border-b={!onDeployPage} class="bg-surface-base">
@@ -93,23 +58,26 @@
     </a>
 
     <Tag text={roleLabel ?? mode} color="gray"></Tag>
-
-    {#if mode === "Preview"}
-      {#if $canvasQuery?.data}
-        <Breadcrumbs {pathParts} {currentPath} />
-      {/if}
-    {/if}
   {/if}
 
+  <!-- Bratrax tabs (DASHBOARDS / CONNECTORS / …) slot into the header from
+       the root layout, sitting between the role tag and the right-side CTAs.
+       The ml-8 gives breathing room after the role tag. -->
+  <div class="ml-8 h-full flex items-center">
+    <slot name="nav-tabs" />
+  </div>
+
   <div class="ml-auto flex gap-x-2 h-full w-fit items-center py-2">
+    <!-- Bratrax header-extras (ClientSwitcher for super_admins, AddStoreButton
+         for multi-store) render in both preview and dev/edit modes. -->
+    <slot name="header-extras" />
     {#if mode === "Preview"}
       {#if route.id?.includes("explore")}
         <ExplorePreviewCTAs exploreName={dashboardName} />
       {:else if route.id?.includes("canvas")}
-        <CanvasPreviewCTAs />
+        <CanvasPreviewCTAs {isAdminOrSuper} />
       {/if}
     {:else if showDeveloperChat}
-      <slot name="header-extras" />
       <button
         type="button"
         on:click={() =>

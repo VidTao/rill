@@ -56,8 +56,10 @@
 
   $: workspace = workspaces.get(resourceKind ?? $inferredResourceKind);
 
-  // Bratrax: only super_admin sees the Canvas configurations panel.
-  $: isSuperAdmin = $bratraxUser?.role === "super_admin";
+  // Bratrax: admins + super_admins see the Canvas configurations panel
+  // (Inspector with metrics config + page editor). Viewers don't.
+  $: isAdminOrSuper =
+    $bratraxUser?.role === "admin" || $bratraxUser?.role === "super_admin";
   // Bratrax: viewers can open dashboards but must not rename them.
   $: isViewer = $bratraxUser?.role === "viewer";
   $: isCanvasWorkspace = workspace === CanvasWorkspace;
@@ -107,7 +109,7 @@
     {:else if isCanvasWorkspace}
       <CanvasWorkspace
         {fileArtifact}
-        showPageEditor={isSuperAdmin}
+        showPageEditor={isAdminOrSuper}
         editable={!isViewer}
       />
     {:else if workspace}

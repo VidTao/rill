@@ -54,7 +54,9 @@
     </div>
   </aside>
 {:else if keySet}
-  <DeveloperChat />
+  <slot>
+    <DeveloperChat />
+  </slot>
 {:else}
   <aside class="chat-sidebar" style="--sidebar-width: {$sidebarWidth}px;">
     <div class="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">

@@ -8,6 +8,8 @@
   import { featureFlags } from "@rilldata/web-common/features/feature-flags";
   import { initPylonWidget } from "@rilldata/web-common/features/help/initPylonWidget";
   import ApplicationHeader from "@rilldata/web-common/layout/ApplicationHeader.svelte";
+  import DashboardBreadcrumbStrip from "@rilldata/web-common/layout/DashboardBreadcrumbStrip.svelte";
+  import { createRuntimeServiceListResources } from "@rilldata/web-common/runtime-client";
   import BlockingOverlayContainer from "@rilldata/web-common/layout/BlockingOverlayContainer.svelte";
   import { overlay } from "@rilldata/web-common/layout/overlay-store";
   import {
@@ -92,6 +94,7 @@
   $: ({ route } = $page);
 
   $: mode = route.id?.includes("(viz)") ? "Preview" : "Dashboards";
+  $: onCanvasPreview = !!route.id?.includes("(viz)/canvas");
 
   $: onConnectorsPage = $page.url.pathname.startsWith("/connectors");
   $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
@@ -114,6 +117,30 @@
   // client switcher dropdown super_admins use — the backend scopes the
   // returned list to their sibling sub-stores.
   $: isMultiStore = !!$bratraxUser?.multi_client_id;
+
+  // First-canvas lookup powers the DASHBOARDS tab href so clicks go straight
+  // to /canvas/<name>, skipping the /developer detour. Falls back to /developer
+  // when the list is empty (it renders the "No dashboards yet" placeholder).
+  // The queryClient must be passed explicitly: this call sits in the root
+  // layout's script, above the QueryClientProvider in the component tree, so
+  // the context-based lookup TanStack uses by default would not find one.
+  $: canvasListQuery = createRuntimeServiceListResources(
+    instanceId,
+    { kind: "rill.runtime.v1.Canvas" },
+    undefined,
+    queryClient,
+  );
+  $: firstCanvasName = (() => {
+    const resources = $canvasListQuery?.data?.resources ?? [];
+    for (const r of resources) {
+      const name = r.meta?.name?.name;
+      if (name) return name;
+    }
+    return null;
+  })();
+  $: dashboardsHref = firstCanvasName
+    ? `/canvas/${firstCanvasName}`
+    : "/developer";
 </script>
 
 <QueryClientProvider client={queryClient}>
@@ -141,123 +168,121 @@
                 <AddStoreButton />
               {/if}
             </svelte:fragment>
+
+            <svelte:fragment slot="nav-tabs">
+              {#if isViewer}
+                <!-- Viewers never onboard. Dashboards + Help only. -->
+                <nav class="bratrax-nav flex gap-x-4 items-center h-full">
+                  <a
+                    href={dashboardsHref}
+                    class="bratrax-nav-link"
+                    class:active={!onHelpPage}
+                  >
+                    Dashboards
+                  </a>
+                  <a
+                    href="/help"
+                    class="bratrax-nav-link"
+                    class:active={onHelpPage}
+                  >
+                    Help
+                  </a>
+                </nav>
+              {:else if !$bratraxOnboarded && !isSuper}
+                <!-- Mid-onboarding minimum nav: Settings + Help (the only
+                   pages with no Rill-project dependency). -->
+                <nav class="bratrax-nav flex gap-x-4 items-center h-full">
+                  <a
+                    href={$bratraxOnboardResumeRoute ?? "/developer"}
+                    class="bratrax-nav-link"
+                    class:active={onOnboardPage}
+                  >
+                    Onboarding
+                  </a>
+                  <a
+                    href="/settings"
+                    class="bratrax-nav-link"
+                    class:active={onSettingsPage}
+                  >
+                    Settings
+                  </a>
+                  <a
+                    href="/help"
+                    class="bratrax-nav-link"
+                    class:active={onHelpPage}
+                  >
+                    Help
+                  </a>
+                </nav>
+              {:else}
+                <nav class="bratrax-nav flex gap-x-4 items-center h-full">
+                  <a
+                    href={dashboardsHref}
+                    class="bratrax-nav-link"
+                    class:active={!onConnectorsPage &&
+                      !onCostSettingsPage &&
+                      !onSettingsPage &&
+                      !onSuperadminsPage &&
+                      !onClientsPage &&
+                      !onHelpPage}
+                  >
+                    Dashboards
+                  </a>
+                  {#if isAdminOrSuper}
+                    <a
+                      href="/connectors"
+                      class="bratrax-nav-link"
+                      class:active={onConnectorsPage}
+                    >
+                      Connectors
+                    </a>
+                  {/if}
+                  {#if isAdminOrSuper}
+                    <a
+                      href="/cost-settings"
+                      class="bratrax-nav-link"
+                      class:active={onCostSettingsPage}
+                    >
+                      Cost Settings
+                    </a>
+                    <a
+                      href="/settings"
+                      class="bratrax-nav-link"
+                      class:active={onSettingsPage}
+                    >
+                      Settings
+                    </a>
+                  {/if}
+                  {#if isSuper}
+                    <a
+                      href="/superadmins"
+                      class="bratrax-nav-link"
+                      class:active={onSuperadminsPage}
+                    >
+                      Superadmins
+                    </a>
+                    <a
+                      href="/clients"
+                      class="bratrax-nav-link"
+                      class:active={onClientsPage}
+                    >
+                      Clients
+                    </a>
+                  {/if}
+                  <a
+                    href="/help"
+                    class="bratrax-nav-link"
+                    class:active={onHelpPage}
+                  >
+                    Help
+                  </a>
+                </nav>
+              {/if}
+            </svelte:fragment>
           </ApplicationHeader>
-          {#if isViewer}
-            <!-- Viewers never onboard. Dashboards + Help only, so a viewer who
-                 clicks into Help can navigate back to their dashboards. -->
-            <nav
-              class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0"
-            >
-              <a
-                href="/developer"
-                class="bratrax-nav-link"
-                class:active={!onHelpPage}
-              >
-                Dashboards
-              </a>
-              <a
-                href="/help"
-                class="bratrax-nav-link"
-                class:active={onHelpPage}
-              >
-                Help
-              </a>
-            </nav>
-          {:else if !$bratraxOnboarded && !isSuper}
-            <!-- Mid-onboarding (any step, including unpaid): the minimum nav is
-               Settings + Help. These are the only pages with no Rill-project
-               dependency, and +layout.ts exempts them from the resume-redirect
-               so the links actually resolve instead of bouncing back. -->
-            <nav
-              class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0"
-            >
-              <a
-                href={$bratraxOnboardResumeRoute ?? "/developer"}
-                class="bratrax-nav-link"
-                class:active={onOnboardPage}
-              >
-                Onboarding
-              </a>
-              <a
-                href="/settings"
-                class="bratrax-nav-link"
-                class:active={onSettingsPage}
-              >
-                Settings
-              </a>
-              <a
-                href="/help"
-                class="bratrax-nav-link"
-                class:active={onHelpPage}
-              >
-                Help
-              </a>
-            </nav>
-          {:else}
-            <nav
-              class="bratrax-nav flex gap-6 border-b border-bratrax-border px-4 py-0"
-            >
-              <a
-                href="/developer"
-                class="bratrax-nav-link"
-                class:active={!onConnectorsPage &&
-                  !onCostSettingsPage &&
-                  !onSettingsPage &&
-                  !onSuperadminsPage &&
-                  !onClientsPage &&
-                  !onHelpPage}
-              >
-                Dashboards
-              </a>
-              {#if isAdminOrSuper}
-                <a
-                  href="/connectors"
-                  class="bratrax-nav-link"
-                  class:active={onConnectorsPage}
-                >
-                  Connectors
-                </a>
-              {/if}
-              {#if isAdminOrSuper}
-                <a
-                  href="/cost-settings"
-                  class="bratrax-nav-link"
-                  class:active={onCostSettingsPage}
-                >
-                  Cost Settings
-                </a>
-                <a
-                  href="/settings"
-                  class="bratrax-nav-link"
-                  class:active={onSettingsPage}
-                >
-                  Settings
-                </a>
-              {/if}
-              {#if isSuper}
-                <a
-                  href="/superadmins"
-                  class="bratrax-nav-link"
-                  class:active={onSuperadminsPage}
-                >
-                  Superadmins
-                </a>
-                <a
-                  href="/clients"
-                  class="bratrax-nav-link"
-                  class:active={onClientsPage}
-                >
-                  Clients
-                </a>
-              {/if}
-              <a
-                href="/help"
-                class="bratrax-nav-link"
-                class:active={onHelpPage}
-              >
-                Help
-              </a>
-            </nav>
+
+          {#if onCanvasPreview}
+            <DashboardBreadcrumbStrip />
           {/if}
 
           <ChecklistBanner />

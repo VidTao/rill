@@ -22,6 +22,7 @@ import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryCl
 import {
   getRuntimeServiceListFilesQueryKey,
   runtimeServiceListFiles,
+  runtimeServiceListResources,
   type V1ListFilesResponse,
 } from "@rilldata/web-common/runtime-client/index.js";
 import { handleUninitializedProject } from "@rilldata/web-common/features/welcome/is-project-initialized.js";
@@ -43,6 +44,27 @@ export async function load({ url, depends, untrack, fetch }) {
     if (user) {
       bratraxUser.set(user);
       bratraxAuthChecked.set(true);
+
+      // Skip the /developer detour: look up the first Canvas dashboard and
+      // redirect there directly. Falls through to /developer only when there
+      // are no dashboards yet — that page renders the "No dashboards" UI.
+      try {
+        const instanceId = get(runtime).instanceId;
+        if (instanceId) {
+          const resources = await runtimeServiceListResources(instanceId, {
+            kind: "rill.runtime.v1.Canvas",
+          });
+          for (const r of resources.resources ?? []) {
+            const name = r.meta?.name?.name;
+            if (name) throw redirect(307, `/canvas/${name}`);
+          }
+        }
+      } catch (e) {
+        if (e && typeof e === "object" && "status" in e && "location" in e) {
+          throw e;
+        }
+        // Swallow runtime errors; fall through to /developer.
+      }
       throw redirect(307, "/developer");
     }
     return { initialized: false };

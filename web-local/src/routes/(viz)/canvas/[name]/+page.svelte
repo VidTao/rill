@@ -4,6 +4,7 @@
   import DashboardChat from "@rilldata/web-common/features/chat/DashboardChat.svelte";
   import { ResourceKind } from "@rilldata/web-common/features/entity-management/resource-selectors.ts";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+  import BratraxChatGate from "$lib/bratrax/BratraxChatGate.svelte";
   import WelcomeBanner from "$lib/bratrax/onboarding/WelcomeBanner.svelte";
   import { autoMarkOnce } from "$lib/bratrax/onboarding/checklist";
   import type { PageData } from "./$types";
@@ -29,7 +30,9 @@
           <CanvasDashboardEmbed {canvasName} />
         </CanvasProvider>
       </div>
-      <DashboardChat kind={ResourceKind.Canvas} />
+      <BratraxChatGate>
+        <DashboardChat kind={ResourceKind.Canvas} />
+      </BratraxChatGate>
     </div>
   </div>
 {/key}
