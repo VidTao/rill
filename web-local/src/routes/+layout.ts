@@ -213,8 +213,11 @@ export async function load({ url, depends, untrack, fetch }) {
     // Sits on top of the funnel: only relevant once step === 'ready'.
     //
     // NOTE: admins are deliberately NOT auto-redirected to /onboarding. The
-    // checklist is opt-in — reachable via the "Continue setup" user-menu link
-    // and surfaced by the dashboards banner (only when data isn't flowing).
+    // checklist is opt-in — surfaced by (a) the CONTINUE SETUP pill in Ribbon 1
+    // when there are incomplete non-skipped items and the user hasn't dismissed,
+    // (b) the always-visible GETTING STARTED entry in the SETTINGS ▾ dropdown,
+    // and (c) the dashboards banner when data-blocking items are outstanding
+    // (Shopify not connected, etc.).
     // A forced redirect hijacked every already-`ready` workspace on login,
     // because optional items (COGS, Anthropic key, Klaviyo, …) are perpetually
     // `todo`; that was wrong.

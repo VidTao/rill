@@ -7,7 +7,6 @@
   import ExplorePreviewCTAs from "@rilldata/web-common/features/explores/ExplorePreviewCTAs.svelte";
   import { featureFlags } from "@rilldata/web-common/features/feature-flags.ts";
   import { isDeployPage } from "@rilldata/web-common/layout/navigation/route-utils";
-  import Tag from "../components/tag/Tag.svelte";
 
   const { developerChat } = featureFlags;
 
@@ -25,6 +24,17 @@
         : externalUser?.role === "viewer"
           ? "Viewer"
           : null;
+  // Role-specific badge color class (Phase 4 of NAV_RESTRUCTURE_HANDOFF.MD):
+  // Admin = acid green, Super Admin = white, Viewer = muted gray. The
+  // background stays neutral; only the label color changes.
+  $: roleClass =
+    externalUser?.role === "admin"
+      ? "role-admin"
+      : externalUser?.role === "super_admin"
+        ? "role-super"
+        : externalUser?.role === "viewer"
+          ? "role-viewer"
+          : "role-neutral";
 
   // Drives the Edit button in CanvasPreviewCTAs. Viewers don't see it.
   $: isAdminOrSuper =
@@ -57,20 +67,34 @@
       />
     </a>
 
-    <Tag text={roleLabel ?? mode} color="gray"></Tag>
+    <span class="role-badge {roleClass}">{roleLabel ?? mode}</span>
   {/if}
 
-  <!-- Bratrax tabs (DASHBOARDS / CONNECTORS / …) slot into the header from
-       the root layout, sitting between the role tag and the right-side CTAs.
-       The ml-8 gives breathing room after the role tag. -->
-  <div class="ml-8 h-full flex items-center">
-    <slot name="nav-tabs" />
+  <!-- Primary nav (e.g. DASHBOARDS link): top-level destinations rendered
+       next to the role tag so the user has a constant anchor back to the
+       dashboards view from any surface (Settings, Customize, etc.). -->
+  <div class="primary-nav-slot">
+    <slot name="primary-nav" />
   </div>
 
-  <div class="ml-auto flex gap-x-2 h-full w-fit items-center py-2">
+  <div class="right-cluster ml-auto flex h-full items-center">
     <!-- Bratrax header-extras (ClientSwitcher for super_admins, AddStoreButton
          for multi-store) render in both preview and dev/edit modes. -->
     <slot name="header-extras" />
+
+    <!-- CONTINUE SETUP pill: conditional CTA for admins with incomplete
+         onboarding. Sits between the client switcher and SETTINGS ▾, matching
+         the NAV_RESTRUCTURE_HANDOFF mockup. -->
+    <slot name="continue-setup" />
+
+    <!-- Bratrax inline nav items (SETTINGS ▾, HELP, SUPERADMINS, CLIENTS) slot
+         in from the root layout, sitting between the client switcher and the
+         theme/AI/avatar cluster. The 22px gap matches the NAV_RESTRUCTURE_HANDOFF spec. -->
+    <div class="nav-tabs-slot">
+      <slot name="nav-tabs" />
+    </div>
+
+    <div class="icon-cluster flex gap-x-2 h-full items-center py-2">
     {#if mode === "Preview"}
       {#if route.id?.includes("explore")}
         <ExplorePreviewCTAs exploreName={dashboardName} />
@@ -103,15 +127,29 @@
       </button>
       <ChatToggle />
     {/if}
-    <LocalAvatarButton {externalUser} {onLogout} {onboardingLink} />
+      <LocalAvatarButton {externalUser} {onLogout} {onboardingLink} />
+    </div>
   </div>
 </header>
 
 <style lang="postcss">
   header {
     @apply w-full box-border;
-    @apply flex gap-x-2 items-center px-4 flex-none;
+    @apply flex items-center px-7 flex-none;
     @apply h-[3.75rem];
+    gap: 22px;
+  }
+
+  .nav-tabs-slot,
+  .primary-nav-slot {
+    @apply flex items-center h-full;
+    gap: 22px;
+  }
+
+  /* Right cluster: ClientSwitcher · nav-tabs · icon-cluster (theme/AI/avatar).
+     22px gap between the three groups; icons within icon-cluster stay tight. */
+  .right-cluster {
+    gap: 22px;
   }
 
   .bratrax-logo-link {
@@ -136,6 +174,36 @@
 
   :global(.dark) .bratrax-logo-dark-mode {
     display: block;
+  }
+
+  /* Role badge: same neutral chip background across roles, label color
+     differs per role (NAV_RESTRUCTURE_HANDOFF.MD §"Visual notes"). */
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    font-family: "Space Mono", "JetBrains Mono", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  /* Admin uses --color-acid-text (the theme-aware acid-as-text token: dark
+     olive in light theme for AA contrast on cream, full acid in dark theme
+     on near-black). Plain --color-acid would render yellow-on-cream in light
+     mode. Super/Viewer use --color-text + --color-text-muted which already
+     flip with the theme. */
+  .role-badge.role-admin {
+    color: var(--color-acid-text);
+  }
+  .role-badge.role-super {
+    color: var(--color-text);
+  }
+  .role-badge.role-viewer,
+  .role-badge.role-neutral {
+    color: var(--color-text-muted);
   }
 
   .bratrax-theme-toggle {

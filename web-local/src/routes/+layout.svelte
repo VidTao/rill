@@ -8,7 +8,15 @@
   import { featureFlags } from "@rilldata/web-common/features/feature-flags";
   import { initPylonWidget } from "@rilldata/web-common/features/help/initPylonWidget";
   import ApplicationHeader from "@rilldata/web-common/layout/ApplicationHeader.svelte";
-  import DashboardBreadcrumbStrip from "@rilldata/web-common/layout/DashboardBreadcrumbStrip.svelte";
+  import DashboardTabsStrip from "@rilldata/web-common/layout/DashboardTabsStrip.svelte";
+  import {
+    dashboardPrefs,
+    dashboardPrefsLoaded,
+    loadDashboardPrefs,
+    mergeDashboardPrefs,
+    resetDashboardPrefs,
+  } from "$lib/bratrax/dashboardPrefs";
+  import SettingsDropdown from "@rilldata/web-common/layout/SettingsDropdown.svelte";
   import { createRuntimeServiceListResources } from "@rilldata/web-common/runtime-client";
   import BlockingOverlayContainer from "@rilldata/web-common/layout/BlockingOverlayContainer.svelte";
   import { overlay } from "@rilldata/web-common/layout/overlay-store";
@@ -42,6 +50,7 @@
   import AddStoreButton from "$lib/bratrax/AddStoreButton.svelte";
   import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
   import ChecklistBanner from "$lib/bratrax/onboarding/ChecklistBanner.svelte";
+  import ContinueSetupPill from "$lib/bratrax/onboarding/ContinueSetupPill.svelte";
   import WelcomeCard from "$lib/bratrax/onboarding/WelcomeCard.svelte";
   import MidOnboardingViewer from "$lib/bratrax/onboarding/MidOnboardingViewer.svelte";
 
@@ -83,6 +92,10 @@
     return () => removeJavascriptListeners?.();
   });
 
+  // Phase 3: hydration of the dashboard-prefs store happens in the
+  // identity-aware reactive block below — when canvasUserKey first goes
+  // from "anon" to "<userId>:<clientId>", we reset + load fresh.
+
   async function handleBratraxLogout() {
     await bratraxLogout();
     bratraxUser.set(null);
@@ -95,6 +108,34 @@
 
   $: mode = route.id?.includes("(viz)") ? "Preview" : "Dashboards";
   $: onCanvasPreview = !!route.id?.includes("(viz)/canvas");
+  $: onCustomizePage = $page.url.pathname.startsWith("/customize");
+  // Ribbon 2 (dashboard tabs strip) mounts on canvas previews and on the
+  // /customize page, so the tabs persist while editing visibility/order.
+  $: showDashboardTabsStrip = onCanvasPreview || onCustomizePage;
+  // Strip-ready gate: TanStack reports `isPending: true` until the first
+  // fetch lands (and we nuke the cache on user-change, so there's no stale
+  // data to short-circuit this). Once the query has settled AND the prefs
+  // store has hydrated, render the strip with the right tabs in the right
+  // order. The same-height placeholder fills the space until then.
+  // Use explicit `=== false` (not !isPending) so when $canvasListQuery is
+  // still undefined during the initial reactive cascade we read FALSE rather
+  // than blowing up on `undefined.isPending`. Same logical outcome — strip
+  // stays hidden until the query resolves — but null-safe.
+  $: dashboardTabsReady =
+    $canvasListQuery?.isPending === false && $dashboardPrefsLoaded;
+
+  // Phase 3: merge runtime canvases × per-user prefs into the final tab list
+  // that DashboardTabsStrip renders. Hidden canvases are filtered out; new
+  // ones (not yet in prefs) get appended at the end via mergeDashboardPrefs.
+  $: dashboardTabs = mergeDashboardPrefs(
+    $canvasListQuery?.data?.resources ?? [],
+    $dashboardPrefs,
+  )
+    .filter((m) => m.visible)
+    .map((m) => ({
+      key: m.key,
+      label: m.resource?.canvas?.spec?.displayName || m.key,
+    }));
 
   $: onConnectorsPage = $page.url.pathname.startsWith("/connectors");
   $: onCostSettingsPage = $page.url.pathname.startsWith("/cost-settings");
@@ -124,10 +165,43 @@
   // The queryClient must be passed explicitly: this call sits in the root
   // layout's script, above the QueryClientProvider in the component tree, so
   // the context-based lookup TanStack uses by default would not find one.
+  //
+  // In multi-tenant Rill the runtime instanceId is the literal string
+  // "default" (the Go proxy maps it to the user's real instance via the
+  // auth cookie). The default query key only sees "default", so a cached
+  // response from a previous identity OR Rill's bundled demo projects
+  // (e.g. margin_scorecard) could leak into a fresh-logged-in admin's view.
+  // Fix: include the auth user identity in the query key. Different user
+  // → different cache slot → no leak, no reactive cleanup needed.
+  $: canvasUserKey = $bratraxUser
+    ? `${$bratraxUser.id}:${$bratraxUser.client_id ?? ""}`
+    : "anon";
+
+  // Reset + refetch dashboard prefs whenever the auth identity changes.
+  // The prefs store is module-scoped (persists across SPA navigations and
+  // in-session logins), so without this the previous user's order leaks
+  // into the new session and the strip renders the wrong tabs until F5.
+  let lastSeenPrefsUserKey: string | null = null;
+  $: if (canvasUserKey !== lastSeenPrefsUserKey) {
+    lastSeenPrefsUserKey = canvasUserKey;
+    resetDashboardPrefs();
+    if ($bratraxUser) void loadDashboardPrefs();
+  }
   $: canvasListQuery = createRuntimeServiceListResources(
     instanceId,
     { kind: "rill.runtime.v1.Canvas" },
-    undefined,
+    {
+      query: {
+        queryKey: [
+          "bratrax-canvas-list",
+          canvasUserKey,
+          instanceId,
+          "Canvas",
+        ],
+        refetchOnMount: "always",
+        staleTime: 0,
+      },
+    },
     queryClient,
   );
   $: firstCanvasName = (() => {
@@ -160,6 +234,22 @@
               ? { href: "/onboarding", label: "First things to try" }
               : { href: "/onboarding", label: "Continue setup" }}
           >
+            <svelte:fragment slot="primary-nav">
+              <!-- DASHBOARDS link sits next to the role tag — the constant
+                   "home" anchor back to the canvas view from any surface.
+                   Hidden during mid-onboarding (the funnel nav strip below
+                   replaces it). -->
+              {#if $bratraxOnboarded || isSuper}
+                <a
+                  href={dashboardsHref}
+                  class="bratrax-nav-link"
+                  class:active={onCanvasPreview}
+                >
+                  Dashboards
+                </a>
+              {/if}
+            </svelte:fragment>
+
             <svelte:fragment slot="header-extras">
               {#if isSuper || isMultiStore}
                 <ClientSwitcher />
@@ -169,120 +259,91 @@
               {/if}
             </svelte:fragment>
 
+            <svelte:fragment slot="continue-setup">
+              <!-- Pill self-gates on role + checklist state; safe to mount
+                   unconditionally — renders nothing for super-admin/viewer or
+                   when the checklist is dismissed/empty. -->
+              <ContinueSetupPill />
+            </svelte:fragment>
+
             <svelte:fragment slot="nav-tabs">
+              <!-- Nav restructure (NAV_RESTRUCTURE_HANDOFF.MD Phase 1):
+                   Dashboards-as-tabs moved to Ribbon 2 below; Ribbon 1 carries
+                   only the SETTINGS ▾ dropdown + inline standalone items. -->
               {#if isViewer}
-                <!-- Viewers never onboard. Dashboards + Help only. -->
-                <nav class="bratrax-nav flex gap-x-4 items-center h-full">
-                  <a
-                    href={dashboardsHref}
-                    class="bratrax-nav-link"
-                    class:active={!onHelpPage}
-                  >
-                    Dashboards
-                  </a>
-                  <a
-                    href="/help"
-                    class="bratrax-nav-link"
-                    class:active={onHelpPage}
-                  >
-                    Help
-                  </a>
-                </nav>
+                <!-- Viewers see a slim Ribbon 1: just HELP. Account + theme
+                     are reachable via the avatar dropdown. No SETTINGS menu. -->
+                <a
+                  href="/help"
+                  class="bratrax-nav-link"
+                  class:active={onHelpPage}
+                >
+                  Help
+                </a>
               {:else if !$bratraxOnboarded && !isSuper}
-                <!-- Mid-onboarding minimum nav: Settings + Help (the only
-                   pages with no Rill-project dependency). -->
-                <nav class="bratrax-nav flex gap-x-4 items-center h-full">
-                  <a
-                    href={$bratraxOnboardResumeRoute ?? "/developer"}
-                    class="bratrax-nav-link"
-                    class:active={onOnboardPage}
-                  >
-                    Onboarding
-                  </a>
-                  <a
-                    href="/settings"
-                    class="bratrax-nav-link"
-                    class:active={onSettingsPage}
-                  >
-                    Settings
-                  </a>
-                  <a
-                    href="/help"
-                    class="bratrax-nav-link"
-                    class:active={onHelpPage}
-                  >
-                    Help
-                  </a>
-                </nav>
+                <!-- Mid-onboarding minimum nav (no Rill-project dependency). -->
+                <a
+                  href={$bratraxOnboardResumeRoute ?? "/developer"}
+                  class="bratrax-nav-link"
+                  class:active={onOnboardPage}
+                >
+                  Onboarding
+                </a>
+                <a
+                  href="/settings"
+                  class="bratrax-nav-link"
+                  class:active={onSettingsPage}
+                >
+                  Settings
+                </a>
+                <a
+                  href="/help"
+                  class="bratrax-nav-link"
+                  class:active={onHelpPage}
+                >
+                  Help
+                </a>
               {:else}
-                <nav class="bratrax-nav flex gap-x-4 items-center h-full">
+                <!-- Admin + super-admin Ribbon 1 nav (post-onboarding). -->
+                {#if isAdminOrSuper}
+                  <SettingsDropdown />
+                {/if}
+                {#if isSuper}
                   <a
-                    href={dashboardsHref}
+                    href="/superadmins"
                     class="bratrax-nav-link"
-                    class:active={!onConnectorsPage &&
-                      !onCostSettingsPage &&
-                      !onSettingsPage &&
-                      !onSuperadminsPage &&
-                      !onClientsPage &&
-                      !onHelpPage}
+                    class:active={onSuperadminsPage}
                   >
-                    Dashboards
+                    Superadmins
                   </a>
-                  {#if isAdminOrSuper}
-                    <a
-                      href="/connectors"
-                      class="bratrax-nav-link"
-                      class:active={onConnectorsPage}
-                    >
-                      Connectors
-                    </a>
-                  {/if}
-                  {#if isAdminOrSuper}
-                    <a
-                      href="/cost-settings"
-                      class="bratrax-nav-link"
-                      class:active={onCostSettingsPage}
-                    >
-                      Cost Settings
-                    </a>
-                    <a
-                      href="/settings"
-                      class="bratrax-nav-link"
-                      class:active={onSettingsPage}
-                    >
-                      Settings
-                    </a>
-                  {/if}
-                  {#if isSuper}
-                    <a
-                      href="/superadmins"
-                      class="bratrax-nav-link"
-                      class:active={onSuperadminsPage}
-                    >
-                      Superadmins
-                    </a>
-                    <a
-                      href="/clients"
-                      class="bratrax-nav-link"
-                      class:active={onClientsPage}
-                    >
-                      Clients
-                    </a>
-                  {/if}
                   <a
-                    href="/help"
+                    href="/clients"
                     class="bratrax-nav-link"
-                    class:active={onHelpPage}
+                    class:active={onClientsPage}
                   >
-                    Help
+                    Clients
                   </a>
-                </nav>
+                {/if}
+                <a
+                  href="/help"
+                  class="bratrax-nav-link"
+                  class:active={onHelpPage}
+                >
+                  Help
+                </a>
               {/if}
             </svelte:fragment>
           </ApplicationHeader>
 
-          {#if onCanvasPreview}
-            <DashboardBreadcrumbStrip />
+          {#if showDashboardTabsStrip}
+            {#if dashboardTabsReady}
+              <DashboardTabsStrip tabs={dashboardTabs} {isAdminOrSuper} />
+            {:else}
+              <!-- Same-height placeholder while the canvas list settles —
+                   prevents a partial-list flash on first login and keeps
+                   the layout from shifting when the real tabs land. -->
+              <div class="dashboard-tabs-placeholder"></div>
+            {/if}
           {/if}
 
           <ChecklistBanner />
@@ -326,6 +387,16 @@
   /* Prevent trackpad navigation (like other code editors, like vscode.dev). */
   :global(body) {
     overscroll-behavior: none;
+  }
+
+  /* Matches DashboardTabsStrip's outer chrome (border + height) so the
+     pre-data placeholder reserves the same vertical space and avoids a
+     layout shift when the real tabs replace it. */
+  .dashboard-tabs-placeholder {
+    height: 50px;
+    width: 100%;
+    border-bottom: 1px solid var(--color-border, var(--border));
+    background: var(--color-surface-base, var(--background));
   }
 
   /* Bratrax navigation tabs — Space Mono, uppercase, theme-aware via tokens.
