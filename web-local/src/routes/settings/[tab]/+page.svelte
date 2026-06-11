@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { page } from "$app/stores";
   import {
     getAccount,
     updateAccount,
@@ -75,7 +77,10 @@
     "Pacific/Auckland",
   ];
 
-  let activeTab: TabId = "account";
+  // activeTab is now URL-driven: /settings/account → "account" etc. The
+  // [tab]/+page.ts load() validates the segment, so the fallback to "account"
+  // here is purely defensive (TS narrowing — params.tab is `string | undefined`).
+  $: activeTab = (($page.params.tab as TabId) ?? "account") as TabId;
   let topError = "";
 
   // ----- Account state -------------------------------------------------------
@@ -448,13 +453,10 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Tab is URL-driven now (see the reactive activeTab declaration above).
+  // The dropdown links to /settings/<tab> directly; in-page tab clicks
+  // navigate via goto() so the URL stays in sync.
   onMount(async () => {
-    // Honor ?tab= deep-links (e.g. the onboarding checklist links here with
-    // ?tab=ai / ?tab=team / ?tab=account).
-    const requested = new URLSearchParams(window.location.search).get("tab");
-    if (requested && TABS.some((t) => t.id === requested)) {
-      activeTab = requested as TabId;
-    }
     await Promise.all([loadAccount(), loadTeam(), loadBilling(), loadAI(), loadMCP()]);
   });
 </script>
@@ -489,7 +491,7 @@
           class="border-b-2 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {activeTab === tab.id
             ? 'border-bratrax-acid text-bratrax-acid'
             : 'border-transparent text-bratrax-text-muted hover:text-bratrax-text-body'}"
-          on:click={() => (activeTab = tab.id)}
+          on:click={() => goto(`/settings/${tab.id}`)}
         >
           {tab.label}
         </button>

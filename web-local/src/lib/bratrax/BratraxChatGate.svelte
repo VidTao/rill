@@ -41,7 +41,7 @@
 
   function goToAISettings() {
     sidebarActions.closeChat();
-    goto("/settings");
+    goto("/settings/ai");
   }
 </script>
 

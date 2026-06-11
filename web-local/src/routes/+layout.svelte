@@ -230,26 +230,8 @@
             {mode}
             externalUser={$bratraxUser}
             onLogout={handleBratraxLogout}
-            onboardingLink={isViewer
-              ? { href: "/onboarding", label: "First things to try" }
-              : { href: "/onboarding", label: "Continue setup" }}
+            onboardingLink={null}
           >
-            <svelte:fragment slot="primary-nav">
-              <!-- DASHBOARDS link sits next to the role tag — the constant
-                   "home" anchor back to the canvas view from any surface.
-                   Hidden during mid-onboarding (the funnel nav strip below
-                   replaces it). -->
-              {#if $bratraxOnboarded || isSuper}
-                <a
-                  href={dashboardsHref}
-                  class="bratrax-nav-link"
-                  class:active={onCanvasPreview}
-                >
-                  Dashboards
-                </a>
-              {/if}
-            </svelte:fragment>
-
             <svelte:fragment slot="header-extras">
               {#if isSuper || isMultiStore}
                 <ClientSwitcher />
@@ -281,7 +263,11 @@
                   Help
                 </a>
               {:else if !$bratraxOnboarded && !isSuper}
-                <!-- Mid-onboarding minimum nav (no Rill-project dependency). -->
+                <!-- Mid-onboarding minimum nav. Settings is the full dropdown
+                     (matches the post-onboarding nav visually); its non-Settings
+                     items bounce back to the onboarding funnel via the
+                     +layout.ts isAlwaysAllowed gate — expected behavior, since
+                     /onboarding is the resume link the user came from anyway. -->
                 <a
                   href={$bratraxOnboardResumeRoute ?? "/developer"}
                   class="bratrax-nav-link"
@@ -289,13 +275,7 @@
                 >
                   Onboarding
                 </a>
-                <a
-                  href="/settings"
-                  class="bratrax-nav-link"
-                  class:active={onSettingsPage}
-                >
-                  Settings
-                </a>
+                <SettingsDropdown />
                 <a
                   href="/help"
                   class="bratrax-nav-link"
@@ -304,7 +284,16 @@
                   Help
                 </a>
               {:else}
-                <!-- Admin + super-admin Ribbon 1 nav (post-onboarding). -->
+                <!-- Admin + super-admin Ribbon 1 nav (post-onboarding).
+                     DASHBOARDS is the leftmost item of the right cluster,
+                     sitting just before SETTINGS ▾. -->
+                <a
+                  href={dashboardsHref}
+                  class="bratrax-nav-link"
+                  class:active={onCanvasPreview}
+                >
+                  Dashboards
+                </a>
                 {#if isAdminOrSuper}
                   <SettingsDropdown />
                 {/if}

@@ -43,23 +43,26 @@
     </DropdownMenu.Item>
     <DropdownMenu.Separator />
     <DropdownMenu.Item
-      href="/settings?tab=account"
+      href="/settings/account"
       class="settings-dropdown-item"
     >
       Account settings
     </DropdownMenu.Item>
-    <DropdownMenu.Item href="/settings?tab=team" class="settings-dropdown-item">
+    <DropdownMenu.Item href="/settings/team" class="settings-dropdown-item">
       Team settings
     </DropdownMenu.Item>
     <DropdownMenu.Separator />
     <DropdownMenu.Item
-      href="/settings?tab=billing"
+      href="/settings/billing"
       class="settings-dropdown-item"
     >
       Billing
     </DropdownMenu.Item>
-    <DropdownMenu.Item href="/settings?tab=ai" class="settings-dropdown-item">
+    <DropdownMenu.Item href="/settings/ai" class="settings-dropdown-item">
       AI settings
+    </DropdownMenu.Item>
+    <DropdownMenu.Item href="/settings/mcp" class="settings-dropdown-item">
+      MCP
     </DropdownMenu.Item>
   </DropdownMenu.Content>
 </DropdownMenu.Root>

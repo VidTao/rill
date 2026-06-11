@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { useCanvas } from "@rilldata/web-common/features/canvas/selector";
-  import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import { featureFlags } from "../feature-flags";
   import { themeControl } from "../themes/theme-control";
   import ChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/ChatToggle.svelte";
 
-  // Driven by Bratrax role from the parent ApplicationHeader. Plain admin and
-  // super_admin see the Edit button; viewers do not.
+  // Bratrax-fork right cluster on canvas preview: theme toggle + AI chat
+  // toggle. The Edit button used to live here but moved to the canvas
+  // filter-bar in 2026-06-10 (mirrors edit-mode's Preview button placement)
+  // — see /canvas/[name]/+page.svelte's `filters-extras` slot. The
+  // isAdminOrSuper prop is left in place for forward-compat even though
+  // unused today.
   export let isAdminOrSuper: boolean = false;
+  // Suppress unused-prop warnings from svelte-check until we either drop it
+  // or wire something else to it.
+  $: void isAdminOrSuper;
 
   const { dashboardChat } = featureFlags;
 
-  $: ({ instanceId } = $runtime);
-  $: canvasName = $page.params.name ?? "";
-  $: canvasQuery = canvasName ? useCanvas(instanceId, canvasName) : null;
-  $: canvasFilePath = $canvasQuery?.data?.filePath ?? "";
   $: themePreference = themeControl.preference;
 </script>
 
@@ -43,10 +43,6 @@
   {/if}
 </button>
 
-{#if isAdminOrSuper && canvasFilePath}
-  <a href={`/files${canvasFilePath}`} class="bratrax-edit-link">Edit</a>
-{/if}
-
 {#if $dashboardChat}
   <ChatToggle />
 {/if}
@@ -69,34 +65,6 @@
     color: var(--color-text, var(--fg-primary));
   }
   .bratrax-theme-toggle:focus-visible {
-    outline: 2px solid var(--color-acid, #D4FF00);
-    outline-offset: 2px;
-  }
-
-  .bratrax-edit-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 32px;
-    padding: 0 12px;
-    background: transparent;
-    border: 1px solid var(--color-border-strong, var(--border));
-    color: var(--color-text-secondary, var(--fg-secondary));
-    font-family: "Space Mono", monospace;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    text-decoration: none;
-    cursor: pointer;
-    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
-  }
-  .bratrax-edit-link:hover {
-    background: var(--color-acid-dim, rgba(212, 255, 0, 0.06));
-    color: var(--color-text, var(--fg-primary));
-    border-color: var(--color-acid, #D4FF00);
-  }
-  .bratrax-edit-link:focus-visible {
     outline: 2px solid var(--color-acid, #D4FF00);
     outline-offset: 2px;
   }
