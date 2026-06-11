@@ -1,25 +1,15 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { BookOpen, HelpCircle, Sparkles, Mail } from "lucide-svelte";
-  import {
-    GETTING_STARTED_URL,
-    HELP_CENTER_URL,
-    SUPPORT_EMAIL,
-  } from "$lib/bratrax/constants";
+  import { HelpCircle, Sparkles, Mail } from "lucide-svelte";
+  import { HELP_CENTER_URL, SUPPORT_EMAIL } from "$lib/bratrax/constants";
+  // NOTE: the "Check out the getting-started guide" row was removed
+  // 2026-06-10 because the guide isn't published yet. When the URL is live
+  // again, re-import GETTING_STARTED_URL + BookOpen and restore the row at
+  // the top of the resources list.
 </script>
 
 <div class="card">
   <div class="title">Resources</div>
-
-  <div class="resource">
-    <BookOpen size={18} class="ricon" />
-    <span>
-      Check out the
-      <a href={GETTING_STARTED_URL} target="_blank" rel="noreferrer noopener">
-        getting-started guide
-      </a>
-    </span>
-  </div>
 
   <div class="resource">
     <HelpCircle size={18} class="ricon" />

@@ -438,6 +438,14 @@
     return `$${(cents / 100).toFixed(2)} ${currency}`;
   }
 
+  // Paint the billing status pill red when the subscription has been
+  // cancelled. Accept both spellings just in case the LS API ever returns
+  // the US form alongside the UK one it currently uses.
+  function isCancelled(status: string | undefined | null): boolean {
+    const s = (status ?? "").toLowerCase();
+    return s === "cancelled" || s === "canceled";
+  }
+
   function roleLabel(r: Role): string {
     if (r === "super_admin") return "OWNER";
     if (r === "admin") return "ADMIN";
@@ -672,13 +680,16 @@
                   {billing.plan} <span class="font-mono text-sm font-normal text-bratrax-text-muted">— {formatPrice(billing.price_cents, billing.currency)}/{billing.interval}</span>
                 </div>
               </div>
-              <span class="bratrax-status-pill">
+              <span
+                class="bratrax-status-pill"
+                class:bratrax-status-pill--danger={isCancelled(billing.status)}
+              >
                 {billing.status}
               </span>
             </div>
             {#if billing.current_period_end}
               <p class="mt-2 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
-                Renews {formatDate(billing.current_period_end)}
+                Expires {formatDate(billing.current_period_end)}
               </p>
             {/if}
             <div class="mt-3 flex items-center gap-2">

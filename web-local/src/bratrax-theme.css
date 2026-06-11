@@ -823,6 +823,14 @@ a.bg-bratrax-acid svg,
   white-space: nowrap;
 }
 
+/* Danger variant — cancelled / terminal subscription states. Uses the
+   design-system tomato token which resolves to #FF3B30 in dark theme and the
+   AA-tuned #E63226 in light theme. White text keeps WCAG contrast on both. */
+.bratrax-status-pill.bratrax-status-pill--danger {
+  background: var(--bratrax-tomato);
+  color: #FFFFFF;
+}
+
 /* ═══════════════════════════════════════════════════════════
    11c. CHART TYPOGRAPHY (v1.3 brief Task 10)
    Vega-Lite renders charts as SVG text inside <g class="role-axis"> /

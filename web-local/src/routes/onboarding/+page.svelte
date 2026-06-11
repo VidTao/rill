@@ -81,7 +81,7 @@
           Welcome back{firstName ? `, ${firstName}` : ""}. Let's finish setting up
           <span class="accent">{result.workspace_name}</span>.
         {:else}
-          <span class="accent">{result.workspace_name}</span> — first things to try.
+          <span class="accent">{result.workspace_name}</span> — Getting started.
         {/if}
       </h1>
 

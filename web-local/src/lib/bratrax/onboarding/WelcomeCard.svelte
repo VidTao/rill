@@ -47,11 +47,16 @@
 
     <div class="bullet">
       <BarChart3 size={18} class="bicon" />
-      <span>Open your Campaign Deep Dive dashboard</span>
+      <span>
+        Open your
+        <a href="/canvas/campaign_deep_dive">Attribution dashboard</a>
+      </span>
     </div>
     <div class="bullet">
       <Search size={18} class="bicon" />
-      <span>Click any order to see its customer journey</span>
+      <span>
+        <a href="/canvas/customer_analytics">Dive into customer analytics</a>
+      </span>
     </div>
     <div class="bullet">
       <Sparkles size={18} class="bicon" />
