@@ -5,6 +5,32 @@ import { apiFetch } from "./onboarding/api";
 // Per-user dashboard preferences power the CUSTOMIZE drag-and-drop panel
 // AND the Ribbon 2 tab order. Backed by `rill_user_dashboard_prefs` in PG.
 
+// ---------------------------------------------------------------------------
+// Rill upstream demo-project filter
+// ---------------------------------------------------------------------------
+// Rill's Go binary ships bundled example projects under
+// runtime/pkg/examples/embed/dist/. Their dashboards leak into the canvas
+// list briefly when a freshly-provisioned client's runtime instance is
+// warming up (the runtime resolves "default" to a demo instance before
+// the auth cookie's mapping fully binds). These names are constants in the
+// Rill binary — no real Bratrax workspace would ever name a canvas this.
+// Filter them out at every canvas-list read site so the user never sees a
+// stale demo tab flash on first login / post-onboarding.
+//
+// Sources of these names:
+//   - rill-cost-monitoring → dashboards/margin_scorecard.yaml
+//   - rill-openrtb-prog-ads → dashboards/auction_explore.yaml
+//   - rill-github-analytics → dashboards/clickhouse_commits_explore.yaml
+export const RILL_DEMO_CANVAS_NAMES: ReadonlySet<string> = new Set([
+  "margin_scorecard",
+  "auction_explore",
+  "clickhouse_commits_explore",
+]);
+
+export function isRillDemoCanvas(name: string | undefined | null): boolean {
+  return !!name && RILL_DEMO_CANVAS_NAMES.has(name);
+}
+
 export interface DashboardPref {
   key: string;
   position: number;

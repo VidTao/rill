@@ -13,6 +13,7 @@
   } from "@rilldata/web-common/runtime-client";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import { ResourceKind } from "@rilldata/web-common/features/entity-management/resource-selectors";
+  import { isRillDemoCanvas } from "$lib/bratrax/dashboardPrefs";
 
   type VerifyState = "pending" | "running" | "refreshing" | "done" | "error";
 
@@ -405,16 +406,33 @@
       if (verifyInterval) clearInterval(verifyInterval);
       verifyInterval = null;
 
-      // Pick the first Canvas/Explore dashboard's file path and route to the
-      // file view, mirroring the post-init redirect in the root +layout.ts.
-      const firstDashboardPath = resources
-        .filter((r) => {
-          const kind = r.meta?.name?.kind;
-          return kind === ResourceKind.Canvas || kind === ResourceKind.Explore;
-        })
-        .flatMap((r) => r.meta?.filePaths ?? [])
-        .find((p) => p.startsWith("/dashboards/"));
-      const target = firstDashboardPath ? `/files${firstDashboardPath}` : "/";
+      // Pick the first Canvas dashboard and route to its preview at
+      // /canvas/<name>. Land users on the dashboard view they'll actually
+      // use day-to-day — the file editor used to be the post-onboarding
+      // target, which was an artifact of the pre-nav-restructure world.
+      // Demo canvases (margin_scorecard etc.) get filtered out so a
+      // warming-up runtime never lands the user on a Rill bundled-example.
+      // Explore-kind resources still fall back to the file view because
+      // there's no /explore/<name> Bratrax-fork preview route.
+      const firstCanvas = resources.find((r) => {
+        const kind = r.meta?.name?.kind;
+        const name = r.meta?.name?.name;
+        return kind === ResourceKind.Canvas && !isRillDemoCanvas(name);
+      });
+      const firstCanvasName = firstCanvas?.meta?.name?.name;
+
+      let target: string;
+      if (firstCanvasName) {
+        target = `/canvas/${firstCanvasName}`;
+      } else {
+        // Fallback: surface any Explore dashboard via the file editor (no
+        // preview route exists for those in the Bratrax fork).
+        const firstExplorePath = resources
+          .filter((r) => r.meta?.name?.kind === ResourceKind.Explore)
+          .flatMap((r) => r.meta?.filePaths ?? [])
+          .find((p) => p.startsWith("/dashboards/"));
+        target = firstExplorePath ? `/files${firstExplorePath}` : "/";
+      }
 
       // Brief delay so user sees the final checkmark before redirect
       redirectTimer = setTimeout(() => goto(target), 1500);

@@ -12,6 +12,7 @@
   import { fly } from "svelte/transition";
   import { get } from "svelte/store";
   import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { isRillDemoCanvas } from "$lib/bratrax/dashboardPrefs";
   import type { LayoutData } from "../$types";
 
   export let data: LayoutData;
@@ -34,7 +35,8 @@
     const resources = $canvasQuery.data?.resources ?? [];
     for (const r of resources) {
       const name = r.meta?.name?.name;
-      if (name) return name;
+      // Skip Rill bundled-example canvases (see RILL_DEMO_CANVAS_NAMES).
+      if (name && !isRillDemoCanvas(name)) return name;
     }
     return null;
   }

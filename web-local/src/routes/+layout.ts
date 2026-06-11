@@ -26,6 +26,7 @@ import {
   type V1ListFilesResponse,
 } from "@rilldata/web-common/runtime-client/index.js";
 import { handleUninitializedProject } from "@rilldata/web-common/features/welcome/is-project-initialized.js";
+import { isRillDemoCanvas } from "$lib/bratrax/dashboardPrefs";
 import { Settings } from "luxon";
 
 Settings.defaultLocale = "en";
@@ -56,7 +57,11 @@ export async function load({ url, depends, untrack, fetch }) {
           });
           for (const r of resources.resources ?? []) {
             const name = r.meta?.name?.name;
-            if (name) throw redirect(307, `/canvas/${name}`);
+            // Skip Rill upstream demo canvases (margin_scorecard etc.) — see
+            // RILL_DEMO_CANVAS_NAMES in dashboardPrefs.ts for context.
+            if (name && !isRillDemoCanvas(name)) {
+              throw redirect(307, `/canvas/${name}`);
+            }
           }
         }
       } catch (e) {

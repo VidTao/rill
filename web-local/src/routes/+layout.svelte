@@ -12,6 +12,7 @@
   import {
     dashboardPrefs,
     dashboardPrefsLoaded,
+    isRillDemoCanvas,
     loadDashboardPrefs,
     mergeDashboardPrefs,
     resetDashboardPrefs,
@@ -127,10 +128,13 @@
   // Phase 3: merge runtime canvases × per-user prefs into the final tab list
   // that DashboardTabsStrip renders. Hidden canvases are filtered out; new
   // ones (not yet in prefs) get appended at the end via mergeDashboardPrefs.
-  $: dashboardTabs = mergeDashboardPrefs(
-    $canvasListQuery?.data?.resources ?? [],
-    $dashboardPrefs,
-  )
+  // Demo canvases (Rill upstream bundled examples) are dropped at the source
+  // so they can never leak into the tab strip during runtime warm-up — see
+  // RILL_DEMO_CANVAS_NAMES in dashboardPrefs.ts.
+  $: realCanvases = ($canvasListQuery?.data?.resources ?? []).filter(
+    (r) => !isRillDemoCanvas(r.meta?.name?.name),
+  );
+  $: dashboardTabs = mergeDashboardPrefs(realCanvases, $dashboardPrefs)
     .filter((m) => m.visible)
     .map((m) => ({
       key: m.key,
@@ -208,7 +212,9 @@
     const resources = $canvasListQuery?.data?.resources ?? [];
     for (const r of resources) {
       const name = r.meta?.name?.name;
-      if (name) return name;
+      // Skip Rill upstream demo dashboards so the DASHBOARDS link never
+      // points at margin_scorecard / auction_explore / etc. during warm-up.
+      if (name && !isRillDemoCanvas(name)) return name;
     }
     return null;
   })();
