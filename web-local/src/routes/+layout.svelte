@@ -204,6 +204,23 @@
         ],
         refetchOnMount: "always",
         staleTime: 0,
+        // Warm-up poll: keep refetching every 2s while the runtime returns
+        // ZERO real canvases (only Rill demos, or an empty list). The custom
+        // queryKey above means FileAndResourceWatcher's SSE invalidation
+        // doesn't reach this query — without a poll we'd see an empty strip
+        // post-onboarding until the user hits F5. Stops the moment at least
+        // one real canvas lands. Genuinely-empty workspaces poll forever at
+        // 2s (tiny payload; the strip just stays empty until the user gets
+        // canvases compiled — acceptable v1 trade-off).
+        refetchInterval: (query) => {
+          const resources = (query?.state?.data?.resources ?? []) as {
+            meta?: { name?: { name?: string } };
+          }[];
+          const realCount = resources.filter(
+            (r) => !isRillDemoCanvas(r.meta?.name?.name),
+          ).length;
+          return realCount > 0 ? false : 2000;
+        },
       },
     },
     queryClient,
@@ -236,7 +253,9 @@
             {mode}
             externalUser={$bratraxUser}
             onLogout={handleBratraxLogout}
-            onboardingLink={null}
+            onboardingLink={isViewer
+              ? { href: "/onboarding", label: "Getting started" }
+              : null}
           >
             <svelte:fragment slot="header-extras">
               {#if isSuper || isMultiStore}
@@ -259,8 +278,20 @@
                    Dashboards-as-tabs moved to Ribbon 2 below; Ribbon 1 carries
                    only the SETTINGS ▾ dropdown + inline standalone items. -->
               {#if isViewer}
-                <!-- Viewers see a slim Ribbon 1: just HELP. Account + theme
-                     are reachable via the avatar dropdown. No SETTINGS menu. -->
+                <!-- Viewers see a slim Ribbon 1: DASHBOARDS + HELP. Account +
+                     theme are reachable via the avatar dropdown; "Getting
+                     started" lives there too via the onboardingLink prop. No
+                     SETTINGS menu. DASHBOARDS hides when the viewer has no
+                     real canvases yet (no broken /developer fallback). -->
+                {#if firstCanvasName}
+                  <a
+                    href={dashboardsHref}
+                    class="bratrax-nav-link"
+                    class:active={onCanvasPreview}
+                  >
+                    Dashboards
+                  </a>
+                {/if}
                 <a
                   href="/help"
                   class="bratrax-nav-link"

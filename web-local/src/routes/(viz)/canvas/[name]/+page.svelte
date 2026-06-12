@@ -28,26 +28,30 @@
   <div class="flex h-full flex-col overflow-hidden">
     <WelcomeBanner />
     <div class="flex flex-1 overflow-hidden">
-      <!-- Position-context wrapper for the absolute Edit overlay below.
-           `relative` + `overflow-hidden` keeps the overlay clipped to the
-           canvas-area bounds; CanvasProvider/Embed render inside as usual. -->
       <div class="canvas-area">
         <CanvasProvider {canvasName} {instanceId} showBanner>
-          <CanvasDashboardEmbed {canvasName} />
+          <CanvasDashboardEmbed {canvasName}>
+            <!-- Edit-dashboard button — rendered into CanvasDashboardWrapper's
+                 filter-right slot, which sits INSIDE the same max-width
+                 relative wrapper as CanvasFilters. The slotted content is
+                 absolutely positioned to that wrapper's right edge, so it
+                 lines up with the filter bar's right edge regardless of
+                 viewport width. svelte:fragment is required so the {#if}
+                 lives INSIDE the slot (Svelte 4 requires slot="..." on a
+                 direct child of the component). -->
+            <svelte:fragment slot="filter-right">
+              {#if isAdminOrSuper}
+                <a
+                  href={`/files/dashboards/${canvasName}.yaml`}
+                  class="canvas-edit-link"
+                  style="position: absolute; top: 0; right: 0; z-index: 60;"
+                >
+                  Edit dashboard
+                </a>
+              {/if}
+            </svelte:fragment>
+          </CanvasDashboardEmbed>
         </CanvasProvider>
-        {#if isAdminOrSuper}
-          <!-- Edit button overlay: sits in the top-right of the canvas area,
-               above the filter bar's right edge. Inline CSS (not Tailwind +
-               not Svelte-scoped) so nothing can override the absolute
-               positioning regardless of how CanvasFilters lays itself out. -->
-          <a
-            href={`/files/dashboards/${canvasName}.yaml`}
-            class="canvas-edit-link"
-            style="position: absolute; top: 14px; right: 14px; z-index: 60;"
-          >
-            Edit
-          </a>
-        {/if}
       </div>
       <BratraxChatGate>
         <DashboardChat kind={ResourceKind.Canvas} />
@@ -66,16 +70,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 32px;
-    padding: 0 12px;
+    height: 26px;
+    padding: 0 10px;
     background: var(--color-surface, transparent);
     border: 1px solid var(--color-border-strong, var(--border));
     color: var(--color-text-secondary, var(--fg-secondary));
-    font-family: "Space Mono", "JetBrains Mono", monospace;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 2px;
+    /* Inherit Inter from parent so the button reads as part of the filter
+       row controls (matches the weight of "Comparing", "as of latest day",
+       etc.) — not a separate uppercase Space-Mono pill. */
+    font-size: 13px;
+    font-weight: 500;
     text-decoration: none;
     cursor: pointer;
     transition:

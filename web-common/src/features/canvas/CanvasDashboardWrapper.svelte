@@ -38,7 +38,18 @@
         class="bg-surface-subtle border-b py-4 px-2 w-full h-fit select-none z-50 flex items-center justify-center"
         on:click|self={onClick}
       >
-        <CanvasFilters {canvasName} {maxWidth} {builder} />
+        <!-- Max-width relative wrapper: CanvasFilters fills it; the
+             `filter-right` slot is absolutely positioned by the consumer to
+             sit at the right edge of the SAME centered max-width container
+             as the tiles below (used by Bratrax for the Edit-dashboard
+             button). Slot is a no-op for callers that don't fill it. -->
+        <div
+          class="relative w-full flex justify-center"
+          style:max-width="{maxWidth}px"
+        >
+          <CanvasFilters {canvasName} {maxWidth} {builder} />
+          <slot name="filter-right" />
+        </div>
       </header>
     {/if}
 

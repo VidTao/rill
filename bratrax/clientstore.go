@@ -228,6 +228,11 @@ func (s *ClientStore) ListByMultiClientID(ctx context.Context, multiClientID str
 // user's email attached. NULL when no admin exists for a client (e.g. a
 // half-onboarded row). The subquery filters `role = 'admin'` so super_admins
 // — who have client_id IS NULL per Track K — are correctly excluded.
+//
+// Ordering: active clients first (alphabetical), then the rest
+// (alphabetical). `rill_clients.active` is the SoT flag the reconcile +
+// event-ingest path gates on; `IS TRUE` lumps NULL + FALSE together as
+// "not active" so the dropdown surfaces in-use workspaces at the top.
 func (s *ClientStore) ListAllWithAdminEmail(ctx context.Context) ([]ClientWithAdmin, error) {
 	var out []ClientWithAdmin
 	err := s.db.SelectContext(ctx, &out,
@@ -239,7 +244,7 @@ func (s *ClientStore) ListAllWithAdminEmail(ctx context.Context) ([]ClientWithAd
 		     ORDER BY u.created_at ASC
 		     LIMIT 1) AS admin_email
 		 FROM rill_clients c
-		 ORDER BY c.company_name ASC, c.created_at ASC`,
+		 ORDER BY (c.active IS TRUE) DESC, c.company_name ASC, c.created_at ASC`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bratrax clientstore: list all with admin email failed: %w", err)

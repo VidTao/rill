@@ -9,6 +9,7 @@ export interface ChecklistItem {
   status: ChecklistStatus;
   action_url: string | null;
   action_label: string | null;
+  label_url?: string | null;
   skippable_prominence: "prominent" | "quiet";
   user_override: "done" | "skipped" | null;
   required_role: string;

@@ -156,6 +156,20 @@
     padding-left: 28px;
     flex-shrink: 0;
   }
+  /* Customize is a low-frequency action — keep it muted (matches MORE)
+     even on the /customize page so it doesn't pull the eye like an active
+     dashboard tab. !important is required because bratrax-theme.css has a
+     global `a { color: var(--accent-primary) !important }` rule that paints
+     every anchor acid — MORE escapes it (it's a <button>, not an <a>), but
+     CUSTOMIZE is an <a> so it inherits the acid override unless we beat it. */
+  :global(.customize-tab),
+  :global(.customize-tab.active) {
+    color: var(--color-text-muted) !important;
+    border-bottom-color: transparent !important;
+  }
+  :global(.customize-tab:hover) {
+    color: var(--color-text) !important;
+  }
 
   :global(.more-trigger) {
     /* same as .dashboard-tab — duplicated as :global so bits-ui's <button>

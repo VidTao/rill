@@ -1,8 +1,11 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { get } from "svelte/store";
   import { goto } from "$app/navigation";
+  import { page } from "$app/stores";
   import { MoreVertical } from "lucide-svelte";
   import * as DropdownMenu from "@rilldata/web-common/components/dropdown-menu";
+  import { sidebarActions } from "@rilldata/web-common/features/chat/layouts/sidebar/sidebar-store";
   import {
     markItem,
     skipItem,
@@ -52,9 +55,15 @@
     }
     if (item.key === "asked_ai_a_question") {
       // The AI chat panel is baked into dashboard views; sending a message
-      // there auto-marks this item.
+      // there auto-marks this item. Open the sidebar BEFORE navigation —
+      // chatOpen is a global store; the chat panel mounts on the destination
+      // canvas page already open.
       void autoMark; // referenced for clarity; auto-mark fires from ChatInput
-      void goto("/canvas/campaign_deep_dive");
+      sidebarActions.openChat();
+      const path = get(page).url.pathname;
+      if (!path.startsWith("/canvas/")) {
+        void goto("/canvas/campaign_deep_dive");
+      }
       return;
     }
     if (item.action_url) {
@@ -69,7 +78,11 @@
   </span>
 
   <div class="body">
-    <div class="label">{item.label}</div>
+    {#if item.label_url}
+      <a class="label label-link" href={item.label_url}>{item.label}</a>
+    {:else}
+      <div class="label">{item.label}</div>
+    {/if}
     {#if item.description}
       <div class="desc">{item.description}</div>
     {/if}
@@ -176,6 +189,15 @@
     font-weight: 300;
     font-size: 16px;
     color: var(--color-text);
+  }
+  a.label-link {
+    color: var(--color-acid-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  a.label-link:hover {
+    opacity: 0.85;
   }
   .skipped .label {
     text-decoration: line-through;

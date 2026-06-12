@@ -47,6 +47,9 @@
 
 {#if canvasName}
   <CanvasDashboardWrapper {maxWidth} {canvasName} {filtersEnabled} embedded>
+    <svelte:fragment slot="filter-right">
+      <slot name="filter-right" />
+    </svelte:fragment>
     {#each rows as row, rowIndex (rowIndex)}
       <StaticCanvasRow
         {row}

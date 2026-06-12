@@ -182,12 +182,6 @@
       {/each}
     </div>
 
-    <div class="advanced">
-      <strong>Advanced — edit dashboard definitions</strong>
-      Edit YAML files in the developer file explorer to customize dashboard
-      definitions, metrics, and data sources. Changes recompile dashboards for
-      all users of this workspace.
-    </div>
   </div>
 </div>
 
@@ -301,16 +295,4 @@
     line-height: 1.5;
   }
 
-  .advanced {
-    font-size: 13px;
-    color: var(--color-text-muted);
-    border-top: 1px solid var(--color-border);
-    padding-top: 18px;
-    margin-top: 24px;
-  }
-  .advanced strong {
-    display: block;
-    color: var(--color-text);
-    margin-bottom: 4px;
-  }
 </style>
