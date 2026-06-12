@@ -5,7 +5,7 @@
   import { onboardStatus, onboardMe } from "$lib/bratrax/onboarding/api";
   import type { OnboardStatus } from "$lib/bratrax/onboarding/api";
   import {
-    runtimeServiceCreateTrigger,
+    // runtimeServiceCreateTrigger,  // disabled for testing — see verify() below
     runtimeServiceListResources,
     V1ReconcileStatus,
     type V1Resource,
@@ -357,30 +357,39 @@
         refreshStartMs = Date.now();
         verifyState = "refreshing";
         consecutiveIdlePolls = 0;
-        try {
-          const sourceResources = resources.filter(
-            (r) => r.meta?.name?.kind === ResourceKind.Source,
-          );
-          if (sourceResources.length > 0) {
-            await runtimeServiceCreateTrigger(instanceId, {
-              resources: sourceResources.map((r) => ({
-                kind: ResourceKind.Source,
-                name: r.meta!.name!.name!,
-              })),
-            });
-          } else {
-            // Sources may be listed under kind=Model with definedAsSource;
-            // fall back to triggering all data resources so the fix still
-            // engages instead of silently no-op'ing.
-            await runtimeServiceCreateTrigger(instanceId, { all: true });
-          }
-        } catch (triggerErr) {
-          console.warn(
-            "Onboarding source refresh trigger failed:",
-            triggerErr,
-          );
-          triggeredRefresh = "failed";
-        }
+        // DISABLED FOR TESTING (2026-06-12): the manual source-refresh trigger
+        // is a DuckDB-era artifact. It forced re-materialization so the
+        // dashboard wouldn't render stale DuckDB data. With ClickHouse-direct
+        // (external: true models, no materialization) there is nothing to
+        // re-materialize — the dashboard reads CH live — so the default
+        // first-access reconcile should suffice once extraction is done.
+        // We keep `triggeredRefresh = true` and the `return` so the
+        // stability-counter redirect logic below is unchanged; only the
+        // CreateTrigger call is skipped.
+        // try {
+        //   const sourceResources = resources.filter(
+        //     (r) => r.meta?.name?.kind === ResourceKind.Source,
+        //   );
+        //   if (sourceResources.length > 0) {
+        //     await runtimeServiceCreateTrigger(instanceId, {
+        //       resources: sourceResources.map((r) => ({
+        //         kind: ResourceKind.Source,
+        //         name: r.meta!.name!.name!,
+        //       })),
+        //     });
+        //   } else {
+        //     // Sources may be listed under kind=Model with definedAsSource;
+        //     // fall back to triggering all data resources so the fix still
+        //     // engages instead of silently no-op'ing.
+        //     await runtimeServiceCreateTrigger(instanceId, { all: true });
+        //   }
+        // } catch (triggerErr) {
+        //   console.warn(
+        //     "Onboarding source refresh trigger failed:",
+        //     triggerErr,
+        //   );
+        //   triggeredRefresh = "failed";
+        // }
         return;
       }
 

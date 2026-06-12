@@ -112,18 +112,24 @@
     min-width: 220px;
   }
 
-  :global(.settings-dropdown-item) {
+  /* Scoped under .settings-dropdown-content (specificity 0,2,0) so it beats
+     bratrax-theme.css §15, which floors every .text-xs element (and bits-ui
+     applies text-xs to each item) to 14px !important. Without the extra class
+     the two !important rules tie on specificity and source order wins, leaving
+     the items at 14px — visibly larger than the 11px Tier 1 links. Matches the
+     Tier 1 nav size (11px / 1.5px tracking). */
+  :global(.settings-dropdown-content .settings-dropdown-item) {
     padding: 10px 16px !important;
     font-family: "Space Mono", "JetBrains Mono", monospace !important;
     font-size: 11px !important;
-    letter-spacing: 0.1em !important;
+    letter-spacing: 1.5px !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     color: var(--color-text) !important;
     cursor: pointer;
   }
 
-  :global(.settings-dropdown-item:hover) {
+  :global(.settings-dropdown-content .settings-dropdown-item:hover) {
     background: var(--color-acid-dim, rgba(212, 255, 0, 0.06)) !important;
   }
 

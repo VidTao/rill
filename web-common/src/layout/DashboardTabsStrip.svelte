@@ -284,17 +284,21 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     min-width: 240px;
   }
-  :global(.more-dropdown-item) {
+  /* Scoped under .more-dropdown-content (specificity 0,2,0) so it beats
+     bratrax-theme.css §15, which floors every .text-xs element to 14px
+     !important (bits-ui applies text-xs to each item). These are overflowed
+     Tier 2 tabs, so they match the 13px / 2px-tracking section-tab size. */
+  :global(.more-dropdown-content .more-dropdown-item) {
     padding: 10px 16px !important;
     font-family: "Space Mono", "JetBrains Mono", monospace !important;
-    font-size: 11px !important;
-    letter-spacing: 0.1em !important;
+    font-size: 13px !important;
+    letter-spacing: 2px !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     color: var(--color-text) !important;
     cursor: pointer;
   }
-  :global(.more-dropdown-item:hover) {
+  :global(.more-dropdown-content .more-dropdown-item:hover) {
     background: var(--color-acid-dim, rgba(212, 255, 0, 0.06)) !important;
   }
 
