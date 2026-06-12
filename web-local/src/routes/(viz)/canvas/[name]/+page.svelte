@@ -44,7 +44,7 @@
                 <a
                   href={`/files/dashboards/${canvasName}.yaml`}
                   class="canvas-edit-link"
-                  style="position: absolute; top: 0; right: 0; z-index: 60;"
+                  style="position: absolute; top: 0; right: var(--filter-slot-right, 0); z-index: 60;"
                 >
                   Edit dashboard
                 </a>

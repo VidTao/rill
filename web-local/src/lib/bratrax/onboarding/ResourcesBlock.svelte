@@ -72,7 +72,14 @@
   }
   a,
   .link {
-    color: var(--color-acid-text);
+    /* Match the global `a { color: var(--accent-primary) !important }`
+       rule in bratrax-theme.css so the button-styled-as-link reads the
+       same as the real anchors in this card — near-black on cream in
+       light theme, acid yellow on near-black in dark. Using
+       --color-acid-text here paints olive green in light theme (the
+       AA-text variant of acid), which is inconsistent with the other
+       links sitting beside it. */
+    color: var(--accent-primary);
     text-decoration: underline;
     font: inherit;
     background: transparent;

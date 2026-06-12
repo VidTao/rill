@@ -24,29 +24,91 @@
   export let isAdminOrSuper: boolean = false;
 
   const USER_PRIMARY_CAP = 6;
+  // Right-edge reserve for CUSTOMIZE + breathing room. Admin/super see the
+  // CUSTOMIZE pill; viewers don't, so reserve less for them.
+  $: reservedRight = isAdminOrSuper ? 160 : 24;
+  // MORE +N ▾ trigger width when at least one tab is overflowing — included
+  // in the budget so the last visible tab doesn't get clipped by MORE. Sized
+  // for the larger 13px tabs plus the "+N" count suffix.
+  const MORE_TRIGGER_WIDTH = 96;
 
   let containerEl: HTMLDivElement;
+  let measurerEl: HTMLDivElement | undefined;
   let widthBudget = Infinity;
+  let primaryCap = USER_PRIMARY_CAP;
 
   $: activeCanvasName = $page.params.name ?? "";
   $: onCustomize = $page.url.pathname.startsWith("/customize");
 
-  // Effective primary cap = min(user cap, width-based cap). The width-based
-  // cap is a coarse estimate: assume each tab averages 220px (Space Mono
-  // 11px uppercase title in a 28px-padded button). We reserve ~200px on the
-  // right for CUSTOMIZE + MORE ▾ + padding.
-  $: estimatedTabWidth = 220;
-  $: reservedRight = 200;
-  $: widthCap = isFinite(widthBudget)
-    ? Math.max(1, Math.floor((widthBudget - reservedRight) / estimatedTabWidth))
-    : USER_PRIMARY_CAP;
-  $: primaryCap = Math.min(USER_PRIMARY_CAP, widthCap);
+  // Real DOM measurement: render every candidate tab in a hidden measurer,
+  // sum their actual widths against the live container width, and only
+  // collapse the surplus into MORE ▾. Beats the previous "assume 220px per
+  // tab" heuristic that pushed tabs into MORE while half the strip sat
+  // empty.
+  function recomputeCap() {
+    if (!measurerEl || !isFinite(widthBudget)) {
+      primaryCap = Math.min(USER_PRIMARY_CAP, tabs.length);
+      return;
+    }
+    const buttons = Array.from(
+      measurerEl.querySelectorAll<HTMLElement>(".measure-tab"),
+    );
+    let sum = 0;
+    let fits = 0;
+    for (let i = 0; i < buttons.length; i++) {
+      const w = buttons[i].offsetWidth;
+      // MORE ▾ renders whenever any tab spills past the inline strip —
+      // either because a candidate didn't fit, OR because the user has
+      // more tabs than USER_PRIMARY_CAP (the surplus always goes to MORE).
+      // If MORE will appear, its width has to fit too.
+      const moreWillRender = i < buttons.length - 1 || tabs.length > buttons.length;
+      const overhead =
+        (moreWillRender ? MORE_TRIGGER_WIDTH : 0) + reservedRight;
+      if (sum + w + overhead > widthBudget) break;
+      sum += w;
+      fits = i + 1;
+    }
+    primaryCap = Math.max(1, Math.min(USER_PRIMARY_CAP, fits));
+  }
 
-  $: primary = tabs.slice(0, primaryCap);
-  $: overflow = tabs.slice(primaryCap);
+  // Recompute on any change to inputs that affect the layout.
+  $: tabs, widthBudget, reservedRight, void tick().then(recomputeCap);
+
+  // Pin the active tab. Whatever is currently selected must stay visible and
+  // never collapse into MORE — otherwise selecting an overflowed dashboard
+  // makes it vanish on a narrow window, which reads as broken. If the active
+  // tab falls past the cap, swap it into the last visible slot and push the
+  // displaced (inactive) tab into MORE. Overflow only ever hides inactive tabs.
+  $: ({ primary, overflow } = partitionTabs(
+    tabs,
+    primaryCap,
+    activeCanvasName,
+    onCustomize,
+  ));
+
+  function partitionTabs(
+    all: DashboardTab[],
+    cap: number,
+    activeName: string,
+    customizeActive: boolean,
+  ): { primary: DashboardTab[]; overflow: DashboardTab[] } {
+    const primary = all.slice(0, cap);
+    const overflow = all.slice(cap);
+    if (customizeActive || overflow.length === 0) return { primary, overflow };
+    const activeIdx = overflow.findIndex((t) => t.key === activeName);
+    if (activeIdx === -1) return { primary, overflow };
+    // Swap the active overflow tab into the last visible slot; the bumped tab
+    // takes the active tab's old place in overflow (order otherwise preserved).
+    const lastIdx = primary.length - 1;
+    const bumped = primary[lastIdx];
+    primary[lastIdx] = overflow[activeIdx];
+    overflow[activeIdx] = bumped;
+    return { primary, overflow };
+  }
 
   onMount(() => {
-    // Observe width changes so MORE ▾ kicks in before tabs overflow.
+    // Observe width changes so MORE ▾ kicks in exactly when the inline
+    // strip would otherwise overflow.
     let observer: ResizeObserver | null = null;
     void tick().then(() => {
       if (!containerEl || typeof ResizeObserver === "undefined") return;
@@ -83,7 +145,7 @@
             ? "dashboard-tab more-trigger active"
             : "dashboard-tab more-trigger"}
         >
-          More <span class="more-chev">▾</span>
+          More +{overflow.length} <span class="more-chev">▾</span>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content class="more-dropdown-content" sideOffset={4}>
           {#each overflow as tab (tab.key)}
@@ -110,6 +172,21 @@
   {/if}
 </div>
 
+<!-- Hidden measurement strip: every candidate tab rendered with the real
+     `.dashboard-tab` styling so `offsetWidth` matches what the visible
+     anchors would render at. Sits off-screen, doesn't intercept pointer
+     events, and is ignored by AT (aria-hidden). The visible strip's
+     `recomputeCap()` reads widths from here. -->
+<div
+  bind:this={measurerEl}
+  class="dashboard-tab-measurer"
+  aria-hidden="true"
+>
+  {#each tabs.slice(0, USER_PRIMARY_CAP) as tab (tab.key)}
+    <span class="dashboard-tab measure-tab">{tab.label}</span>
+  {/each}
+</div>
+
 <style lang="postcss">
   .dashboard-tabs-strip {
     @apply flex items-stretch w-full px-6 border-b;
@@ -125,11 +202,11 @@
   .dashboard-tab {
     @apply inline-flex items-center px-4 py-3.5 whitespace-nowrap;
     font-family: "Space Mono", "JetBrains Mono", monospace;
-    font-size: 11px;
-    letter-spacing: 0.12em;
+    font-size: 13px;
+    letter-spacing: 2px;
     font-weight: 700;
     text-transform: uppercase;
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
     text-decoration: none;
     border-bottom: 2px solid transparent;
     transition:
@@ -140,7 +217,7 @@
   }
 
   .dashboard-tab:hover {
-    color: var(--color-text);
+    color: var(--bratrax-text-headline, var(--color-text));
   }
 
   /* Use :global on .active for the dropdown trigger button (bits-ui renders
@@ -179,11 +256,11 @@
     padding: 14px 16px;
     white-space: nowrap;
     font-family: "Space Mono", "JetBrains Mono", monospace;
-    font-size: 11px;
-    letter-spacing: 0.12em;
+    font-size: 13px;
+    letter-spacing: 2px;
     font-weight: 700;
     text-transform: uppercase;
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
     text-decoration: none;
     border: none;
     border-bottom: 2px solid transparent;
@@ -194,7 +271,7 @@
       border-color 0.2s;
   }
   :global(.more-trigger:hover) {
-    color: var(--color-text);
+    color: var(--bratrax-text-headline, var(--color-text));
   }
   :global(.more-trigger .more-chev) {
     margin-left: 4px;
@@ -219,5 +296,18 @@
   }
   :global(.more-dropdown-item:hover) {
     background: var(--color-acid-dim, rgba(212, 255, 0, 0.06)) !important;
+  }
+
+  /* Off-screen measurer — anchors render at full size so offsetWidth
+     matches what the visible strip would render at, but it doesn't paint
+     and doesn't intercept events. */
+  .dashboard-tab-measurer {
+    position: absolute;
+    left: -10000px;
+    top: 0;
+    visibility: hidden;
+    pointer-events: none;
+    white-space: nowrap;
+    display: flex;
   }
 </style>

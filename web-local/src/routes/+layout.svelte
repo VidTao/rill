@@ -430,9 +430,9 @@
      auto-flip with the .dark class on <html>. Active state shows the acid border. */
   .bratrax-nav-link {
     font-family: "Space Mono", "JetBrains Mono", monospace;
-    font-size: 0.875rem; /* 14px */
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
     color: var(--color-text-muted) !important;
     text-decoration: none;
@@ -445,17 +445,14 @@
   }
 
   .bratrax-nav-link:hover {
-    color: var(--color-text) !important;
-    background: var(--color-acid-dim);
+    color: var(--color-text-secondary) !important;
   }
 
+  /* Active on the utility bar signals with brightness only — bright text + a
+     neutral underline, NO acid. The acid "you are here" marker is reserved for
+     the section tabs (Tier 2), so the screen carries exactly one acid signal. */
   .bratrax-nav-link.active {
-    color: var(--color-text) !important;
-    background: var(--color-acid-mid);
-    border-bottom-color: var(--color-acid);
-  }
-
-  :global(.dark) .bratrax-nav-link.active {
-    color: var(--color-acid) !important;
+    color: var(--bratrax-text-headline, var(--color-text)) !important;
+    border-bottom-color: var(--color-border-strong);
   }
 </style>

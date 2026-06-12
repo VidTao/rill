@@ -80,9 +80,9 @@
     border: none;
     cursor: pointer;
     font-family: "Space Mono", "JetBrains Mono", monospace;
-    font-size: 0.875rem;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
     color: var(--color-text-muted);
     padding: 10px 12px;
@@ -93,13 +93,12 @@
       background-color 0.2s;
   }
   :global(.settings-trigger:hover) {
-    color: var(--color-text);
-    background: var(--color-acid-dim, rgba(212, 255, 0, 0.06));
+    color: var(--color-text-secondary);
   }
+  /* Brightness-only active state — no acid (reserved for the section tabs). */
   :global(.settings-trigger.active) {
-    color: var(--color-text);
-    background: var(--color-acid-mid, rgba(212, 255, 0, 0.12));
-    border-bottom-color: var(--color-acid);
+    color: var(--bratrax-text-headline, var(--color-text));
+    border-bottom-color: var(--color-border-strong);
   }
   :global(.settings-trigger:focus-visible) {
     outline: 2px solid var(--color-acid, #d4ff00);

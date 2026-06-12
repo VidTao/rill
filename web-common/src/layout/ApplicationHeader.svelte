@@ -136,8 +136,17 @@
   header {
     @apply w-full box-border;
     @apply flex items-center px-7 flex-none;
-    @apply h-[3.75rem];
+    @apply h-[3.25rem];
     gap: 22px;
+  }
+
+  /* The utility bar reads as a quiet plane behind the louder section tabs:
+     a hair darker than the page (#080808 vs #0A0A0A) so it recedes, plus a
+     1px neutral hairline so Tier 1 and Tier 2 read as two distinct planes.
+     Dark theme only — light theme mirrors the logic in a later pass. */
+  :global(.dark) header {
+    background: #080808;
+    border-bottom: 1px solid var(--color-border-strong);
   }
 
   .nav-tabs-slot,
