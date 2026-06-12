@@ -44,6 +44,16 @@
   const REFRESH_TIMEOUT_MS = 10 * 60 * 1000;
   const REQUIRED_IDLE_POLLS = 3;
 
+  // Grace window for transient "table does not exist" reconcile errors. Rill's
+  // file-watcher reconciles the generated project mid-deploy — before all ~130
+  // ClickHouse tables exist — so some MetricsViews briefly settle IDLE with a
+  // "does not exist" error. The onboarding backend fires a post-deploy reconcile
+  // (instance evict) that clears these within seconds, so we keep polling
+  // through them for this window instead of failing permanently. Any OTHER
+  // settled error is a genuine build failure and still fails fast.
+  const TRANSIENT_ERROR_GRACE_MS = 90_000;
+  let transientErrorSinceMs: number | null = null;
+
   // ---------------------------------------------------------------------------
   // Step display configuration
   // ---------------------------------------------------------------------------
@@ -277,7 +287,8 @@
         return;
       }
 
-      const failed: string[] = [];
+      const transientFailed: string[] = [];
+      const hardFailed: string[] = [];
       let anyPending = false;
 
       // Kinds whose pending state must block redirect. Walking only the
@@ -313,7 +324,15 @@
         const isIdle =
           r.meta?.reconcileStatus === V1ReconcileStatus.RECONCILE_STATUS_IDLE;
         if (required.has(k) && isIdle && r.meta?.reconcileError) {
-          failed.push(r.meta?.name?.name ?? k);
+          // "table ... does not exist" is the deploy/reconcile race (file-watcher
+          // reconciled before the CH tables landed); the backend's post-deploy
+          // reconcile clears it within seconds, so treat it as retryable. Any
+          // other settled error is a genuine build failure.
+          if (/does not exist/i.test(r.meta?.reconcileError ?? "")) {
+            transientFailed.push(r.meta?.name?.name ?? k);
+          } else {
+            hardFailed.push(r.meta?.name?.name ?? k);
+          }
           continue;
         }
         if (!isIdle && DATA_KINDS.has(kind)) {
@@ -321,13 +340,33 @@
         }
       }
 
-      if (failed.length > 0) {
+      // Genuine build error → fail immediately.
+      if (hardFailed.length > 0) {
         verifyState = "error";
-        error = `Failed to build: ${failed.join(", ")}`;
+        error = `Failed to build: ${hardFailed.join(", ")}`;
         if (verifyInterval) clearInterval(verifyInterval);
         verifyInterval = null;
         return;
       }
+
+      // Transient "does not exist" → keep polling for the grace window; the
+      // backend's post-deploy reconcile clears it within seconds. Fail only if
+      // it persists past TRANSIENT_ERROR_GRACE_MS (a real, non-self-healing
+      // problem rather than the deploy/reconcile race).
+      if (transientFailed.length > 0) {
+        if (transientErrorSinceMs === null) transientErrorSinceMs = Date.now();
+        if (Date.now() - transientErrorSinceMs < TRANSIENT_ERROR_GRACE_MS) {
+          verifyState = "running";
+          return;
+        }
+        verifyState = "error";
+        error = `Failed to build: ${transientFailed.join(", ")}`;
+        if (verifyInterval) clearInterval(verifyInterval);
+        verifyInterval = null;
+        return;
+      }
+      // Clean poll — reset the timer so a future blip gets a full grace window.
+      transientErrorSinceMs = null;
 
       const timedOut =
         triggeredRefresh === true &&
