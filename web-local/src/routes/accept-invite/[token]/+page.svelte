@@ -11,6 +11,10 @@
     checkCompanyAvailable,
     type CompanyCheckResult,
   } from "$lib/bratrax/onboarding/api";
+  import {
+    TERMS_OF_SERVICE_URL,
+    PRIVACY_POLICY_URL,
+  } from "$lib/bratrax/constants";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 
   let invite: InvitationPreview | null = null;
@@ -23,6 +27,10 @@
   let companyName = "";
   let submitError = "";
   let submitting = false;
+  // ToS + Privacy consent — required for any kind of invite acceptance,
+  // since accepting creates the rill_users row (and for signup invites,
+  // the rill_clients row too).
+  let agreedToTerms = false;
 
   $: token = $page.params.token;
 
@@ -34,6 +42,7 @@
     !invite.accepted &&
     password.length >= 8 &&
     passwordsMatch &&
+    agreedToTerms &&
     (!isSignup ||
       (companyName.trim().length > 0 &&
         companyChecked &&
@@ -286,6 +295,30 @@
             {submitError}
           </div>
         {/if}
+
+        <label class="flex items-start gap-2 text-sm font-light text-bratrax-text-body">
+          <input
+            type="checkbox"
+            bind:checked={agreedToTerms}
+            class="mt-1 h-4 w-4 flex-none accent-bratrax-acid"
+          />
+          <span>
+            I agree to the
+            <a
+              href={TERMS_OF_SERVICE_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              class="underline">Terms of Service</a
+            >
+            and
+            <a
+              href={PRIVACY_POLICY_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              class="underline">Privacy Policy</a
+            >
+          </span>
+        </label>
 
         <button
           type="submit"

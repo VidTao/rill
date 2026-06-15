@@ -12,6 +12,10 @@
     checkCompanyAvailable,
     type CompanyCheckResult,
   } from "$lib/bratrax/onboarding/api";
+  import {
+    TERMS_OF_SERVICE_URL,
+    PRIVACY_POLICY_URL,
+  } from "$lib/bratrax/constants";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 
   let email = "";
@@ -19,6 +23,12 @@
   let companyName = "";
   let error = "";
   let loading = false;
+
+  // ToS + Privacy consent — gates both the open-mode signup submit and the
+  // invite-only Request Access CTA. Required on /signup regardless of mode
+  // (legal requirement: explicit consent before any account creation or
+  // waitlist signup).
+  let agreedToTerms = false;
 
   // Gate the form on the runtime ONLY_INVITATION_LINK env var. The Go proxy
   // exposes the value via /bratrax/auth/config (public). Default to gating
@@ -191,10 +201,35 @@
           </p>
         </div>
 
+        <label class="flex items-start gap-2 text-sm font-light text-bratrax-text-body">
+          <input
+            type="checkbox"
+            bind:checked={agreedToTerms}
+            class="mt-1 h-4 w-4 flex-none accent-bratrax-acid"
+          />
+          <span>
+            I agree to the
+            <a
+              href={TERMS_OF_SERVICE_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              class="underline">Terms of Service</a
+            >
+            and
+            <a
+              href={PRIVACY_POLICY_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              class="underline">Privacy Policy</a
+            >
+          </span>
+        </label>
+
         <button
           type="button"
           on:click={openRequestAccess}
-          class="block w-full bg-bratrax-acid px-4 py-3 text-center font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px"
+          disabled={!agreedToTerms}
+          class="block w-full bg-bratrax-acid px-4 py-3 text-center font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50 disabled:hover:translate-y-0"
         >
           Request access →
         </button>
@@ -264,9 +299,33 @@
           />
         </div>
 
+        <label class="flex items-start gap-2 text-sm font-light text-bratrax-text-body">
+          <input
+            type="checkbox"
+            bind:checked={agreedToTerms}
+            class="mt-1 h-4 w-4 flex-none accent-bratrax-acid"
+          />
+          <span>
+            I agree to the
+            <a
+              href={TERMS_OF_SERVICE_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              class="underline">Terms of Service</a
+            >
+            and
+            <a
+              href={PRIVACY_POLICY_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              class="underline">Privacy Policy</a
+            >
+          </span>
+        </label>
+
         <button
           type="submit"
-          disabled={loading || companyCheckBusy || !companyChecked || !!companyCheckError}
+          disabled={loading || companyCheckBusy || !companyChecked || !!companyCheckError || !agreedToTerms}
           class="mt-2 w-full bg-bratrax-acid px-4 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
         >
           {loading ? "SETTING UP..." : "GET STARTED →"}
