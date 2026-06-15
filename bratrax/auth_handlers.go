@@ -24,7 +24,7 @@ import (
 
 const (
 	bratraxCookieName  = "bratrax_auth"
-	bratraxTokenTTL    = 24 * time.Hour
+	bratraxTokenTTL    = 14 * 24 * time.Hour
 	maxRequestBodySize = 1 << 20 // 1 MB
 	minPasswordLength  = 8
 	maxPasswordLength  = 72 // bcrypt truncates beyond 72 bytes
