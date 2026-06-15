@@ -20,9 +20,16 @@
 
   let email = "";
   let password = "";
+  let confirm = "";
   let companyName = "";
   let error = "";
   let loading = false;
+
+  // Confirm-password match check — mirrors the accept-invite/[token] form
+  // so the two account-creation surfaces validate identically. Empty
+  // password means "not yet typed" — don't surface the mismatch message
+  // until the user has typed something in BOTH fields.
+  $: passwordsMatch = password.length > 0 && password === confirm;
 
   // ToS + Privacy consent — gates both the open-mode signup submit and the
   // invite-only Request Access CTA. Required on /signup regardless of mode
@@ -299,6 +306,24 @@
           />
         </div>
 
+        <div class="flex flex-col gap-1">
+          <label for="confirm-password" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+            Confirm password
+          </label>
+          <input
+            id="confirm-password"
+            type="password"
+            bind:value={confirm}
+            required
+            minlength="8"
+            autocomplete="new-password"
+            class="signup-input border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
+          />
+          {#if confirm.length > 0 && !passwordsMatch}
+            <p class="font-mono text-[10px] text-bratrax-tomato">Passwords don't match</p>
+          {/if}
+        </div>
+
         <label class="flex items-start gap-2 text-sm font-light text-bratrax-text-body">
           <input
             type="checkbox"
@@ -325,7 +350,7 @@
 
         <button
           type="submit"
-          disabled={loading || companyCheckBusy || !companyChecked || !!companyCheckError || !agreedToTerms}
+          disabled={loading || companyCheckBusy || !companyChecked || !!companyCheckError || !agreedToTerms || !passwordsMatch}
           class="mt-2 w-full bg-bratrax-acid px-4 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
         >
           {loading ? "SETTING UP..." : "GET STARTED →"}
