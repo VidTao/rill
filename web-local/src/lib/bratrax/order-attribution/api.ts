@@ -30,6 +30,7 @@ const ORDER_TIMELINE_DIMENSIONS = new Set([
   "anonymous_id",
   "campaign",
   "campaign_id",
+  "campaign_type",
   "channel_group",
   "conversion_ts",
   "customer_id",
@@ -56,6 +57,20 @@ const ORDER_TIMELINE_DIMENSIONS = new Set([
   "source",
   "url",
 ]);
+
+// The campaign_deep_dive pivot (cross_metrics) names its level-2 dimension
+// `source`, but the value is a campaign-type label (Search / Conversion /
+// (none)), derived from dim_campaigns — not the raw platform source.
+// order_timeline_v1 exposes that same derived label as `campaign_type` and
+// keeps the raw platform value (facebook / paworigin.com) under `source` for
+// the per-order timeline display. So when forwarding a cell filter to the
+// drilldown we remap `source` -> `campaign_type`; otherwise a Meta cell's
+// `source='(none)'` (or a Google cell's `source='Search'`) matches zero rows
+// against the raw `source` column. Only the pivot dimensions whose meaning
+// differs across the two views belong here.
+const PIVOT_DIM_RENAME: Record<string, string> = {
+  source: "campaign_type",
+};
 
 // Per-model "this touchpoint won" flag. The order_timeline_v1 view carries a
 // boolean column for each supported attribution model; we filter Modal 1 on
@@ -97,13 +112,23 @@ function pruneFilterToOrderTimeline(
     if (kept.length === 1) return kept[0];
     return { cond: { op, exprs: kept } };
   }
-  // Leaf comparison (IN / NIN / EQ / etc.): drop if the ident isn't on the
+  // Leaf comparison (IN / NIN / EQ / etc.): remap pivot-specific dimension
+  // names to their order_timeline column, then drop if the ident isn't on the
   // drilldown view.
   const ident = inner[0]?.ident;
-  if (typeof ident === "string" && !ORDER_TIMELINE_DIMENSIONS.has(ident)) {
+  if (typeof ident !== "string") return expr;
+  const mapped = PIVOT_DIM_RENAME[ident] ?? ident;
+  if (!ORDER_TIMELINE_DIMENSIONS.has(mapped)) {
     return undefined;
   }
-  return expr;
+  if (mapped === ident) return expr;
+  // Clone the leaf with the remapped identifier, preserving the values.
+  return {
+    cond: {
+      op: expr.cond.op,
+      exprs: [{ ident: mapped }, ...inner.slice(1)],
+    },
+  };
 }
 
 // Truthy-fallback for the human-readable order label. The compiler emits
