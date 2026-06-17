@@ -5,6 +5,7 @@
     getClientDetail,
     type ClientDetail,
     type ClientConnection,
+    type ClientStatus,
   } from "$lib/bratrax/superadmins/api";
   import ClientEmailAutomations from "$lib/bratrax/superadmins/ClientEmailAutomations.svelte";
   import ClientEmailHistory from "$lib/bratrax/superadmins/ClientEmailHistory.svelte";
@@ -27,13 +28,47 @@
     "ready",
   ];
 
-  // Expected platforms for the shopify-paid-media template (Shopify + 3 ads).
-  const EXPECTED_PLATFORMS = [
-    { id: "shopify", label: "Shopify" },
-    { id: "facebook_ads", label: "Facebook Ads" },
-    { id: "google_ads", label: "Google Ads" },
-    { id: "tiktok_ads", label: "TikTok Ads" },
-  ];
+  const STATUS_ICON: Record<ClientStatus, string> = {
+    healthy: "●",
+    running: "▶",
+    waiting: "⏸",
+    needs_handoff: "⚠",
+    stuck: "⚠",
+    error: "✕",
+    cancelled: "◐",
+    expired: "◌",
+  };
+  const STATUS_LABEL: Record<ClientStatus, string> = {
+    healthy: "Healthy",
+    running: "Running",
+    waiting: "Waiting",
+    needs_handoff: "Needs handoff",
+    stuck: "Stuck",
+    error: "Error",
+    cancelled: "Cancelled",
+    expired: "Expired",
+  };
+
+  // Page-level state pill — color-matched to the status (mockup §§2-5).
+  function pillStyle(s: ClientStatus): string {
+    switch (s) {
+      case "needs_handoff":
+        return "background: var(--bratrax-acid); color: #000;";
+      case "error":
+      case "stuck":
+        return "background: var(--bratrax-tomato); color: #000;";
+      case "cancelled":
+        return "background: var(--bratrax-lavender); color: #000;";
+      case "expired":
+        return "background: var(--bratrax-gray); color: var(--bratrax-text-headline);";
+      case "healthy":
+        return "background: var(--color-acid-dim); color: var(--color-acid-text); border: 1px solid var(--color-acid-mid);";
+      case "running":
+        return "background: transparent; color: var(--bratrax-cyan); border: 1px solid var(--bratrax-cyan);";
+      default: // waiting
+        return "background: var(--bratrax-bg); color: var(--bratrax-text-muted); border: 1px solid var(--bratrax-border);";
+    }
+  }
 
   onMount(load);
 
@@ -58,18 +93,58 @@
     });
   }
 
-  function ageLabel(hours: number | null): string {
-    if (hours == null) return "—";
-    if (hours < 1) return `${Math.round(hours * 60)}m ago`;
-    if (hours < 48) return `${Math.round(hours)}h ago`;
-    return `${Math.round(hours / 24)}d ago`;
+  function relativeTime(iso: string | null): string {
+    if (!iso) return "— tracking pending";
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) return "— tracking pending";
+    const days = Math.floor((Date.now() - then) / 86400000);
+    if (days <= 0) return "today";
+    if (days === 1) return "yesterday";
+    if (days < 30) return `${days} days ago`;
+    return fmtDate(iso);
   }
 
+  // Normalize the external-landing-pages alias: connected_platforms stores
+  // either "external_pages" (legacy) or "funnelish" (builder sub-picker); the
+  // registry id is "external_pages". Mirrors the /onboard/me read-time rewrite.
   $: connectionByPlatform = new Map<string, ClientConnection>(
     (detail?.onboarding.connected_platforms ?? [])
       .filter((c) => c && typeof c === "object")
-      .map((c) => [c.platform, c]),
+      .map((c) => [c.platform === "funnelish" ? "external_pages" : c.platform, c]),
   );
+
+  $: primaryIntegrations =
+    detail?.supported_integrations?.filter((i) => i.category === "primary") ?? [];
+  $: optionalIntegrations =
+    detail?.supported_integrations?.filter((i) => i.category === "optional") ?? [];
+
+  // Card top-accent colors, varying by each card's contribution to state.
+  $: onboardingAccent = !detail
+    ? "transparent"
+    : detail.onboarding.step === "error"
+      ? "var(--bratrax-tomato)"
+      : detail.status === "needs_handoff" || detail.onboarding.step === "ready"
+        ? "var(--bratrax-acid)"
+        : "var(--bratrax-border)";
+
+  $: subscriptionAccent = !detail
+    ? "transparent"
+    : detail.status === "cancelled"
+      ? "var(--bratrax-lavender)"
+      : detail.status === "expired"
+        ? "var(--bratrax-gray)"
+        : detail.subscription.is_paid_subscriber && detail.subscription.status === "active"
+          ? "var(--bratrax-acid)"
+          : "var(--bratrax-border)";
+
+  $: allPrimaryConnected =
+    primaryIntegrations.length > 0 &&
+    primaryIntegrations.every((i) => connectionByPlatform.has(i.id));
+  $: connectionsAccent = allPrimaryConnected
+    ? "var(--bratrax-acid)"
+    : "var(--bratrax-border)";
+
+  $: stepIndex = detail ? STEP_FLOW.indexOf(detail.onboarding.step ?? "") : -1;
 
   $: extractionLabel = (() => {
     const es = detail?.onboarding.extraction_status;
@@ -82,10 +157,7 @@
   class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12"
 >
   <div class="w-full max-w-5xl px-4">
-    <a
-      href="/clients"
-      class="font-mono text-[11px] text-bratrax-acid hover:underline"
-    >
+    <a href="/clients" class="font-mono text-[11px] uppercase tracking-[2px] text-bratrax-text-muted hover:text-bratrax-acid">
       ← All clients
     </a>
 
@@ -101,60 +173,56 @@
     {#if loading}
       <div class="mt-6 space-y-3">
         {#each Array(4) as _}
-          <div
-            class="h-28 animate-pulse border border-bratrax-border bg-bratrax-surface"
-          ></div>
+          <div class="h-28 animate-pulse border border-bratrax-border bg-bratrax-surface"></div>
         {/each}
       </div>
     {:else if detail}
       <!-- Header -->
-      <div class="mt-4 flex items-start justify-between">
-        <div>
-          <h1 class="text-2xl font-black text-bratrax-text-headline">
-            {detail.company_name}
-          </h1>
-          <div class="mt-1 font-mono text-[11px] text-bratrax-text-muted">
-            {detail.client_id} · Signed up {fmtDate(detail.signed_up_at)}
-            {#if detail.timezone}· {detail.timezone}{/if}
-          </div>
+      <div class="mt-4">
+        <h1 class="text-2xl font-black text-bratrax-text-headline">
+          {detail.company_name}
+        </h1>
+        <div class="mt-1 font-mono text-[11px] text-bratrax-text-muted">
+          {detail.client_id} · Signed up {fmtDate(detail.signed_up_at)}
+          {#if detail.timezone}· {detail.timezone}{/if}
+          · Shopify embed {detail.shopify_embed_enabled ? "enabled" : "not enabled"}
         </div>
-        <div class="font-mono text-[11px] text-bratrax-text-muted">
-          ⏱ Updated {ageLabel(detail.onboarding.step_age_hours)}
+        <!-- Page-level state pill -->
+        <div
+          class="mt-3 inline-block font-mono text-[12px] font-bold uppercase tracking-[1.5px]"
+          style={`${pillStyle(detail.status)} padding: 5px 10px;`}
+        >
+          {STATUS_ICON[detail.status]} {STATUS_LABEL[detail.status]}{detail.status_sub_label
+            ? ` · ${detail.status_sub_label}`
+            : ""}
         </div>
       </div>
 
       <!-- Onboarding -->
-      <section
-        class="relative mt-6 border border-bratrax-border bg-bratrax-surface p-5"
-      >
-        <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
-        <h2
-          class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
-        >
+      <section class="relative mt-6 border border-bratrax-border bg-bratrax-surface p-5">
+        <div class="absolute left-0 right-0 top-0 h-1" style={`background: ${onboardingAccent}`}></div>
+        <h2 class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
           Onboarding
         </h2>
 
         <div class="flex flex-wrap items-center gap-1 font-mono text-[11px]">
           {#each STEP_FLOW as step, i}
             <span
-              class:font-bold={detail.onboarding.step === step}
-              class:text-bratrax-acid={detail.onboarding.step === step}
-              class:text-bratrax-text-muted={detail.onboarding.step !== step}
+              class:font-bold={i === stepIndex}
+              class:text-bratrax-acid={i === stepIndex && detail.onboarding.step !== "error"}
+              class:text-bratrax-text-body={i < stepIndex}
+              class:text-bratrax-text-muted={i > stepIndex}
             >
-              {detail.onboarding.step === step ? "● " : ""}{step}
+              {i === stepIndex ? "● " : ""}{step}
             </span>
-            {#if i < STEP_FLOW.length - 1}<span class="text-bratrax-text-muted"
-                >→</span
-              >{/if}
+            {#if i < STEP_FLOW.length - 1}<span class="text-bratrax-text-muted">→</span>{/if}
           {/each}
           {#if detail.onboarding.step === "error"}
             <span class="font-bold text-bratrax-tomato">· ✕ error</span>
           {/if}
         </div>
 
-        <dl
-          class="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[11px] sm:grid-cols-3"
-        >
+        <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[11px] sm:grid-cols-3">
           <div>
             <dt class="inline text-bratrax-text-muted">Template:</dt>
             {detail.onboarding.template_name ?? "—"}
@@ -171,31 +239,81 @@
             <dt class="inline text-bratrax-text-muted">Extraction:</dt>
             {extractionLabel}
           </div>
+          {#if detail.onboarding.step_age_hours != null}
+            <div>
+              <dt class="inline text-bratrax-text-muted">Step age:</dt>
+              {Math.round(detail.onboarding.step_age_hours)} hours
+            </div>
+          {/if}
+          <div>
+            <dt class="inline text-bratrax-text-muted">Error:</dt>
+            {detail.onboarding.error_message ?? "—"}
+          </div>
         </dl>
+      </section>
+
+      <!-- Connections — registry-driven, two columns (primary | optional) -->
+      <section class="relative mt-4 border border-bratrax-border bg-bratrax-surface p-5">
+        <div class="absolute left-0 right-0 top-0 h-1" style={`background: ${connectionsAccent}`}></div>
+        <h2 class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
+          Connections
+        </h2>
+        <div class="grid gap-x-8 gap-y-1 md:grid-cols-2">
+          {#each [primaryIntegrations, optionalIntegrations] as column}
+            <ul class="space-y-1 font-mono text-[11px]">
+              {#each column as integ (integ.id)}
+                {@const conn = connectionByPlatform.get(integ.id)}
+                <li class="flex items-baseline gap-3 py-1">
+                  <span class={conn ? "text-bratrax-acid" : "text-bratrax-text-muted"}>
+                    {conn ? "✓" : "○"}
+                  </span>
+                  <span class="w-40 shrink-0 font-bold text-bratrax-text-headline">
+                    {integ.display_name}
+                  </span>
+                  <span class="flex-1">
+                    {#if conn}
+                      <span class="text-bratrax-text-body">
+                        {conn.account_name || conn.account_id || "connected"}
+                      </span>
+                      {#if conn.connected_at}
+                        <span class="block text-bratrax-text-muted">Connected {fmtDate(conn.connected_at)}</span>
+                      {/if}
+                    {:else}
+                      <span class="text-bratrax-text-muted">— not connected —</span>
+                    {/if}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+          {/each}
+        </div>
       </section>
 
       <!-- Subscription + Team -->
       <div class="mt-4 grid gap-4 md:grid-cols-2">
-        <section class="border border-bratrax-border bg-bratrax-surface p-5">
-          <h2
-            class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
-          >
+        <section class="relative border border-bratrax-border bg-bratrax-surface p-5">
+          <div class="absolute left-0 right-0 top-0 h-1" style={`background: ${subscriptionAccent}`}></div>
+          <h2 class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
             Subscription
           </h2>
           <dl class="grid gap-y-1 font-mono text-[11px]">
             <div>
               <dt class="inline text-bratrax-text-muted">Status:</dt>
-              <span
-                class:text-bratrax-acid={detail.subscription.status ===
-                  "active"}
-              >
-                ● {detail.subscription.status ?? "—"}
+              <span class:text-bratrax-acid={detail.subscription.status === "active"}>
+                {detail.subscription.status ?? "—"}
               </span>
             </div>
-            <div>
-              <dt class="inline text-bratrax-text-muted">Paid:</dt>
-              {detail.subscription.is_paid_subscriber ? "yes" : "no"}
-            </div>
+            {#if detail.status === "cancelled" || detail.status === "expired"}
+              <div>
+                <dt class="inline text-bratrax-text-muted">Access ends:</dt>
+                {fmtDate(detail.subscription_ends_at)}
+              </div>
+            {:else}
+              <div>
+                <dt class="inline text-bratrax-text-muted">Next billing:</dt>
+                {fmtDate(detail.subscription_renews_at)}
+              </div>
+            {/if}
             <div>
               <dt class="inline text-bratrax-text-muted">Customer ID:</dt>
               {detail.subscription.lemon_customer_id ?? "—"}
@@ -204,27 +322,18 @@
               <dt class="inline text-bratrax-text-muted">Subscription:</dt>
               {detail.subscription.lemon_subscription_id ?? "—"}
             </div>
-            <div>
-              <dt class="inline text-bratrax-text-muted">Shopify embed:</dt>
-              {detail.shopify_embed_enabled ? "✓ enabled" : "not enabled"}
-            </div>
           </dl>
         </section>
 
         <section class="border border-bratrax-border bg-bratrax-surface p-5">
-          <h2
-            class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
-          >
+          <h2 class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
             Team ({detail.team.length})
           </h2>
           <ul class="space-y-1 font-mono text-[11px]">
             {#each detail.team as m (m.id)}
               <li class="flex items-center justify-between gap-2">
-                <span class="text-bratrax-text-headline"
-                  >{m.name || m.email}</span
-                >
-                <span class="text-bratrax-text-muted">{m.email} ({m.role})</span
-                >
+                <span class="text-bratrax-text-headline">{m.name || m.email}</span>
+                <span class="text-bratrax-text-muted">{m.email} ({m.role})</span>
               </li>
             {/each}
           </ul>
@@ -232,58 +341,29 @@
           {#if detail.pending_invitations.length}
             <div class="mt-3 font-mono text-[11px]">
               <div class="text-bratrax-text-muted">
-                {detail.pending_invitations.length} pending invite{detail
-                  .pending_invitations.length === 1
+                {detail.pending_invitations.length} pending invite{detail.pending_invitations
+                  .length === 1
                   ? ""
                   : "s"}:
               </div>
               <ul class="mt-1 space-y-0.5">
                 {#each detail.pending_invitations as inv (inv.token)}
                   <li class="text-bratrax-text-body">
-                    • {inv.email} ({inv.role}, expires {fmtDate(
-                      inv.expires_at,
-                    )})
+                    • {inv.email} ({inv.role}, expires {fmtDate(inv.expires_at)})
                   </li>
                 {/each}
               </ul>
             </div>
           {/if}
+
+          <div class="mt-4 border-t border-dashed border-bratrax-border pt-3 font-mono text-[11px] text-bratrax-text-muted">
+            Last sign-in (any user):
+            <span class:text-bratrax-lavender={!detail.workspace_last_seen}>
+              {relativeTime(detail.workspace_last_seen)}
+            </span>
+          </div>
         </section>
       </div>
-
-      <!-- Connections -->
-      <section class="mt-4 border border-bratrax-border bg-bratrax-surface p-5">
-        <h2
-          class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
-        >
-          Connections
-        </h2>
-        <ul class="space-y-1 font-mono text-[11px]">
-          {#each EXPECTED_PLATFORMS as p}
-            {@const conn = connectionByPlatform.get(p.id)}
-            <li class="flex items-center gap-3">
-              <span
-                class={conn ? "text-bratrax-acid" : "text-bratrax-text-muted"}
-              >
-                {conn ? "✓" : "○"}
-              </span>
-              <span class="w-32 text-bratrax-text-headline">{p.label}</span>
-              {#if conn}
-                <span class="text-bratrax-text-body"
-                  >{conn.account_name || conn.account_id || "connected"}</span
-                >
-                {#if conn.connected_at}
-                  <span class="text-bratrax-text-muted"
-                    >· Connected {fmtDate(conn.connected_at)}</span
-                  >
-                {/if}
-              {:else}
-                <span class="text-bratrax-text-muted">— not connected —</span>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      </section>
 
       <!-- Email automations + Email history (Phase 4c sections) -->
       <ClientEmailAutomations {clientId} />

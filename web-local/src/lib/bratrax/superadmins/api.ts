@@ -189,6 +189,19 @@ export function dismissAccessRequest(
 // flip a single-store client into a multi-store parent in one click.
 // ---------------------------------------------------------------------------
 
+// The 8-state CRM taxonomy, computed server-side (see superadmins.py
+// derive_status + docs/INTERNAL_CRM_REDESIGN_HANDOFF.md). The frontend reads
+// one `status` string per client; precedence is resolved on the backend.
+export type ClientStatus =
+  | "healthy"
+  | "running"
+  | "waiting"
+  | "needs_handoff"
+  | "stuck"
+  | "error"
+  | "cancelled"
+  | "expired";
+
 export interface SuperadminClientRow {
   client_id: string;
   company_name: string;
@@ -216,11 +229,18 @@ export interface SuperadminClientRow {
   connected_platform_count: number;
   connected_platforms: string[];
   updated_at: string | null;
+  // --- CRM redesign: single computed status + supporting signals -----------
+  status: ClientStatus;
+  status_sub_label: string | null;
+  workspace_last_seen: string | null;
+  subscription_ends_at: string | null;
+  subscription_renews_at: string | null;
 }
 
 export interface ClientFilters {
   step?: string[];
   subscription_status?: string[];
+  status?: ClientStatus[];
   paid?: "true" | "false";
   search?: string;
   stuck_hours?: number;
@@ -233,6 +253,7 @@ function buildClientsQuery(filters?: ClientFilters): string {
   filters.subscription_status?.forEach((s) =>
     qs.append("subscription_status", s),
   );
+  filters.status?.forEach((s) => qs.append("status", s));
   if (filters.paid) qs.set("paid", filters.paid);
   if (filters.search) qs.set("search", filters.search);
   if (filters.stuck_hours != null)
@@ -253,11 +274,21 @@ export function listAllClients(
 
 export interface ClientsSummary {
   total: number;
-  active_paid: number;
-  stuck_over_24h: number;
-  in_error: number;
-  ready: number;
-  signed_up_this_week: number;
+  // status IN (needs_handoff, stuck, error)
+  needs_attention: number;
+  // status === healthy
+  healthy: number;
+  // status IN (cancelled, expired)
+  cancelled_or_expired: number;
+}
+
+// One supported-integration descriptor from the backend connector registry.
+// `id` matches the platform string in connected_platforms — the detail view
+// joins each registry row against the client's actual connections.
+export interface SupportedIntegration {
+  id: string;
+  display_name: string;
+  category: "primary" | "optional";
 }
 
 export function getClientsSummary(): Promise<ClientsSummary> {
@@ -298,6 +329,15 @@ export interface ClientDetail {
   rill_project_id: string | null;
   shopify_embed_enabled: boolean;
   multi_client_id: string | null;
+  // --- CRM redesign: single computed status + supporting signals -----------
+  status: ClientStatus;
+  status_sub_label: string | null;
+  workspace_last_seen: string | null;
+  subscription_ends_at: string | null;
+  subscription_renews_at: string | null;
+  // Backend-registered list of every supported integration; joined against
+  // onboarding.connected_platforms to render the Connections card.
+  supported_integrations: SupportedIntegration[];
   onboarding: {
     step: string | null;
     step_age_hours: number | null;
@@ -315,6 +355,8 @@ export interface ClientDetail {
     status: string | null;
     lemon_subscription_id: string | null;
     lemon_customer_id: string | null;
+    ends_at: string | null;
+    renews_at: string | null;
   };
   team: ClientTeamMember[];
   pending_invitations: ClientPendingInvite[];

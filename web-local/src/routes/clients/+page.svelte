@@ -8,6 +8,7 @@
     type SuperadminClientRow,
     type ClientFilters,
     type ClientsSummary,
+    type ClientStatus,
   } from "$lib/bratrax/superadmins/api";
 
   let clients: SuperadminClientRow[] = [];
@@ -15,7 +16,60 @@
   let topError = "";
   let loading = true;
 
-  // --- Filters --------------------------------------------------------------
+  // --- Status taxonomy (mirrors backend derive_status) ----------------------
+  // icon + label + the text color and row-stripe color per state. Colors are
+  // CSS vars so they flip correctly between light/dark themes. `acidText` uses
+  // the olive-on-cream fallback in light theme (raw acid fails AA as text).
+  const STATUS_META: Record<
+    ClientStatus,
+    { icon: string; label: string; color: string; stripe: string | null }
+  > = {
+    needs_handoff: { icon: "⚠", label: "Needs handoff", color: "var(--color-acid-text)", stripe: "var(--bratrax-acid)" },
+    stuck: { icon: "⚠", label: "Stuck", color: "var(--bratrax-tomato)", stripe: "var(--bratrax-tomato)" },
+    error: { icon: "✕", label: "Error", color: "var(--bratrax-tomato)", stripe: "var(--bratrax-tomato)" },
+    cancelled: { icon: "◐", label: "Cancelled", color: "var(--bratrax-lavender)", stripe: "var(--bratrax-lavender)" },
+    expired: { icon: "◌", label: "Expired", color: "var(--bratrax-text-muted)", stripe: "var(--bratrax-gray)" },
+    running: { icon: "▶", label: "Running", color: "var(--bratrax-cyan)", stripe: null },
+    waiting: { icon: "⏸", label: "Waiting", color: "var(--bratrax-text-muted)", stripe: null },
+    healthy: { icon: "●", label: "Healthy", color: "var(--color-acid-text)", stripe: null },
+  };
+
+  // Triage priority — lower sorts to the top. Urgent states surface first.
+  const STATUS_PRIORITY: Record<ClientStatus, number> = {
+    error: 0,
+    stuck: 1,
+    needs_handoff: 2,
+    cancelled: 3,
+    expired: 4,
+    running: 5,
+    waiting: 6,
+    healthy: 7,
+  };
+
+  // --- Tiles double as the status filter ------------------------------------
+  // Each non-Total tile maps to a set of statuses; clicking applies ?status=.
+  type TileKey = "total" | "needs_attention" | "healthy" | "cancelled_or_expired";
+  const TILE_STATUSES: Record<Exclude<TileKey, "total">, ClientStatus[]> = {
+    needs_attention: ["needs_handoff", "stuck", "error"],
+    healthy: ["healthy"],
+    cancelled_or_expired: ["cancelled", "expired"],
+  };
+  const TILES: { key: TileKey; label: string; accent: string | null }[] = [
+    { key: "total", label: "Total", accent: null },
+    { key: "needs_attention", label: "Needs attention", accent: "var(--bratrax-tomato)" },
+    { key: "healthy", label: "Healthy", accent: "var(--bratrax-acid)" },
+    { key: "cancelled_or_expired", label: "Cancelled / expired", accent: "var(--bratrax-lavender)" },
+  ];
+  function tileValue(key: TileKey): number | undefined {
+    if (!summary) return undefined;
+    if (key === "total") return summary.total;
+    if (key === "needs_attention") return summary.needs_attention;
+    if (key === "healthy") return summary.healthy;
+    return summary.cancelled_or_expired;
+  }
+  let activeTile: TileKey = "total";
+
+  // --- Secondary filters ----------------------------------------------------
   const STEPS = [
     "payment_pending",
     "created",
@@ -28,32 +82,25 @@
     "ready",
     "error",
   ];
-  const SUB_STATUSES = [
-    "active",
-    "past_due",
-    "cancelled",
-    "paused",
-    "expired",
-    "inactive",
-  ];
+  const SUB_STATUSES = ["active", "past_due", "cancelled", "paused", "expired", "inactive"];
 
   let selectedSteps = new Set<string>();
-  let subStatus = ""; // "" = all
-  let paid = ""; // "" = any | "true" | "false"
+  let subStatus = "";
+  let paid = "";
   let stuckHours: number | null = null;
-  let errorsOnly = false;
   let search = "";
   let stepMenuOpen = false;
 
   // --- Sorting (client-side) ------------------------------------------------
-  type SortKey = "company" | "step" | "stuck";
-  let sortKey: SortKey = "stuck";
-  let sortDir: "asc" | "desc" = "desc";
+  type SortKey = "company" | "status" | "stuck";
+  let sortKey: SortKey = "status";
+  let sortDir: "asc" | "desc" = "asc";
 
-  // --- Multi-store promotion (preserved from the original page) -------------
+  // --- Multi-store promotion (preserved) ------------------------------------
   let confirmOpen = false;
   let confirmTarget: SuperadminClientRow | null = null;
   let enabling = false;
+  let openMenuId: string | null = null;
 
   onMount(() => {
     loadSummary();
@@ -64,20 +111,18 @@
     try {
       summary = await getClientsSummary();
     } catch {
-      // Tiles are non-critical; the table error banner covers hard failures.
       summary = null;
     }
   }
 
   function currentFilters(): ClientFilters {
     const f: ClientFilters = {};
-    const steps = errorsOnly ? ["error"] : [...selectedSteps];
-    if (steps.length) f.step = steps;
+    if (selectedSteps.size) f.step = [...selectedSteps];
     if (subStatus) f.subscription_status = [subStatus];
+    if (activeTile !== "total") f.status = TILE_STATUSES[activeTile];
     if (paid === "true" || paid === "false") f.paid = paid;
     if (search.trim()) f.search = search.trim();
-    if (stuckHours != null && !Number.isNaN(stuckHours))
-      f.stuck_hours = stuckHours;
+    if (stuckHours != null && !Number.isNaN(stuckHours)) f.stuck_hours = stuckHours;
     return f;
   }
 
@@ -94,18 +139,21 @@
     }
   }
 
-  // Debounce any filter change (covers the search input's ~250ms requirement
-  // and avoids a request per keystroke / checkbox toggle).
   let debounceTimer: ReturnType<typeof setTimeout>;
   function scheduleReload() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(loadClients, 250);
   }
 
+  function selectTile(tile: TileKey) {
+    activeTile = activeTile === tile ? "total" : tile;
+    loadClients();
+  }
+
   function toggleStep(step: string) {
     if (selectedSteps.has(step)) selectedSteps.delete(step);
     else selectedSteps.add(step);
-    selectedSteps = selectedSteps; // trigger reactivity
+    selectedSteps = selectedSteps;
     scheduleReload();
   }
 
@@ -114,8 +162,8 @@
     subStatus = "";
     paid = "";
     stuckHours = null;
-    errorsOnly = false;
     search = "";
+    activeTile = "total";
     loadClients();
   }
 
@@ -124,8 +172,8 @@
     !!subStatus ||
     !!paid ||
     stuckHours != null ||
-    errorsOnly ||
-    !!search.trim();
+    !!search.trim() ||
+    activeTile !== "total";
 
   // --- Sorting --------------------------------------------------------------
   function setSort(key: SortKey) {
@@ -133,7 +181,7 @@
       sortDir = sortDir === "asc" ? "desc" : "asc";
     } else {
       sortKey = key;
-      sortDir = key === "company" || key === "step" ? "asc" : "desc";
+      sortDir = key === "stuck" ? "desc" : "asc";
     }
   }
 
@@ -143,9 +191,15 @@
     if (sortKey === "company") {
       av = a.company_name?.toLowerCase() ?? "";
       bv = b.company_name?.toLowerCase() ?? "";
-    } else if (sortKey === "step") {
-      av = a.onboarding_step ?? "";
-      bv = b.onboarding_step ?? "";
+    } else if (sortKey === "status") {
+      av = STATUS_PRIORITY[a.status] ?? 99;
+      bv = STATUS_PRIORITY[b.status] ?? 99;
+      // Tie-break by step age so the longest-waiting urgent row floats up.
+      if (av === bv) {
+        const ah = a.step_age_hours ?? -1;
+        const bh = b.step_age_hours ?? -1;
+        return bh - ah;
+      }
     } else {
       av = a.step_age_hours ?? -1;
       bv = b.step_age_hours ?? -1;
@@ -155,29 +209,7 @@
     return 0;
   });
 
-  // --- Step glyph + helpers -------------------------------------------------
-  function stepGlyph(step: string | null): string {
-    switch (step) {
-      case "payment_pending":
-      case "created":
-      case "embed_pending":
-        return "⏵";
-      case "platforms_connected":
-        return "●";
-      case "activating":
-      case "compiling":
-      case "deploying":
-      case "extracting":
-        return "◐";
-      case "ready":
-        return "◉";
-      case "error":
-        return "✕";
-      default:
-        return "·";
-    }
-  }
-
+  // --- Display helpers ------------------------------------------------------
   function stuckLabel(c: SuperadminClientRow): string {
     if (c.step_age_hours == null) return "—";
     const h = c.step_age_hours;
@@ -185,17 +217,24 @@
     return `${Math.round(h)}h`;
   }
 
-  function isStuck(c: SuperadminClientRow): boolean {
-    return (
-      c.onboarding_step !== "ready" &&
-      c.step_age_hours != null &&
-      c.step_age_hours > 24
-    );
+  // Color-temperature scaling on the Stuck column.
+  function stuckColor(c: SuperadminClientRow): string {
+    const h = c.step_age_hours;
+    if (h == null) return "var(--bratrax-text-muted)";
+    if (h >= 72) return "var(--bratrax-tomato)";
+    if (h >= 24) return "var(--bratrax-text-headline)";
+    return "var(--bratrax-text-body)";
+  }
+
+  function copyEmail(email: string | null, e: Event) {
+    e.stopPropagation();
+    if (email) navigator.clipboard?.writeText(email);
   }
 
   // --- Multi-store handlers -------------------------------------------------
   function requestEnable(c: SuperadminClientRow, e: Event) {
     e.stopPropagation();
+    openMenuId = null;
     confirmTarget = c;
     confirmOpen = true;
   }
@@ -225,10 +264,17 @@
     }
   }
 
+  function toggleMenu(id: string, e: Event) {
+    e.stopPropagation();
+    openMenuId = openMenuId === id ? null : id;
+  }
+
   function openDetail(c: SuperadminClientRow) {
     goto(`/clients/${encodeURIComponent(c.client_id)}`);
   }
 </script>
+
+<svelte:window on:click={() => (openMenuId = null)} />
 
 <div
   class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12"
@@ -246,26 +292,37 @@
       </div>
       <h1 class="text-2xl font-black text-bratrax-text-headline">Clients</h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
-        Read-only status of every customer workspace — onboarding step,
-        subscription, connections, errors. Click a row for full detail.
+        Read-only status of every customer workspace. Each row carries one
+        computed status; the four most urgent surface at the top. Click a tile
+        to scope the table, click a row for full detail.
       </p>
     </div>
 
-    <!-- Summary tiles -->
-    <div
-      class="mb-6 grid grid-cols-3 gap-px border border-bratrax-border bg-bratrax-border sm:grid-cols-6"
-    >
-      {#each [["TOTAL", summary?.total], ["ACTIVE PAID", summary?.active_paid], ["STUCK >24h", summary?.stuck_over_24h], ["IN ERROR", summary?.in_error], ["READY", summary?.ready], ["SIGNED UP THIS WK", summary?.signed_up_this_week]] as [label, value]}
-        <div class="bg-bratrax-bg px-3 py-3">
+    <!-- Summary tiles — double as the status filter -->
+    <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {#each TILES as tile (tile.key)}
+        <button
+          type="button"
+          on:click={() => selectTile(tile.key)}
+          class="relative border border-bratrax-border bg-bratrax-bg px-4 py-3 text-left transition-colors hover:bg-bratrax-surface"
+          class:is-active={activeTile === tile.key}
+        >
+          <span
+            class="absolute left-0 right-0 top-0"
+            style={`background: ${tile.accent ?? "transparent"}; height: ${activeTile === tile.key ? "5px" : "3px"}`}
+          ></span>
           <div
             class="font-mono text-[9px] font-bold uppercase tracking-[1px] text-bratrax-text-muted"
           >
-            {label}
+            {tile.label}
           </div>
-          <div class="mt-1 text-xl font-black text-bratrax-text-headline">
-            {summary ? (value ?? 0) : "…"}
+          <div
+            class="mt-1 text-2xl font-black leading-none"
+            style={`color: ${tile.accent ?? "var(--bratrax-text-headline)"}`}
+          >
+            {summary ? (tileValue(tile.key) ?? 0) : "…"}
           </div>
-        </div>
+        </button>
       {/each}
     </div>
 
@@ -274,22 +331,17 @@
         class="mb-4 flex items-center justify-between border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
       >
         <span>{topError}</span>
-        <button type="button" on:click={loadClients} class="underline"
-          >Retry</button
-        >
+        <button type="button" on:click={loadClients} class="underline">Retry</button>
       </div>
     {/if}
 
-    <!-- Filters -->
+    <!-- Secondary filters -->
     <div class="mb-4 flex flex-wrap items-end gap-3 font-mono text-[10px]">
-      <!-- Step multi-select -->
       <div class="relative">
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
-          Step
-        </div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Step</div>
         <button
           type="button"
-          on:click={() => (stepMenuOpen = !stepMenuOpen)}
+          on:click|stopPropagation={() => (stepMenuOpen = !stepMenuOpen)}
           class="border border-bratrax-border bg-bratrax-bg px-2 py-1 text-bratrax-text-body"
         >
           {selectedSteps.size ? `${selectedSteps.size} selected` : "All"} ▾
@@ -297,6 +349,10 @@
         {#if stepMenuOpen}
           <div
             class="absolute z-10 mt-1 max-h-64 w-52 overflow-y-auto border border-bratrax-border bg-bratrax-surface p-2 shadow-lg"
+            on:click|stopPropagation
+            on:keydown|stopPropagation
+            role="menu"
+            tabindex="-1"
           >
             {#each STEPS as step}
               <label
@@ -306,7 +362,6 @@
                   type="checkbox"
                   checked={selectedSteps.has(step)}
                   on:change={() => toggleStep(step)}
-                  disabled={errorsOnly}
                 />
                 <span>{step}</span>
               </label>
@@ -315,11 +370,8 @@
         {/if}
       </div>
 
-      <!-- Subscription -->
       <div>
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
-          Subscription
-        </div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Subscription</div>
         <select
           bind:value={subStatus}
           on:change={loadClients}
@@ -332,11 +384,8 @@
         </select>
       </div>
 
-      <!-- Paid -->
       <div>
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
-          Paid
-        </div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Paid</div>
         <select
           bind:value={paid}
           on:change={loadClients}
@@ -348,11 +397,8 @@
         </select>
       </div>
 
-      <!-- Stuck > N hours -->
       <div>
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
-          Stuck &gt; (hrs)
-        </div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Stuck &gt; (hrs)</div>
         <input
           type="number"
           min="0"
@@ -363,21 +409,8 @@
         />
       </div>
 
-      <!-- Errors only -->
-      <label class="flex cursor-pointer items-center gap-2 pb-1">
-        <input
-          type="checkbox"
-          bind:checked={errorsOnly}
-          on:change={loadClients}
-        />
-        <span class="text-bratrax-text-body">Errors only</span>
-      </label>
-
-      <!-- Search -->
-      <div class="flex-1 min-w-[180px]">
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
-          Search
-        </div>
+      <div class="min-w-[180px] flex-1">
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Search</div>
         <input
           type="text"
           bind:value={search}
@@ -388,21 +421,17 @@
       </div>
 
       {#if hasFilters}
-        <button
-          type="button"
-          on:click={clearFilters}
-          class="pb-1 text-bratrax-acid underline"
-        >
+        <button type="button" on:click={clearFilters} class="pb-1 text-bratrax-acid underline">
           Clear filters
         </button>
       {/if}
     </div>
 
-    <!-- Table -->
+    <!-- List -->
     {#if loading}
       <div class="space-y-2">
         {#each Array(6) as _}
-          <div class="h-10 animate-pulse bg-bratrax-bg"></div>
+          <div class="h-12 animate-pulse bg-bratrax-bg"></div>
         {/each}
       </div>
     {:else if sortedClients.length === 0}
@@ -411,106 +440,128 @@
       >
         No clients match these filters.
         {#if hasFilters}
-          <button
-            type="button"
-            on:click={clearFilters}
-            class="ml-1 text-bratrax-acid underline"
-          >
+          <button type="button" on:click={clearFilters} class="ml-1 text-bratrax-acid underline">
             Clear filters
           </button>
         {/if}
       </div>
     {:else}
-      <table class="w-full border-collapse font-mono text-[11px]">
-        <thead>
-          <tr
-            class="border-b border-bratrax-border text-left uppercase tracking-[1px] text-bratrax-text-muted"
+      <div class="border border-bratrax-border bg-bratrax-bg">
+        <!-- header row -->
+        <div
+          class="client-row border-b border-bratrax-border font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+        >
+          <div></div>
+          <button type="button" class="px-3 py-3 text-left" on:click={() => setSort("company")}>
+            Company {sortKey === "company" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+          </button>
+          <button type="button" class="px-3 py-3 text-left" on:click={() => setSort("status")}>
+            Status {sortKey === "status" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+          </button>
+          <button type="button" class="px-3 py-3 text-left" on:click={() => setSort("stuck")}>
+            Stuck {sortKey === "stuck" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+          </button>
+          <div></div>
+        </div>
+
+        {#each sortedClients as c (c.client_id)}
+          <div
+            class="client-row group cursor-pointer border-b border-bratrax-border/50 last:border-b-0 hover:bg-bratrax-surface"
+            on:click={() => openDetail(c)}
+            on:keydown={(e) => e.key === "Enter" && openDetail(c)}
+            role="button"
+            tabindex="0"
           >
-            <th
-              class="cursor-pointer px-2 py-2"
-              on:click={() => setSort("company")}
-            >
-              Company {sortKey === "company"
-                ? sortDir === "asc"
-                  ? "↑"
-                  : "↓"
-                : "↕"}
-            </th>
-            <th
-              class="cursor-pointer px-2 py-2"
-              on:click={() => setSort("step")}
-            >
-              Step {sortKey === "step" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
-            </th>
-            <th
-              class="cursor-pointer px-2 py-2"
-              on:click={() => setSort("stuck")}
-            >
-              Stuck {sortKey === "stuck"
-                ? sortDir === "asc"
-                  ? "↑"
-                  : "↓"
-                : "↕"}
-            </th>
-            <th class="px-2 py-2">Paid</th>
-            <th class="px-2 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each sortedClients as c (c.client_id)}
-            <tr
-              class="cursor-pointer border-b border-bratrax-border/50 hover:bg-bratrax-bg"
-              on:click={() => openDetail(c)}
-            >
-              <td class="px-2 py-2 align-top">
-                <div class="font-bold text-bratrax-text-headline">
-                  {c.company_name}
-                </div>
-                <div class="text-[10px] text-bratrax-text-muted">
-                  {c.admin_email ?? "no admin"}{c.admin_name
-                    ? ` · ${c.admin_name}`
-                    : ""}
-                </div>
+            <!-- left stripe -->
+            <div
+              class="self-stretch"
+              style={`background: ${STATUS_META[c.status]?.stripe ?? "transparent"}`}
+            ></div>
+
+            <!-- company + admin -->
+            <div class="px-3 py-3">
+              <div class="font-mono text-[13px] font-bold text-bratrax-text-headline">
+                {c.company_name}
                 {#if c.multi_client_id}
                   <span
-                    class="mt-1 inline-block border border-bratrax-acid/40 px-1 py-0.5 text-[8px] text-bratrax-acid"
+                    class="ml-1 inline-block border border-bratrax-acid/40 px-1 py-0.5 align-middle text-[8px] text-bratrax-acid"
                   >
                     MULTI-STORE
                   </span>
                 {/if}
-              </td>
-              <td class="px-2 py-2 align-top">
-                <span class:text-bratrax-tomato={c.onboarding_step === "error"}>
-                  {stepGlyph(c.onboarding_step)}
-                  {c.onboarding_step ?? "—"}
-                </span>
-              </td>
-              <td class="px-2 py-2 align-top whitespace-nowrap">
-                {stuckLabel(c)}
-                {#if isStuck(c)}<span
-                    class="text-bratrax-tomato"
-                    title="Stuck > 24h">⚠</span
-                  >{/if}
-              </td>
-              <td class="px-2 py-2 align-top">
-                {c.subscription_status ??
-                  (c.is_paid_subscriber ? "active" : "—")}
-              </td>
-              <td class="px-2 py-2 align-top text-right">
-                {#if !c.multi_client_id}
+              </div>
+              <div class="mt-0.5 font-mono text-[11px] text-bratrax-text-muted">
+                {c.admin_email ?? "no admin"}{c.admin_name ? ` · ${c.admin_name}` : ""}
+                {#if c.admin_email}
                   <button
                     type="button"
-                    on:click={(e) => requestEnable(c, e)}
-                    class="btn-bratrax btn-neutral btn-compact"
+                    on:click={(e) => copyEmail(c.admin_email, e)}
+                    class="ml-1 hidden border border-bratrax-border px-1 py-0.5 text-[8px] uppercase tracking-[1px] text-bratrax-text-muted hover:border-bratrax-acid hover:text-bratrax-acid group-hover:inline-block"
                   >
-                    Enable multi-store
+                    ⧉ Copy
                   </button>
                 {/if}
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+              </div>
+            </div>
+
+            <!-- status -->
+            <div class="px-3 py-3 font-mono text-[12px] font-bold uppercase tracking-[1.2px]">
+              <span class="flex items-center gap-1.5" style={`color: ${STATUS_META[c.status]?.color}`}>
+                <span class="w-3.5 text-center not-italic">{STATUS_META[c.status]?.icon}</span>
+                {STATUS_META[c.status]?.label ?? c.status}
+              </span>
+              {#if c.status_sub_label}
+                <span class="mt-0.5 block pl-5 text-[11px] font-normal normal-case tracking-normal text-bratrax-text-muted">
+                  {c.status_sub_label}
+                </span>
+              {/if}
+            </div>
+
+            <!-- stuck -->
+            <div class="whitespace-nowrap px-3 py-3 font-mono text-[13px]" style={`color: ${stuckColor(c)}`}>
+              {stuckLabel(c)}
+            </div>
+
+            <!-- overflow -->
+            <div class="relative px-3 py-3 text-center">
+              <button
+                type="button"
+                on:click={(e) => toggleMenu(c.client_id, e)}
+                class="font-mono text-[18px] font-bold text-bratrax-text-muted hover:text-bratrax-acid"
+                aria-label="Row actions"
+              >
+                ⋯
+              </button>
+              {#if openMenuId === c.client_id}
+                <div
+                  class="absolute right-2 top-10 z-20 w-44 border border-bratrax-border bg-bratrax-surface py-1 text-left shadow-lg"
+                  on:click|stopPropagation
+                  on:keydown|stopPropagation
+                  role="menu"
+                  tabindex="-1"
+                >
+                  <button
+                    type="button"
+                    on:click={() => openDetail(c)}
+                    class="block w-full px-3 py-2 text-left font-mono text-[11px] text-bratrax-text-body hover:bg-bratrax-bg"
+                  >
+                    Open detail
+                  </button>
+                  {#if !c.multi_client_id}
+                    <button
+                      type="button"
+                      on:click={(e) => requestEnable(c, e)}
+                      class="block w-full px-3 py-2 text-left font-mono text-[11px] text-bratrax-text-body hover:bg-bratrax-bg"
+                    >
+                      Enable multi-store
+                    </button>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
 
       <div class="mt-3 font-mono text-[10px] text-bratrax-text-muted">
         {sortedClients.length} client{sortedClients.length === 1 ? "" : "s"}
@@ -575,3 +626,12 @@
     </div>
   </div>
 {/if}
+
+<style>
+  /* stripe / company / status / stuck / overflow */
+  .client-row {
+    display: grid;
+    grid-template-columns: 4px 1fr 280px 90px 56px;
+    align-items: center;
+  }
+</style>

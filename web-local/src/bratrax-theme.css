@@ -107,6 +107,9 @@
   --color-acid-dim:    rgba(140, 170, 0, 0.08);
   --color-acid-mid:    rgba(140, 170, 0, 0.20);
 
+  /* Dormant gray for the CRM "Expired" state — gray-on-cream stripe/pill. */
+  --color-gray:        #8A847A;
+
   /* Divergent overrides for light theme */
   --chart-div-neg-1:   #FFA8A0;
   --chart-div-neutral: #C8C2B6;
@@ -123,6 +126,7 @@
   --bratrax-tomato:         #E63226;
   --bratrax-cyan:           #0099CC;
   --bratrax-lavender:       #8B7AE8;
+  --bratrax-gray:           var(--color-gray);
   --bratrax-text-headline:  var(--color-text);
   --bratrax-text-primary:   var(--color-text);
   --bratrax-text-body:      var(--color-text-secondary);
@@ -206,6 +210,9 @@
   --color-acid-dim:    rgba(212, 255, 0, 0.06);
   --color-acid-mid:    rgba(212, 255, 0, 0.16);
 
+  /* Dormant gray for the CRM "Expired" state — visible stripe on near-black. */
+  --color-gray:        #4a4a4a;
+
   /* Divergent — dark variants (defaults from :root apply) */
 
   /* -- Legacy --bratrax-* aliases -- */
@@ -219,6 +226,7 @@
   --bratrax-tomato:         #FF3B30;
   --bratrax-cyan:           #00D4FF;
   --bratrax-lavender:       #B4A0FF;
+  --bratrax-gray:           var(--color-gray);
   --bratrax-text-headline:  #FAFAF5;
   --bratrax-text-primary:   var(--color-text);
   --bratrax-text-body:      var(--color-text-secondary);

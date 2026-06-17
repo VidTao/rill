@@ -173,6 +173,12 @@ func (s *AuthService) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Stamp last_login_at for the CRM's login-quiet workspace detection. Best
+	// effort: a failure here must never block a valid login.
+	if err := s.store.UpdateLastLogin(r.Context(), user.ID); err != nil {
+		s.logger.Warn("update last login failed", zap.Int("user_id", user.ID), zap.Error(err))
+	}
+
 	token, err := s.issueToken(user)
 	if err != nil {
 		s.logger.Error("token issuance failed", zap.Error(err))

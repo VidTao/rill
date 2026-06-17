@@ -44,6 +44,7 @@ type UserStoreInterface interface {
 	ListUsers(ctx context.Context) ([]User, error)
 	LinkUserToClient(ctx context.Context, userID int, clientID string) error
 	SetLastClientID(ctx context.Context, userID int, clientID string) error
+	UpdateLastLogin(ctx context.Context, userID int) error
 }
 
 // UserStore provides CRUD operations on rill_users.
@@ -174,6 +175,21 @@ func (s *UserStore) SetLastClientID(ctx context.Context, userID int, clientID st
 	)
 	if err != nil {
 		return fmt.Errorf("bratrax userstore: set last client id failed: %w", err)
+	}
+	return nil
+}
+
+// UpdateLastLogin stamps last_login_at on a successful login. The CRM rolls this
+// up per workspace (MAX across the workspace's users) to surface login-quiet
+// workspaces. Once per login is enough: the 24h JWT TTL means active users
+// re-auth roughly daily, so no per-request throttling is needed.
+func (s *UserStore) UpdateLastLogin(ctx context.Context, userID int) error {
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE rill_users SET last_login_at = NOW() WHERE id = $1",
+		userID,
+	)
+	if err != nil {
+		return fmt.Errorf("bratrax userstore: update last login failed: %w", err)
 	}
 	return nil
 }

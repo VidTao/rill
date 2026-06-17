@@ -101,6 +101,10 @@ func (m *mockUserStore) SetLastClientID(_ context.Context, userID int, clientID 
 	return nil
 }
 
+func (m *mockUserStore) UpdateLastLogin(_ context.Context, _ int) error {
+	return nil
+}
+
 const (
 	testIssuerURL    = "http://localhost:9009/bratrax"
 	testAudienceURL  = "http://localhost:9009"
