@@ -20,6 +20,7 @@ import type { BaseCanvasComponent } from "./BaseCanvasComponent";
 import { ImageComponent } from "./image";
 import { LeaderboardComponent } from "./leaderboard";
 import { MarkdownCanvasComponent } from "./markdown";
+import { MetricTreeComponent } from "./metric-tree";
 import { PivotCanvasComponent } from "./pivot";
 import type {
   CanvasComponentType,
@@ -31,6 +32,7 @@ import TableIcon from "@rilldata/web-common/features/canvas/icons/TableIcon.svel
 import TextIcon from "@rilldata/web-common/features/canvas/icons/TextIcon.svelte";
 import BigNumberIcon from "@rilldata/web-common/features/canvas/icons/BigNumberIcon.svelte";
 import LeaderboardIcon from "@rilldata/web-common/features/canvas/icons/LeaderboardIcon.svelte";
+import MetricTreeIcon from "@rilldata/web-common/features/canvas/icons/MetricTreeIcon.svelte";
 import {
   CHART_CONFIG,
   type ChartMetadataConfig,
@@ -104,6 +106,7 @@ const NON_CHART_TYPES = [
   "table",
   "pivot",
   "leaderboard",
+  "metric_tree",
 ] as const;
 const ALL_COMPONENT_TYPES = [...CHART_TYPES, ...NON_CHART_TYPES] as const;
 
@@ -135,12 +138,14 @@ const baseComponentMap = {
   leaderboard: LeaderboardComponent,
   table: PivotCanvasComponent,
   pivot: PivotCanvasComponent,
+  metric_tree: MetricTreeComponent,
 } as const;
 const IconMap = {
   markdown: TextIcon,
   kpi_grid: BigNumberIcon,
   leaderboard: LeaderboardIcon,
   table: TableIcon,
+  metric_tree: MetricTreeIcon,
 };
 
 const chartComponentMap = Object.fromEntries(
@@ -160,6 +165,7 @@ const baseDisplayMap = {
   pivot: "Pivot",
   image: "Image",
   leaderboard: "Leaderboard",
+  metric_tree: "Metric Tree",
 } as const;
 
 const chartDisplayMap = Object.fromEntries(

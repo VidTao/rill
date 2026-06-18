@@ -8,6 +8,7 @@
   import BigNumberIcon from "./icons/BigNumberIcon.svelte";
   import ChartIcon from "./icons/ChartIcon.svelte";
   import LeaderboardIcon from "./icons/LeaderboardIcon.svelte";
+  import MetricTreeIcon from "./icons/MetricTreeIcon.svelte";
   import TableIcon from "./icons/TableIcon.svelte";
   import TextIcon from "./icons/TextIcon.svelte";
   type MenuItem = {
@@ -32,6 +33,7 @@
     { id: "markdown", label: "Text/Markdown", icon: TextIcon },
     { id: "kpi_grid", label: "KPI", icon: BigNumberIcon },
     { id: "leaderboard", label: "Leaderboard", icon: LeaderboardIcon },
+    { id: "metric_tree", label: "Metric Tree", icon: MetricTreeIcon },
     { id: "image", label: "Image", icon: ChartIcon },
   ];
 
