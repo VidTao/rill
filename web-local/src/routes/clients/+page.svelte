@@ -24,14 +24,54 @@
     ClientStatus,
     { icon: string; label: string; color: string; stripe: string | null }
   > = {
-    needs_handoff: { icon: "⚠", label: "Needs handoff", color: "var(--color-acid-text)", stripe: "var(--bratrax-acid)" },
-    stuck: { icon: "⚠", label: "Stuck", color: "var(--bratrax-tomato)", stripe: "var(--bratrax-tomato)" },
-    error: { icon: "✕", label: "Error", color: "var(--bratrax-tomato)", stripe: "var(--bratrax-tomato)" },
-    cancelled: { icon: "◐", label: "Cancelled", color: "var(--bratrax-lavender)", stripe: "var(--bratrax-lavender)" },
-    expired: { icon: "◌", label: "Expired", color: "var(--bratrax-text-muted)", stripe: "var(--bratrax-gray)" },
-    running: { icon: "▶", label: "Running", color: "var(--bratrax-cyan)", stripe: null },
-    waiting: { icon: "⏸", label: "Waiting", color: "var(--bratrax-text-muted)", stripe: null },
-    healthy: { icon: "●", label: "Healthy", color: "var(--color-acid-text)", stripe: null },
+    needs_handoff: {
+      icon: "⚠",
+      label: "Needs handoff",
+      color: "var(--color-acid-text)",
+      stripe: "var(--bratrax-acid)",
+    },
+    stuck: {
+      icon: "⚠",
+      label: "Stuck",
+      color: "var(--bratrax-tomato)",
+      stripe: "var(--bratrax-tomato)",
+    },
+    error: {
+      icon: "✕",
+      label: "Error",
+      color: "var(--bratrax-tomato)",
+      stripe: "var(--bratrax-tomato)",
+    },
+    cancelled: {
+      icon: "◐",
+      label: "Cancelled",
+      color: "var(--bratrax-lavender)",
+      stripe: "var(--bratrax-lavender)",
+    },
+    expired: {
+      icon: "◌",
+      label: "Expired",
+      color: "var(--bratrax-text-muted)",
+      stripe: "var(--bratrax-gray)",
+    },
+    running: {
+      icon: "▶",
+      label: "Running",
+      color: "var(--bratrax-cyan)",
+      stripe: null,
+    },
+    waiting: {
+      icon: "⏸",
+      label: "Waiting",
+      color: "var(--bratrax-text-muted)",
+      stripe: null,
+    },
+    healthy: {
+      icon: "●",
+      label: "Healthy",
+      color: "var(--color-acid-text)",
+      stripe: "var(--bratrax-acid)",
+    },
   };
 
   // Triage priority — lower sorts to the top. Urgent states surface first.
@@ -48,7 +88,11 @@
 
   // --- Tiles double as the status filter ------------------------------------
   // Each non-Total tile maps to a set of statuses; clicking applies ?status=.
-  type TileKey = "total" | "needs_attention" | "healthy" | "cancelled_or_expired";
+  type TileKey =
+    | "total"
+    | "needs_attention"
+    | "healthy"
+    | "cancelled_or_expired";
   const TILE_STATUSES: Record<Exclude<TileKey, "total">, ClientStatus[]> = {
     needs_attention: ["needs_handoff", "stuck", "error"],
     healthy: ["healthy"],
@@ -56,9 +100,17 @@
   };
   const TILES: { key: TileKey; label: string; accent: string | null }[] = [
     { key: "total", label: "Total", accent: null },
-    { key: "needs_attention", label: "Needs attention", accent: "var(--bratrax-tomato)" },
+    {
+      key: "needs_attention",
+      label: "Needs attention",
+      accent: "var(--bratrax-tomato)",
+    },
     { key: "healthy", label: "Healthy", accent: "var(--bratrax-acid)" },
-    { key: "cancelled_or_expired", label: "Cancelled / expired", accent: "var(--bratrax-lavender)" },
+    {
+      key: "cancelled_or_expired",
+      label: "Cancelled / expired",
+      accent: "var(--bratrax-lavender)",
+    },
   ];
   function tileValue(key: TileKey): number | undefined {
     if (!summary) return undefined;
@@ -82,7 +134,14 @@
     "ready",
     "error",
   ];
-  const SUB_STATUSES = ["active", "past_due", "cancelled", "paused", "expired", "inactive"];
+  const SUB_STATUSES = [
+    "active",
+    "past_due",
+    "cancelled",
+    "paused",
+    "expired",
+    "inactive",
+  ];
 
   let selectedSteps = new Set<string>();
   let subStatus = "";
@@ -122,7 +181,8 @@
     if (activeTile !== "total") f.status = TILE_STATUSES[activeTile];
     if (paid === "true" || paid === "false") f.paid = paid;
     if (search.trim()) f.search = search.trim();
-    if (stuckHours != null && !Number.isNaN(stuckHours)) f.stuck_hours = stuckHours;
+    if (stuckHours != null && !Number.isNaN(stuckHours))
+      f.stuck_hours = stuckHours;
     return f;
   }
 
@@ -226,9 +286,16 @@
     return "var(--bratrax-text-body)";
   }
 
-  function copyEmail(email: string | null, e: Event) {
+  // Track which row was just copied so the button can show "Copied" feedback.
+  let copiedClientId: string | null = null;
+  let copyResetTimer: ReturnType<typeof setTimeout>;
+  function copyEmail(email: string | null, clientId: string, e: Event) {
     e.stopPropagation();
-    if (email) navigator.clipboard?.writeText(email);
+    if (!email) return;
+    navigator.clipboard?.writeText(email);
+    copiedClientId = clientId;
+    clearTimeout(copyResetTimer);
+    copyResetTimer = setTimeout(() => (copiedClientId = null), 1500);
   }
 
   // --- Multi-store handlers -------------------------------------------------
@@ -304,15 +371,22 @@
         <button
           type="button"
           on:click={() => selectTile(tile.key)}
-          class="relative border border-bratrax-border bg-bratrax-bg px-4 py-3 text-left transition-colors hover:bg-bratrax-surface"
+          class="relative border border-bratrax-border px-4 py-3 text-left transition-colors hover:bg-bratrax-surface"
           class:is-active={activeTile === tile.key}
+          class:bg-bratrax-surface={activeTile === tile.key}
+          class:bg-bratrax-bg={activeTile !== tile.key}
+          style={activeTile === tile.key
+            ? `box-shadow: inset 0 0 0 2px ${tile.accent ?? "var(--bratrax-acid)"}`
+            : ""}
         >
           <span
             class="absolute left-0 right-0 top-0"
             style={`background: ${tile.accent ?? "transparent"}; height: ${activeTile === tile.key ? "5px" : "3px"}`}
           ></span>
           <div
-            class="font-mono text-[9px] font-bold uppercase tracking-[1px] text-bratrax-text-muted"
+            class="font-mono text-[9px] font-bold uppercase tracking-[1px]"
+            class:text-bratrax-text-muted={activeTile !== tile.key}
+            class:text-bratrax-text-headline={activeTile === tile.key}
           >
             {tile.label}
           </div>
@@ -331,14 +405,18 @@
         class="mb-4 flex items-center justify-between border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
       >
         <span>{topError}</span>
-        <button type="button" on:click={loadClients} class="underline">Retry</button>
+        <button type="button" on:click={loadClients} class="underline"
+          >Retry</button
+        >
       </div>
     {/if}
 
     <!-- Secondary filters -->
     <div class="mb-4 flex flex-wrap items-end gap-3 font-mono text-[10px]">
       <div class="relative">
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Step</div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
+          Step
+        </div>
         <button
           type="button"
           on:click|stopPropagation={() => (stepMenuOpen = !stepMenuOpen)}
@@ -371,7 +449,9 @@
       </div>
 
       <div>
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Subscription</div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
+          Subscription
+        </div>
         <select
           bind:value={subStatus}
           on:change={loadClients}
@@ -385,7 +465,9 @@
       </div>
 
       <div>
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Paid</div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
+          Paid
+        </div>
         <select
           bind:value={paid}
           on:change={loadClients}
@@ -398,7 +480,9 @@
       </div>
 
       <div>
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Stuck &gt; (hrs)</div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
+          Stuck &gt; (hrs)
+        </div>
         <input
           type="number"
           min="0"
@@ -410,7 +494,9 @@
       </div>
 
       <div class="min-w-[180px] flex-1">
-        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">Search</div>
+        <div class="mb-1 uppercase tracking-[1px] text-bratrax-text-muted">
+          Search
+        </div>
         <input
           type="text"
           bind:value={search}
@@ -421,7 +507,11 @@
       </div>
 
       {#if hasFilters}
-        <button type="button" on:click={clearFilters} class="pb-1 text-bratrax-acid underline">
+        <button
+          type="button"
+          on:click={clearFilters}
+          class="pb-1 text-bratrax-acid underline"
+        >
           Clear filters
         </button>
       {/if}
@@ -440,7 +530,11 @@
       >
         No clients match these filters.
         {#if hasFilters}
-          <button type="button" on:click={clearFilters} class="ml-1 text-bratrax-acid underline">
+          <button
+            type="button"
+            on:click={clearFilters}
+            class="ml-1 text-bratrax-acid underline"
+          >
             Clear filters
           </button>
         {/if}
@@ -452,13 +546,33 @@
           class="client-row border-b border-bratrax-border font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
         >
           <div></div>
-          <button type="button" class="px-3 py-3 text-left" on:click={() => setSort("company")}>
-            Company {sortKey === "company" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+          <button
+            type="button"
+            class="px-3 py-3 text-left"
+            on:click={() => setSort("company")}
+          >
+            Company {sortKey === "company"
+              ? sortDir === "asc"
+                ? "↑"
+                : "↓"
+              : "↕"}
           </button>
-          <button type="button" class="px-3 py-3 text-left" on:click={() => setSort("status")}>
-            Status {sortKey === "status" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+          <button
+            type="button"
+            class="px-3 py-3 text-left"
+            on:click={() => setSort("status")}
+          >
+            Status {sortKey === "status"
+              ? sortDir === "asc"
+                ? "↑"
+                : "↓"
+              : "↕"}
           </button>
-          <button type="button" class="px-3 py-3 text-left" on:click={() => setSort("stuck")}>
+          <button
+            type="button"
+            class="px-3 py-3 text-left"
+            on:click={() => setSort("stuck")}
+          >
             Stuck {sortKey === "stuck" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
           </button>
           <div></div>
@@ -480,7 +594,9 @@
 
             <!-- company + admin -->
             <div class="px-3 py-3">
-              <div class="font-mono text-[13px] font-bold text-bratrax-text-headline">
+              <div
+                class="font-mono text-[13px] font-bold text-bratrax-text-headline"
+              >
                 {c.company_name}
                 {#if c.multi_client_id}
                   <span
@@ -491,34 +607,57 @@
                 {/if}
               </div>
               <div class="mt-0.5 font-mono text-[11px] text-bratrax-text-muted">
-                {c.admin_email ?? "no admin"}{c.admin_name ? ` · ${c.admin_name}` : ""}
+                {c.admin_email ?? "no admin"}{c.admin_name
+                  ? ` · ${c.admin_name}`
+                  : ""}
                 {#if c.admin_email}
                   <button
                     type="button"
-                    on:click={(e) => copyEmail(c.admin_email, e)}
-                    class="ml-1 hidden border border-bratrax-border px-1 py-0.5 text-[8px] uppercase tracking-[1px] text-bratrax-text-muted hover:border-bratrax-acid hover:text-bratrax-acid group-hover:inline-block"
+                    on:click={(e) => copyEmail(c.admin_email, c.client_id, e)}
+                    class="ml-1 border px-1 py-0.5 text-[8px] uppercase tracking-[1px] hover:border-bratrax-acid hover:text-bratrax-acid"
+                    class:hidden={copiedClientId !== c.client_id}
+                    class:group-hover:inline-block={copiedClientId !==
+                      c.client_id}
+                    class:inline-block={copiedClientId === c.client_id}
+                    class:border-bratrax-border={copiedClientId !== c.client_id}
+                    class:text-bratrax-text-muted={copiedClientId !==
+                      c.client_id}
+                    class:border-bratrax-acid={copiedClientId === c.client_id}
+                    class:text-bratrax-acid={copiedClientId === c.client_id}
                   >
-                    ⧉ Copy
+                    {copiedClientId === c.client_id ? "✓ Copied" : "⧉ Copy"}
                   </button>
                 {/if}
               </div>
             </div>
 
             <!-- status -->
-            <div class="px-3 py-3 font-mono text-[12px] font-bold uppercase tracking-[1.2px]">
-              <span class="flex items-center gap-1.5" style={`color: ${STATUS_META[c.status]?.color}`}>
-                <span class="w-3.5 text-center not-italic">{STATUS_META[c.status]?.icon}</span>
+            <div
+              class="px-3 py-3 font-mono text-[12px] font-bold uppercase tracking-[1.2px]"
+            >
+              <span
+                class="flex items-center gap-1.5"
+                style={`color: ${STATUS_META[c.status]?.color}`}
+              >
+                <span class="w-3.5 text-center not-italic"
+                  >{STATUS_META[c.status]?.icon}</span
+                >
                 {STATUS_META[c.status]?.label ?? c.status}
               </span>
               {#if c.status_sub_label}
-                <span class="mt-0.5 block pl-5 text-[11px] font-normal normal-case tracking-normal text-bratrax-text-muted">
+                <span
+                  class="mt-0.5 block pl-5 text-[11px] font-normal normal-case tracking-normal text-bratrax-text-muted"
+                >
                   {c.status_sub_label}
                 </span>
               {/if}
             </div>
 
             <!-- stuck -->
-            <div class="whitespace-nowrap px-3 py-3 font-mono text-[13px]" style={`color: ${stuckColor(c)}`}>
+            <div
+              class="whitespace-nowrap px-3 py-3 font-mono text-[13px]"
+              style={`color: ${stuckColor(c)}`}
+            >
               {stuckLabel(c)}
             </div>
 
@@ -579,6 +718,7 @@
     on:keydown={(e) => e.key === "Escape" && !enabling && (confirmOpen = false)}
     role="presentation"
   >
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div
       class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
       on:click|stopPropagation
