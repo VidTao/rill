@@ -120,7 +120,7 @@ export async function load({ url, depends, untrack, fetch }) {
   //                      to embed_pending), so the forward-nav allowance
   //                      isn't needed and lets users jump into
   //                      half-broken downstream pages otherwise.
-  // Without these gates a user could type /onboard/shopify directly while
+  // Without these gates a user could type /onboard/store directly while
   // payment_pending and the forward-nav rule would let them stay there.
   const HARD_GATE_STEPS = new Set([
     "payment_pending",
@@ -153,8 +153,11 @@ export async function load({ url, depends, untrack, fetch }) {
     //
     // Exceptions (all gated on `onboard_oauth_return` being set, so we
     // only bypass when /connectors initiated the flow):
-    //   - /onboard/shopify  — reused as the shop-URL prompt when a ready
+    //   - /onboard/store    — reused as the shop-URL prompt when a ready
     //     user reconnects Shopify from /connectors.
+    //   - /onboard/shopify  — the Shopify OAuth callback lands at
+    //     /onboard/shopify/callback (SHOPIFY_REDIRECT_URI), kept after the
+    //     picker rename so the provider redirect still resolves.
     //   - /onboard/embed    — detour when the Theme App Embed got disabled.
     //   - /onboard/stack    — redirect-OAuth landing for TikTok / Klaviyo /
     //     Microsoft Bing Ads when initiated from /connectors. The page
@@ -179,7 +182,8 @@ export async function load({ url, depends, untrack, fetch }) {
       url.pathname === "/onboard" || url.pathname.startsWith("/onboard/");
     if (me?.step === "ready" && isOnboardFunnel) {
       const isOAuthCallbackBounce =
-        (url.pathname.startsWith("/onboard/shopify") ||
+        (url.pathname.startsWith("/onboard/store") ||
+          url.pathname.startsWith("/onboard/shopify") ||
           url.pathname.startsWith("/onboard/embed") ||
           url.pathname.startsWith("/onboard/stack")) &&
         typeof sessionStorage !== "undefined" &&
@@ -202,7 +206,14 @@ export async function load({ url, depends, untrack, fetch }) {
       const isHardGate = me?.step ? HARD_GATE_STEPS.has(me.step) : false;
       if (isHardGate) {
         // Must be on the gate page exactly. Anything else bounces back.
-        if (!url.pathname.startsWith(target)) {
+        // Exception: the Shopify OAuth callback always lands at
+        // /onboard/shopify/callback (SHOPIFY_REDIRECT_URI is registered there in
+        // the Shopify Partner dashboard, separate from the renamed /onboard/store
+        // picker). Let it through every hard gate so the token exchange can
+        // complete — at step "created" the callback is where the connect flow
+        // finishes, and it self-redirects once the step advances.
+        const isShopifyOAuthReturn = url.pathname.startsWith("/onboard/shopify");
+        if (!url.pathname.startsWith(target) && !isShopifyOAuthReturn) {
           throw redirect(307, target);
         }
       } else {

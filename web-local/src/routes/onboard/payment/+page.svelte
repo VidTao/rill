@@ -33,7 +33,7 @@
       const s = await getPaymentStatus();
       if (s.is_paid) {
         clearPoll();
-        await goto("/onboard/shopify");
+        await goto("/onboard/store");
         return true;
       }
     } catch (e) {
@@ -65,7 +65,7 @@
     try {
       const result = await getPaymentCheckoutUrl();
       if (result.already_paid) {
-        await goto("/onboard/shopify");
+        await goto("/onboard/store");
         return;
       }
       if (!result.checkout_url) {
@@ -92,7 +92,7 @@
     if (!me?.client_id) {
       // No client yet — fall back to the start of onboarding. Layout will
       // sort it out.
-      await goto("/onboard/shopify");
+      await goto("/onboard/store");
       return;
     }
 
@@ -100,13 +100,13 @@
 
     // Already a paying subscriber → skip directly to onboarding.
     if (me.is_paid_subscriber) {
-      await goto("/onboard/shopify");
+      await goto("/onboard/store");
       return;
     }
 
     // ?return=1 = LS just bounced the user back after checkout. Webhook
     // may still be in flight on our side. Poll until is_paid flips, then
-    // continue to /onboard/shopify.
+    // continue to /onboard/store.
     if ($page.url.searchParams.get("return") === "1") {
       // Run one immediate check before kicking off the interval so
       // already-paid (fast webhook) cases don't wait the first 2s.

@@ -16,7 +16,7 @@
   onMount(async () => {
     const code = $page.url.searchParams.get("code");
     const shopParam = $page.url.searchParams.get("shop");
-    const shop = shopParam || sessionStorage.getItem("onboard_shopify_shop") || "";
+    const shop = shopParam || sessionStorage.getItem("onboard_store_shop") || "";
 
     if (!code || !shop) {
       error = "Missing authorization code or shop. Please try connecting again.";
@@ -42,7 +42,7 @@
         throw new Error(body.error ?? "Failed to connect Shopify");
       }
 
-      // Step 2: Honor the return-to set by the originating page. /onboard/shopify
+      // Step 2: Honor the return-to set by the originating page. /onboard/store
       // (the default onboarding path) sets it to "/onboard/stack"; /connectors
       // sets it to "/connectors". Falls back to /onboard/stack for the legacy
       // path that didn't set sessionStorage.
@@ -83,7 +83,7 @@
         {error}
       </div>
       <a
-        href="/onboard/shopify"
+        href="/onboard/store"
         class="text-sm text-indigo-600 hover:underline"
       >
         Try again

@@ -7,7 +7,7 @@
   // current user belongs to a multi-client. Click opens a styled modal asking
   // for the new store's display name, then provisions it via
   // /bratrax/multi-client/add-store, switches the active-client cookie to the
-  // new sub-store, and hard-reloads into /onboard/shopify (the route guard
+  // new sub-store, and hard-reloads into /onboard/store (the route guard
   // handles the rest).
 
   let modalOpen = false;
@@ -47,8 +47,8 @@
       await bratraxSwitchClient(result.client_id);
       // Hard reload so Rill stores re-init for the new instance. The
       // resume-onboarding guard in +layout.ts sees step='created' on the
-      // fresh row and sends the user to /onboard/shopify.
-      window.location.href = "/onboard/shopify";
+      // fresh row and sends the user to /onboard/store.
+      window.location.href = "/onboard/store";
     } catch (e: any) {
       busy = false;
       error = e?.message ?? "Failed to add store";

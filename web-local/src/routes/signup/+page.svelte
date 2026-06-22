@@ -154,8 +154,8 @@
       sessionStorage.setItem("onboard_client_id", result.client_id);
       sessionStorage.setItem("onboard_client_name", result.client_name);
 
-      // Redirect to Connect Shopify (Screen 2)
-      await goto("/onboard/shopify");
+      // Redirect to Connect your store (Screen 2)
+      await goto("/onboard/store");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {

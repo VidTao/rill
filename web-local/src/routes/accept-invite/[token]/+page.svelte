@@ -113,7 +113,7 @@
       );
 
       // Signup invites: log the new user in immediately and run onboard_start
-      // so they land on /onboard/shopify with a real client. Doing this in one
+      // so they land on /onboard/store with a real client. Doing this in one
       // submit handler keeps the user from getting orphaned (account exists,
       // no client yet) if they navigate away before completing onboarding.
       if (result.kind === "signup") {
@@ -123,7 +123,7 @@
         // Forward requires_payment from the accept response so the new
         // rill_clients row is stamped with the right is_paid_subscriber. If
         // the invite was inceptly (requires_payment=false), the user skips
-        // /onboard/payment and goes straight to /onboard/shopify.
+        // /onboard/payment and goes straight to /onboard/store.
         // Forward is_multi_store so the backend creates a rill_multi_clients
         // parent + links the first sub-store; the dashboard then renders the
         // client switcher + "Add store" header button.
@@ -137,9 +137,9 @@
         sessionStorage.setItem("onboard_client_id", started.client_id);
         sessionStorage.setItem("onboard_client_name", started.client_name);
         // Layout's resume-onboarding logic will redirect to /onboard/payment
-        // for paying users (step=payment_pending) or stay on /onboard/shopify
+        // for paying users (step=payment_pending) or stay on /onboard/store
         // for inceptly users (step=created).
-        await goto("/onboard/shopify");
+        await goto("/onboard/store");
         return;
       }
 

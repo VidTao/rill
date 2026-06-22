@@ -47,7 +47,7 @@ export function getOnboardResumeRoute(
 ): string | null {
   switch (step) {
     case "created":
-      return "/onboard/shopify";
+      return "/onboard/store";
     case "payment_pending":
       return "/onboard/payment";
     case "embed_pending":
@@ -73,7 +73,7 @@ export function getOnboardResumeRoute(
 // the user's current step.
 //
 // /onboard/payment is first because the LS paywall gates everything else —
-// a user with step='payment_pending' can't reach /onboard/shopify until
+// a user with step='payment_pending' can't reach /onboard/store until
 // the subscription webhook flips them to step='created'.
 //
 // Adding a new onboard route requires THREE updates in lockstep:
@@ -84,7 +84,7 @@ export function getOnboardResumeRoute(
 // Missing #2 → infinite redirect loop. Missing #3 → URL-bar bypassable.
 const ONBOARD_ROUTE_ORDER = [
   "/onboard/payment",
-  "/onboard/shopify",
+  "/onboard/store",
   "/onboard/embed",
   "/onboard/stack",
   "/onboard/business",
@@ -362,7 +362,7 @@ export function getOAuthConfig(): Promise<OAuthConfig> {
 // calls getPaymentCheckoutUrl() → window.location = url. After LS payment,
 // LS redirects back to /onboard/payment?return=1, page polls
 // getPaymentStatus() until is_paid=true (webhook confirms it server-side),
-// then goto /onboard/shopify.
+// then goto /onboard/store.
 
 export interface PaymentCheckoutResult {
   checkout_url?: string;

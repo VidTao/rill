@@ -80,7 +80,7 @@
   onMount(async () => {
     const me = await onboardMe();
     if (!me?.client_id) {
-      await goto("/onboard/shopify");
+      await goto("/onboard/store");
       return;
     }
     if (me.shopify_embed_enabled) {

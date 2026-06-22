@@ -778,11 +778,11 @@
   function handleShopifyConnect() {
     if (isConnected("shopify")) return;
     // Shopify needs a shop-domain input first — delegate to the existing
-    // /onboard/shopify page (which has the input form + redirect-to-Shopify
+    // /onboard/store page (which has the input form + redirect-to-Shopify
     // OAuth init). The callback at /onboard/shopify/callback honors
     // onboard_oauth_return and bounces back here.
     sessionStorage.setItem("onboard_oauth_return", "/connectors");
-    goto("/onboard/shopify");
+    goto("/onboard/store");
   }
 
   function handleCardConnect(platform: Platform) {

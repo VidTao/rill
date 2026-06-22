@@ -28,7 +28,7 @@
   onMount(async () => {
     const me = await onboardMe();
     if (!me?.client_id) {
-      await goto("/onboard/shopify");
+      await goto("/onboard/store");
       return;
     }
     clientId = me.client_id;
