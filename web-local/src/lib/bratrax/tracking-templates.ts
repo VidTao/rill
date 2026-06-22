@@ -8,11 +8,20 @@ export const GOOGLE_ACCOUNT_TRACKING_TEMPLATE = `${GOOGLE_TRACKING_TEMPLATE}?${G
 export const META_URL_PARAMETERS =
   "utm_source=facebook&utm_medium=paid_social&utm_campaign={{campaign.id}}&utm_term={{adset.id}}&utm_content={{ad.id}}&bt_campaign_id={{campaign.id}}&bt_adset_id={{adset.id}}&bt_ad_id={{ad.id}}&bt_placement={{placement}}&bt_site_source_name={{site_source_name}}&campaign_id={{campaign.id}}&campaign_name={{campaign.name}}&adset_id={{adset.id}}&adset_name={{adset.name}}&ad_id={{ad.id}}&ad_name={{ad.name}}&site_source_name={{site_source_name}}&placement={{placement}}";
 
+export const ORGANIC_CONTENT_URL_PARAMETERS =
+  "utm_source={platform}&utm_medium=organic_social&utm_campaign={initiative_slug}&utm_term={placement_slug}&utm_content={post_slug}";
+
+export interface TrackingTemplatePayload {
+  google_ads?: { template?: string };
+  facebook_ads?: { template?: string };
+  organic_content?: { template?: string };
+}
+
 export const trackingVerificationChecklist = [
-  "Click a test ad or preview link.",
-  "Confirm the URL contains campaign, ad set or ad group, and ad IDs.",
-  "Confirm the Bratrax dashboard resolves the campaign.",
-  "Confirm lower-level ad set, asset group, or ad appears where supported.",
+  "Click a test link.",
+  "Confirm the URL contains source, medium, campaign, term, and content values.",
+  "Confirm Bratrax resolves the channel and campaign.",
+  "Confirm placement and post slug appear in the Campaign Deep Dive drilldown.",
 ];
 
 export const googleTrackingWarnings = [
@@ -25,4 +34,10 @@ export const metaTrackingWarnings = [
   "Do not include a leading ?.",
   "Paste this into URL Parameters, not Website URL.",
   "Apply this at campaign level in Meta Ads Manager; Meta does not reliably support this as an account-level URL setting.",
+];
+
+export const organicContentWarnings = [
+  "Use utm_source for the social platform, such as instagram, tiktok, facebook, or youtube.",
+  "Use utm_campaign for the broader content initiative.",
+  "Use utm_content for the individual post or link slug.",
 ];

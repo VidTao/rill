@@ -1,16 +1,39 @@
 <script lang="ts">
   import { Check, Copy } from "lucide-svelte";
+  import { onMount } from "svelte";
+  import { apiFetch } from "$lib/bratrax/onboarding/api";
   import {
     GOOGLE_ACCOUNT_TRACKING_TEMPLATE,
     META_URL_PARAMETERS,
+    ORGANIC_CONTENT_URL_PARAMETERS,
     googleTrackingWarnings,
     metaTrackingWarnings,
+    organicContentWarnings,
     trackingVerificationChecklist,
   } from "$lib/bratrax/tracking-templates";
+  import type { TrackingTemplatePayload } from "$lib/bratrax/tracking-templates";
 
-  type CopyKey = "google-combined" | "meta-params";
+  type CopyKey = "google-combined" | "meta-params" | "organic-params";
 
   let copied: CopyKey | "" = "";
+  let googleTemplate = GOOGLE_ACCOUNT_TRACKING_TEMPLATE;
+  let metaTemplate = META_URL_PARAMETERS;
+  let organicTemplate = ORGANIC_CONTENT_URL_PARAMETERS;
+
+  onMount(async () => {
+    try {
+      const templates = await apiFetch<TrackingTemplatePayload>(
+        "/bratrax/onboard/tracking-templates",
+      );
+      googleTemplate =
+        templates.google_ads?.template || GOOGLE_ACCOUNT_TRACKING_TEMPLATE;
+      metaTemplate = templates.facebook_ads?.template || META_URL_PARAMETERS;
+      organicTemplate =
+        templates.organic_content?.template || ORGANIC_CONTENT_URL_PARAMETERS;
+    } catch (e) {
+      console.warn("Failed to load tracking templates", e);
+    }
+  });
 
   async function copyValue(key: CopyKey, value: string) {
     try {
@@ -25,17 +48,17 @@
   }
 
   const flowSteps = [
-    "Ad click",
+    "Click",
     "URL parameters",
     "Bratrax attribution",
     "Campaign reporting",
   ];
 
-  const metaFields = [
+  $: metaFields = [
     {
       key: "meta-params" as const,
       label: "URL Parameters",
-      value: META_URL_PARAMETERS,
+      value: metaTemplate,
     },
   ];
 </script>
@@ -44,11 +67,11 @@
   <div class="tracking-guide-header">
     <div>
       <div class="tracking-eyebrow">Tracking setup</div>
-      <h2 id="tracking-setup-title">Paid media URL templates</h2>
+      <h2 id="tracking-setup-title">URL tracking templates</h2>
       <p>
-        Add these URL settings in Google Ads and Meta Ads so Bratrax can resolve
-        revenue to campaign, ad set or asset group, and ad level wherever the ad
-        platform supports it.
+        Add these URL settings to paid ads and organic content links so Bratrax
+        can resolve revenue to channel, platform, campaign, placement, and post
+        level wherever the source supports it.
       </p>
     </div>
   </div>
@@ -84,8 +107,7 @@
           <button
             type="button"
             class="copy-button"
-            on:click={() =>
-              copyValue("google-combined", GOOGLE_ACCOUNT_TRACKING_TEMPLATE)}
+            on:click={() => copyValue("google-combined", googleTemplate)}
             title="Copy Google Ads tracking template"
             aria-label="Copy Google Ads tracking template"
           >
@@ -98,7 +120,7 @@
             {/if}
           </button>
         </div>
-        <pre>{GOOGLE_ACCOUNT_TRACKING_TEMPLATE}</pre>
+        <pre>{googleTemplate}</pre>
       </div>
 
       <ul class="warning-list">
@@ -149,6 +171,50 @@
 
       <ul class="warning-list">
         {#each metaTrackingWarnings as warning}
+          <li>{warning}</li>
+        {/each}
+      </ul>
+    </article>
+
+    <article class="platform-panel organic-panel">
+      <div class="platform-header">
+        <span class="platform-mark organic-mark"></span>
+        <div>
+          <div class="platform-kicker">Organic Content</div>
+          <h3>Social profile and content links</h3>
+        </div>
+      </div>
+
+      <p class="platform-note">
+        Add this parameter string to outbound links from organic social posts,
+        bio links, stories, captions, and creator content. Replace each brace
+        placeholder before publishing the link.
+      </p>
+
+      <div class="copy-block">
+        <div class="copy-block-top">
+          <span>URL Parameters</span>
+          <button
+            type="button"
+            class="copy-button"
+            on:click={() => copyValue("organic-params", organicTemplate)}
+            title="Copy Organic Content URL Parameters"
+            aria-label="Copy Organic Content URL Parameters"
+          >
+            {#if copied === "organic-params"}
+              <Check size={14} />
+              Copied
+            {:else}
+              <Copy size={14} />
+              Copy
+            {/if}
+          </button>
+        </div>
+        <pre>{organicTemplate}</pre>
+      </div>
+
+      <ul class="warning-list">
+        {#each organicContentWarnings as warning}
           <li>{warning}</li>
         {/each}
       </ul>
@@ -248,7 +314,7 @@
 
   .platform-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
   }
 
@@ -292,6 +358,10 @@
     background: #1877f2;
   }
 
+  .organic-mark {
+    background: #14b86a;
+  }
+
   .copy-block {
     margin-top: 12px;
     border: 0.5px solid var(--color-border);
@@ -329,7 +399,9 @@
     text-transform: uppercase;
     color: var(--color-text);
     background: var(--color-elevated);
-    transition: border-color 0.15s, background-color 0.15s;
+    transition:
+      border-color 0.15s,
+      background-color 0.15s;
   }
 
   .copy-button:hover {
