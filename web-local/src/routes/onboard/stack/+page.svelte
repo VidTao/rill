@@ -703,6 +703,32 @@
     }
   }
 
+  // Exit the "Completing connection…" spinner gracefully when an account-fetch
+  // step fails (e.g. the provider returns no ad accounts). Without this the
+  // bounce screen would spin forever. Mirrors the OAuth-error path above: clear
+  // pending state, surface the message — inline on /onboard/stack, or bounced
+  // back to /connectors via `connectors_error` when that's where we came from.
+  function bounceOutOfOAuth(message: string) {
+    isOAuthBounce = false;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("code");
+    url.searchParams.delete("state");
+    window.history.replaceState({}, "", url.toString());
+    sessionStorage.removeItem("pinterest_ads_oauth_state");
+    sessionStorage.removeItem("bing_ads_oauth_state");
+    sessionStorage.removeItem("klaviyo_oauth_state");
+    sessionStorage.removeItem("tiktok_ads_oauth_state");
+    sessionStorage.removeItem("onboard_oauth_platform");
+    const where = sessionStorage.getItem("onboard_oauth_return");
+    sessionStorage.removeItem("onboard_oauth_return");
+    if (where && where !== "/onboard/stack") {
+      sessionStorage.setItem("connectors_error", message);
+      goto(where);
+      return;
+    }
+    error = message;
+  }
+
   async function handlePinterestReturn(code: string, state: string) {
     error = "";
     loading = "pinterest_ads";
@@ -734,7 +760,9 @@
       url.searchParams.delete("state");
       window.history.replaceState({}, "", url.toString());
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      // No ad accounts / token failure / etc. — surface it and leave the
+      // spinner instead of hanging on "Completing connection…".
+      bounceOutOfOAuth(e instanceof Error ? e.message : String(e));
     } finally {
       loading = "";
     }
