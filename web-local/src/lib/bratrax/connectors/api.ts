@@ -1,10 +1,5 @@
 import { get } from "svelte/store";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
-import type {
-  AdvertisingConnection,
-  CrmConnection,
-  PlatformConnection,
-} from "./types";
 
 function getBaseUrl(): string {
   return get(runtime).host;
@@ -123,38 +118,4 @@ export async function exchangeGoogleTokens(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code, selectedAccounts }),
   });
-}
-
-// ── Connection fetchers ──
-
-interface ConnectionsResponse<T> {
-  success: boolean;
-  data: T;
-}
-
-export async function getAllPlatformConnections(): Promise<
-  Record<string, PlatformConnection>
-> {
-  const res = await apiFetch<
-    ConnectionsResponse<Record<string, PlatformConnection>>
-  >("/bratrax/users/get-all-platform-connections");
-  return res.data;
-}
-
-export async function getAllAdConnections(): Promise<
-  Record<string, AdvertisingConnection[]>
-> {
-  const res = await apiFetch<
-    ConnectionsResponse<Record<string, AdvertisingConnection[]>>
-  >("/bratrax/users/get-all-ad-connections");
-  return res.data;
-}
-
-export async function getAllCrmConnections(): Promise<
-  Record<string, CrmConnection[]>
-> {
-  const res = await apiFetch<
-    ConnectionsResponse<Record<string, CrmConnection[]>>
-  >("/bratrax/users/get-all-crm-connections");
-  return res.data;
 }
