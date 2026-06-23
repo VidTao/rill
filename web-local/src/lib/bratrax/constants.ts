@@ -10,3 +10,8 @@ export const SUPPORT_EMAIL = "support@bratrax.com";
 // acceptance).
 export const TERMS_OF_SERVICE_URL = "https://bratrax.com/terms-of-service";
 export const PRIVACY_POLICY_URL = "https://bratrax.com/privacy-policy";
+
+// Doors-closed waitlist survey (Typeform). After a visitor joins the waitlist
+// on /signup, the browser redirects here with their email appended as
+// #email=<URL-encoded>. The survey has a matching `email` parameter configured.
+export const WAITLIST_TYPEFORM_URL = "https://form.typeform.com/to/NEugqBiK";

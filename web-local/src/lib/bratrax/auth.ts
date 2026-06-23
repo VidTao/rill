@@ -94,11 +94,14 @@ export interface AccessRequestResult {
   status: "pending" | "already_pending" | "already_approved" | "already_user";
 }
 
-export async function requestAccess(email: string): Promise<AccessRequestResult> {
+export async function requestAccess(
+  email: string,
+  firstName?: string,
+): Promise<AccessRequestResult> {
   const res = await fetch(`${getBaseUrl()}/bratrax/access-requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, first_name: firstName ?? "" }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
