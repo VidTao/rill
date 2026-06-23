@@ -3,38 +3,45 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
-  import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { onMount } from "svelte";
+  import { getAuthConfig } from "$lib/bratrax/auth";
 
   // Store-provider chooser. Shopify is connectable by everyone. WooCommerce is
-  // gated to super_admins during the token-validation phase (no ingestion
-  // pipeline exists yet); for everyone else it renders as a disabled "coming
-  // soon" placeholder. Shopify is pre-selected so the common flow is friction-free.
+  // gated behind the ALLOW_WOOCOMMERCE env flag (surfaced via /bratrax/auth/config)
+  // during the token-validation phase — when off it renders as a disabled
+  // "coming soon" placeholder. Shopify is pre-selected so the common flow is
+  // friction-free.
   type StoreProvider = "shopify" | "woocommerce";
   let selectedStore: StoreProvider = "shopify";
 
-  $: isSuperAdmin = $bratraxUser?.role === "super_admin";
+  // ALLOW_WOOCOMMERCE on the Go proxy. Fetched on mount; defaults to false so a
+  // transient failure keeps WooCommerce gated rather than exposing it.
+  let allowWoocommerce = false;
+  onMount(async () => {
+    allowWoocommerce = (await getAuthConfig()).allow_woocommerce;
+  });
 
   // /connectors sends super_admins here with ?provider=woocommerce to jump
   // straight to the WooCommerce form. Apply once (one-shot) so a manual switch
   // back to Shopify isn't immediately overridden.
   $: providerParam = $page.url.searchParams.get("provider") || "";
   let appliedProvider = false;
-  $: if (!appliedProvider && providerParam === "woocommerce" && isSuperAdmin) {
+  $: if (!appliedProvider && providerParam === "woocommerce" && allowWoocommerce) {
     selectedStore = "woocommerce";
     appliedProvider = true;
   }
 
   // Shopify
   let shop = "";
-  // WooCommerce (super_admin only)
+  // WooCommerce (gated by ALLOW_WOOCOMMERCE)
   let wooStoreUrl = "";
 
   let error = "";
   let loading = false;
 
   function selectStore(provider: StoreProvider) {
-    // WooCommerce is only selectable by super_admins for now.
-    if (provider === "woocommerce" && !isSuperAdmin) return;
+    // WooCommerce is only selectable when ALLOW_WOOCOMMERCE is on.
+    if (provider === "woocommerce" && !allowWoocommerce) return;
     selectedStore = provider;
     error = "";
   }
@@ -147,20 +154,20 @@
           <span class="font-mono text-xs font-bold uppercase tracking-wider">Shopify</span>
         </button>
 
-        <!-- WooCommerce — super_admin only for now, else "coming soon" -->
+        <!-- WooCommerce — live when ALLOW_WOOCOMMERCE is on, else "coming soon" -->
         <button
           type="button"
           on:click={() => selectStore("woocommerce")}
-          disabled={!isSuperAdmin}
+          disabled={!allowWoocommerce}
           class="flex flex-col items-center gap-2 border px-4 py-4 transition-all
-            {!isSuperAdmin
+            {!allowWoocommerce
               ? 'cursor-not-allowed border-bratrax-border bg-bratrax-bg text-bratrax-text-muted'
               : selectedStore === 'woocommerce'
                 ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
                 : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}"
           aria-pressed={selectedStore === "woocommerce"}
         >
-          <svg class="h-8 w-8 {isSuperAdmin ? '' : 'opacity-50'}" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 {allowWoocommerce ? '' : 'opacity-50'}" viewBox="0 0 24 24" fill="none">
             <rect x="2" y="6" width="20" height="12" rx="2" fill="#7F54B3" />
             <path
               d="M6.2 9.6c.5 0 .8.3.9.8.1.6 0 1.4-.3 2.2.4-.7.7-1.2 1-1.5.2-.3.5-.4.8-.4.4 0 .6.3.7.7.1.4 0 1 .2 1.8.1-.9.4-1.6.8-2 .2-.2.4-.4.7-.4.4 0 .6.4.4 1-.3.9-.4 1.6-.4 2.1 0 .2 0 .4.1.5.3 0 .6-.4.9-1l.4.5c-.5.9-1 1.4-1.5 1.4-.4 0-.7-.4-.8-1.1-.1-.5-.1-1 0-1.5-.3.9-.6 1.6-.9 2-.2.3-.5.5-.8.5-.4 0-.6-.4-.7-1.1-.1-.5-.1-1.1-.1-1.9-.4 1.3-.8 2.2-1.2 2.6-.2.2-.4.4-.7.4-.3 0-.5-.2-.6-.6-.3-1-.3-2.4 0-4.2 0-.3.2-.4.5-.4z"
@@ -168,7 +175,7 @@
             />
           </svg>
           <span class="font-mono text-xs font-bold uppercase tracking-wider">WooCommerce</span>
-          {#if !isSuperAdmin}
+          {#if !allowWoocommerce}
             <span class="font-mono text-[10px] normal-case tracking-normal text-bratrax-text-muted">
               coming soon
             </span>

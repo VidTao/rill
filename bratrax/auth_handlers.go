@@ -40,6 +40,7 @@ type AuthService struct {
 	audienceURL        string
 	secureCookie       bool
 	onlyInvitationLink bool
+	allowWoocommerce   bool
 }
 
 // jwksKeyFile is the path where the dev JWT signing key is persisted.
@@ -55,7 +56,7 @@ type persistedJWKS struct {
 // NewAuthService creates an AuthService with a persistent JWT issuer.
 // The signing key is saved to ~/.bratrax/jwt_dev_key.json on first run
 // and reused on subsequent runs so tokens survive restarts.
-func NewAuthService(store UserStoreInterface, logger *zap.Logger, issuerURL, audienceURL string, secureCookie, onlyInvitationLink bool) (*AuthService, error) {
+func NewAuthService(store UserStoreInterface, logger *zap.Logger, issuerURL, audienceURL string, secureCookie, onlyInvitationLink, allowWoocommerce bool) (*AuthService, error) {
 	issuer, err := loadOrCreateIssuer(logger, issuerURL)
 	if err != nil {
 		return nil, err
@@ -76,6 +77,7 @@ func NewAuthService(store UserStoreInterface, logger *zap.Logger, issuerURL, aud
 		audienceURL:        audienceURL,
 		secureCookie:       secureCookie,
 		onlyInvitationLink: onlyInvitationLink,
+		allowWoocommerce:   allowWoocommerce,
 	}, nil
 }
 
@@ -402,7 +404,8 @@ func (s *AuthService) HandleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"invite_only": s.onlyInvitationLink,
+		"invite_only":       s.onlyInvitationLink,
+		"allow_woocommerce": s.allowWoocommerce,
 	})
 }
 

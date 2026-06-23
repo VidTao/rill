@@ -49,7 +49,7 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	}
 
 	// Auth service (persistent JWT issuer)
-	authSvc, err := NewAuthService(store, logger, cfg.IssuerURL, cfg.AudienceURL, cfg.SecureCookie, cfg.OnlyInvitationLink)
+	authSvc, err := NewAuthService(store, logger, cfg.IssuerURL, cfg.AudienceURL, cfg.SecureCookie, cfg.OnlyInvitationLink, cfg.AllowWoocommerce)
 	if err != nil {
 		store.Close()
 		return nil, fmt.Errorf("bratrax: failed to create auth service: %w", err)

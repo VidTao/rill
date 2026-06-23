@@ -68,6 +68,9 @@ export async function bratraxLogout(): Promise<void> {
 
 export interface BratraxAuthConfig {
   invite_only: boolean;
+  // Gates the WooCommerce store connector on /onboard/store + /connectors.
+  // Driven by the ALLOW_WOOCOMMERCE env flag on the Go proxy.
+  allow_woocommerce: boolean;
 }
 
 // Public, unauthenticated. Used by /signup to decide whether to render the
@@ -78,10 +81,10 @@ export async function getAuthConfig(
 ): Promise<BratraxAuthConfig> {
   try {
     const res = await fetchFn(`${getBaseUrl()}/bratrax/auth/config`);
-    if (!res.ok) return { invite_only: false };
+    if (!res.ok) return { invite_only: false, allow_woocommerce: false };
     return await res.json();
   } catch {
-    return { invite_only: false };
+    return { invite_only: false, allow_woocommerce: false };
   }
 }
 

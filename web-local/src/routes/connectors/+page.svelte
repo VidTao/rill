@@ -17,7 +17,7 @@
   import TaboolaCredentialModal from "./TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "./OutbrainLoginModal.svelte";
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
-  import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { getAuthConfig } from "$lib/bratrax/auth";
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount
   // (BUG-01: not hardcoded in source). Empty until the fetch completes;
@@ -48,8 +48,8 @@
 
   const platforms: Platform[] = [
     { id: "shopify",        name: "Shopify",                type: "shopify",                                                          color: "#95BF47" },
-    // WooCommerce is super_admin-only for now (token-validation phase). It is
-    // filtered out of `visiblePlatforms` below for everyone else.
+    // WooCommerce is gated behind the ALLOW_WOOCOMMERCE env flag. It is
+    // filtered out of `visiblePlatforms` below when the flag is off.
     { id: "woocommerce",    name: "WooCommerce",            type: "credential_modal",                                                 color: "#7F54B3" },
     { id: "google_ads",     name: "Google Ads",             type: "client_sdk",                                                       color: "#4285F4" },
     { id: "facebook_ads",   name: "Facebook Ads",           type: "client_sdk",                                                       color: "#1877F2" },
@@ -65,11 +65,12 @@
     // { id: "amazon_ads",    name: "Amazon Ads",  type: "oauth", authUrlPath: "/bratrax/connectors/amazon-ads/auth-url",  color: "#FF9900" },
   ];
 
-  // WooCommerce stays super_admin-gated during the token-validation phase; drop
-  // the filter (and the backend _require_super_admin guard) to open it to all.
-  $: isSuperAdmin = $bratraxUser?.role === "super_admin";
+  // WooCommerce is gated behind the ALLOW_WOOCOMMERCE env flag (Go proxy,
+  // surfaced via /bratrax/auth/config). Off → filtered out of the grid.
+  // Defaults false until getAuthConfig() resolves in onMount.
+  let allowWoocommerce = false;
   $: visiblePlatforms = platforms.filter(
-    (p) => p.id !== "woocommerce" || isSuperAdmin,
+    (p) => p.id !== "woocommerce" || allowWoocommerce,
   );
 
   // ---------------------------------------------------------------------------
@@ -896,6 +897,9 @@
       }
       window.history.replaceState(window.history.state, "", window.location.pathname);
     }
+
+    // ALLOW_WOOCOMMERCE gate (Go proxy env, via /bratrax/auth/config).
+    allowWoocommerce = (await getAuthConfig()).allow_woocommerce;
 
     await refreshFromServer();
     // Public OAuth client IDs (BUG-01: not hardcoded in source).
