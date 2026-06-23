@@ -747,18 +747,28 @@
         accounts: Array<{ id: string; name: string }>;
       };
       pinterestAdsState = body.state;
-      accountModalAccounts = body.accounts.map((a) => ({
-        id: a.id,
-        name: a.name || a.id,
-      }));
       accountModalPlatform = "Pinterest";
-      showAccountModal = true;
 
       // Strip the callback params so a refresh doesn't re-trigger.
       const url = new URL(window.location.href);
       url.searchParams.delete("code");
       url.searchParams.delete("state");
       window.history.replaceState({}, "", url.toString());
+
+      const pinAccounts = body.accounts || [];
+      if (pinAccounts.length === 0) {
+        // No ad accounts on this login — persist the token anyway (empty list)
+        // so the card shows connected. handleAccountSelection does the /connect
+        // POST + refresh + bounce-back; skip the account picker entirely.
+        await handleAccountSelection([]);
+        return;
+      }
+
+      accountModalAccounts = pinAccounts.map((a) => ({
+        id: a.id,
+        name: a.name || a.id,
+      }));
+      showAccountModal = true;
     } catch (e) {
       // No ad accounts / token failure / etc. — surface it and leave the
       // spinner instead of hanging on "Completing connection…".
