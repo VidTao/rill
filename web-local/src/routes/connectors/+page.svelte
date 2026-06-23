@@ -17,6 +17,7 @@
   import TaboolaCredentialModal from "./TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "./OutbrainLoginModal.svelte";
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
+  import { bratraxUser } from "$lib/bratrax/auth-store";
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount
   // (BUG-01: not hardcoded in source). Empty until the fetch completes;
@@ -47,6 +48,9 @@
 
   const platforms: Platform[] = [
     { id: "shopify",        name: "Shopify",                type: "shopify",                                                          color: "#95BF47" },
+    // WooCommerce is super_admin-only for now (token-validation phase). It is
+    // filtered out of `visiblePlatforms` below for everyone else.
+    { id: "woocommerce",    name: "WooCommerce",            type: "credential_modal",                                                 color: "#7F54B3" },
     { id: "google_ads",     name: "Google Ads",             type: "client_sdk",                                                       color: "#4285F4" },
     { id: "facebook_ads",   name: "Facebook Ads",           type: "client_sdk",                                                       color: "#1877F2" },
     { id: "tiktok_ads",     name: "TikTok Ads",             type: "oauth",            authUrlPath: "/bratrax/onboard/tiktok/auth-url",      color: "#000000" },
@@ -60,6 +64,13 @@
     // { id: "pinterest_ads", name: "Pinterest",   type: "oauth", authUrlPath: "/bratrax/connectors/pinterest/auth-url",   color: "#E60023" },
     // { id: "amazon_ads",    name: "Amazon Ads",  type: "oauth", authUrlPath: "/bratrax/connectors/amazon-ads/auth-url",  color: "#FF9900" },
   ];
+
+  // WooCommerce stays super_admin-gated during the token-validation phase; drop
+  // the filter (and the backend _require_super_admin guard) to open it to all.
+  $: isSuperAdmin = $bratraxUser?.role === "super_admin";
+  $: visiblePlatforms = platforms.filter(
+    (p) => p.id !== "woocommerce" || isSuperAdmin,
+  );
 
   // ---------------------------------------------------------------------------
   // State
@@ -712,6 +723,17 @@
     }
   }
 
+  // WooCommerce: needs the store URL first, then redirects to the store's
+  // wc-auth authorize screen (the Auth-Endpoint flow). /onboard/store collects
+  // the URL and kicks off the redirect — same "store-domain page first" pattern
+  // as Shopify. The store POSTs the key pair back to the public callback, then
+  // the browser lands back here and refreshFromServer shows it connected.
+  function handleWooCommerceConnect() {
+    if (isConnected("woocommerce")) return;
+    sessionStorage.setItem("onboard_oauth_return", "/connectors");
+    goto("/onboard/store?provider=woocommerce");
+  }
+
   // ---------------------------------------------------------------------------
   // Disconnect
   // ---------------------------------------------------------------------------
@@ -763,6 +785,14 @@
         currency: cred.currency || "",
       };
       infoModalAccounts = [];
+    } else if (platform.id === "woocommerce") {
+      // Single-store shape, WooCommerce field names.
+      infoModalShopify = {
+        shop: cred.store_url || "",
+        shopName: cred.store_name || "",
+        currency: cred.currency || "",
+      };
+      infoModalAccounts = [];
     } else {
       // Multi-account shape: TikTok stores them under `advertisers`; everyone else uses `accounts`.
       const list: any[] = cred.accounts || cred.advertisers || [];
@@ -786,6 +816,10 @@
   }
 
   function handleCardConnect(platform: Platform) {
+    if (platform.id === "woocommerce") {
+      handleWooCommerceConnect();
+      return;
+    }
     if (platform.type === "client_sdk") {
       if (platform.id === "google_ads") handleGoogleAdsConnect();
       else if (platform.id === "facebook_ads") handleFacebookConnect();
@@ -849,6 +883,18 @@
     if (carriedError) {
       error = carriedError;
       sessionStorage.removeItem("connectors_error");
+    }
+
+    // WooCommerce wc-auth returns here with ?success=…&user_id=<signed token>
+    // appended. The key pair already arrived via the server-to-server callback,
+    // so just surface a failure (if any) and scrub the params from the URL +
+    // history so a refresh / back-button doesn't carry the token around.
+    const wooReturn = new URLSearchParams(window.location.search);
+    if (wooReturn.has("user_id") || wooReturn.has("success")) {
+      if (wooReturn.get("success") === "0") {
+        error = "WooCommerce connection was cancelled or didn't complete.";
+      }
+      window.history.replaceState(window.history.state, "", window.location.pathname);
     }
 
     await refreshFromServer();
@@ -929,7 +975,7 @@
     {/if}
 
     <div class="connector-list-card">
-      {#each platforms as platform}
+      {#each visiblePlatforms as platform}
         {@const connected = isConnected(platform.id)}
         <div class="connector-row" class:row-disconnected={!connected}>
           <span class="connector-icon" style="background-color: {platform.color}"></span>

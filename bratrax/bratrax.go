@@ -106,6 +106,15 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	observability.MuxHandle(mux, "GET /email/pause",
 		observability.Middleware("bratrax", logger, proxy))
 
+	// WooCommerce wc-auth callback. The merchant's store POSTs the generated
+	// REST API key pair here server-to-server (no login cookie), so it must
+	// bypass the auth mapper. Public by design — the signed `user_id` state
+	// token in the body is the auth. Registered explicitly so it wins over the
+	// /bratrax/ auth catch-all; the prefix-stripper forwards it to Flask as
+	// /onboard/woocommerce/callback verbatim.
+	observability.MuxHandle(mux, "POST /bratrax/onboard/woocommerce/callback",
+		observability.Middleware("bratrax", logger, proxy))
+
 	// Super_admin client-switcher endpoints. Both auth themselves via the
 	// JWT cookie + role check; not behind the AuthMapper proxy middleware.
 	switchSvc := NewClientSwitchService(authMapper, store, clientStore, logger, cfg.SecureCookie)

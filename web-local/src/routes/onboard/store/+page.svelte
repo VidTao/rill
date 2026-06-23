@@ -1,34 +1,46 @@
 <script lang="ts">
   import { get } from "svelte/store";
+  import { goto } from "$app/navigation";
+  import { page } from "$app/stores";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+  import { bratraxUser } from "$lib/bratrax/auth-store";
 
-  // Store-provider chooser. Shopify is the only connectable provider today;
-  // WooCommerce is a disabled "coming soon" placeholder until its Auth-Endpoint
-  // connector + ingestion pipeline land. Pre-selecting Shopify keeps the current
-  // single-provider flow friction-free.
+  // Store-provider chooser. Shopify is connectable by everyone. WooCommerce is
+  // gated to super_admins during the token-validation phase (no ingestion
+  // pipeline exists yet); for everyone else it renders as a disabled "coming
+  // soon" placeholder. Shopify is pre-selected so the common flow is friction-free.
   type StoreProvider = "shopify" | "woocommerce";
   let selectedStore: StoreProvider = "shopify";
 
+  $: isSuperAdmin = $bratraxUser?.role === "super_admin";
+
+  // /connectors sends super_admins here with ?provider=woocommerce to jump
+  // straight to the WooCommerce form. Apply once (one-shot) so a manual switch
+  // back to Shopify isn't immediately overridden.
+  $: providerParam = $page.url.searchParams.get("provider") || "";
+  let appliedProvider = false;
+  $: if (!appliedProvider && providerParam === "woocommerce" && isSuperAdmin) {
+    selectedStore = "woocommerce";
+    appliedProvider = true;
+  }
+
+  // Shopify
   let shop = "";
+  // WooCommerce (super_admin only)
+  let wooStoreUrl = "";
+
   let error = "";
   let loading = false;
 
   function selectStore(provider: StoreProvider) {
-    // WooCommerce is not available yet — guard against selecting it.
-    if (provider === "woocommerce") return;
+    // WooCommerce is only selectable by super_admins for now.
+    if (provider === "woocommerce" && !isSuperAdmin) return;
     selectedStore = provider;
     error = "";
   }
 
-  async function handleConnect() {
+  async function handleShopifyConnect() {
     error = "";
-
-    if (selectedStore === "woocommerce") {
-      // Deferred: the WooCommerce Auth-Endpoint connector is not built yet.
-      // The card is disabled, so this branch is currently unreachable.
-      return;
-    }
-
     const trimmed = shop.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
     if (!trimmed || !trimmed.includes(".myshopify.com")) {
       error = "Please enter your Shopify store URL (e.g., mystore.myshopify.com)";
@@ -51,6 +63,40 @@
       sessionStorage.setItem("onboard_store_shop", trimmed);
 
       // Redirect to Shopify OAuth
+      window.location.href = data.url;
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      loading = false;
+    }
+  }
+
+  // WooCommerce wc-auth (Auth Endpoint) flow: we only collect the store URL,
+  // then ask the backend to build the authorize URL and redirect the merchant
+  // to their own WordPress admin to approve. WooCommerce POSTs the generated key
+  // pair to our public callback and sends the browser back to return_url.
+  async function handleWooConnect() {
+    error = "";
+    const url = wooStoreUrl.trim();
+    if (!url) {
+      error = "Enter your WooCommerce store URL.";
+      return;
+    }
+
+    loading = true;
+    try {
+      const host = get(runtime).host;
+      // Default the post-approval landing to /connectors (safe for the ready
+      // super_admins testing this — avoids the /onboard/* ready-bounce).
+      const returnTo = sessionStorage.getItem("onboard_oauth_return") || "/connectors";
+      const res = await fetch(
+        `${host}/bratrax/onboard/woocommerce/auth-url?store_url=${encodeURIComponent(url)}&return=${encodeURIComponent(returnTo)}`,
+        { credentials: "include" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as any).error || "Failed to start WooCommerce connection");
+      }
+      // Redirect to the store's wc-auth authorize screen.
       window.location.href = data.url;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -101,13 +147,20 @@
           <span class="font-mono text-xs font-bold uppercase tracking-wider">Shopify</span>
         </button>
 
-        <!-- WooCommerce (coming soon, disabled) -->
+        <!-- WooCommerce — super_admin only for now, else "coming soon" -->
         <button
           type="button"
-          disabled
-          class="flex cursor-not-allowed flex-col items-center gap-2 border border-bratrax-border bg-bratrax-bg px-4 py-4 text-bratrax-text-muted"
+          on:click={() => selectStore("woocommerce")}
+          disabled={!isSuperAdmin}
+          class="flex flex-col items-center gap-2 border px-4 py-4 transition-all
+            {!isSuperAdmin
+              ? 'cursor-not-allowed border-bratrax-border bg-bratrax-bg text-bratrax-text-muted'
+              : selectedStore === 'woocommerce'
+                ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
+                : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}"
+          aria-pressed={selectedStore === "woocommerce"}
         >
-          <svg class="h-8 w-8 opacity-50" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 {isSuperAdmin ? '' : 'opacity-50'}" viewBox="0 0 24 24" fill="none">
             <rect x="2" y="6" width="20" height="12" rx="2" fill="#7F54B3" />
             <path
               d="M6.2 9.6c.5 0 .8.3.9.8.1.6 0 1.4-.3 2.2.4-.7.7-1.2 1-1.5.2-.3.5-.4.8-.4.4 0 .6.3.7.7.1.4 0 1 .2 1.8.1-.9.4-1.6.8-2 .2-.2.4-.4.7-.4.4 0 .6.4.4 1-.3.9-.4 1.6-.4 2.1 0 .2 0 .4.1.5.3 0 .6-.4.9-1l.4.5c-.5.9-1 1.4-1.5 1.4-.4 0-.7-.4-.8-1.1-.1-.5-.1-1 0-1.5-.3.9-.6 1.6-.9 2-.2.3-.5.5-.8.5-.4 0-.6-.4-.7-1.1-.1-.5-.1-1.1-.1-1.9-.4 1.3-.8 2.2-1.2 2.6-.2.2-.4.4-.7.4-.3 0-.5-.2-.6-.6-.3-1-.3-2.4 0-4.2 0-.3.2-.4.5-.4z"
@@ -115,9 +168,11 @@
             />
           </svg>
           <span class="font-mono text-xs font-bold uppercase tracking-wider">WooCommerce</span>
-          <span class="font-mono text-[10px] normal-case tracking-normal text-bratrax-text-muted">
-            coming soon
-          </span>
+          {#if !isSuperAdmin}
+            <span class="font-mono text-[10px] normal-case tracking-normal text-bratrax-text-muted">
+              coming soon
+            </span>
+          {/if}
         </button>
       </div>
 
@@ -143,7 +198,7 @@
         </div>
 
         <button
-          on:click={handleConnect}
+          on:click={handleShopifyConnect}
           disabled={loading}
           class="w-full bg-bratrax-acid px-4 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
         >
@@ -152,6 +207,33 @@
 
         <p class="text-center font-mono text-[10px] text-bratrax-text-muted">
           We'll request read access to orders, products, and customers.
+        </p>
+      {:else if selectedStore === "woocommerce"}
+        <div class="flex flex-col gap-1">
+          <label for="woo-url" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
+            Store URL
+          </label>
+          <input
+            id="woo-url"
+            type="text"
+            bind:value={wooStoreUrl}
+            class="border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
+            placeholder="https://yourstore.com"
+            autocomplete="off"
+          />
+        </div>
+
+        <button
+          on:click={handleWooConnect}
+          disabled={loading}
+          class="w-full bg-bratrax-acid px-4 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
+        >
+          {loading ? "REDIRECTING..." : "CONNECT WOOCOMMERCE →"}
+        </button>
+
+        <p class="text-center font-mono text-[10px] text-bratrax-text-muted">
+          You'll approve a Read-only API key in your store's WordPress admin, then
+          land back here.
         </p>
       {/if}
     </div>

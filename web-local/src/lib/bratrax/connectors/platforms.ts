@@ -140,6 +140,18 @@ export const PLATFORMS: PlatformConfig[] = [
     detailType: "crm",
   },
   {
+    id: "woocommerce",
+    name: "WooCommerce",
+    logo: "woocommerce-logo.png",
+    description: "Connect your WooCommerce store for e-commerce analytics",
+    category: "ecommerce",
+    flowType: "oauth-modal-input",
+    apiSlug: "woocommerce",
+    callbackParams: [],
+    connectionKey: "WooCommerce",
+    detailType: "crm",
+  },
+  {
     id: "amazon-sp-us",
     name: "Amazon SP (US)",
     logo: "amazon-logo.webp",
