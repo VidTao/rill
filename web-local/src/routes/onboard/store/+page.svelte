@@ -92,9 +92,12 @@
     loading = true;
     try {
       const host = get(runtime).host;
-      // Default the post-approval landing to /connectors (safe for the ready
-      // super_admins testing this — avoids the /onboard/* ready-bounce).
-      const returnTo = sessionStorage.getItem("onboard_oauth_return") || "/connectors";
+      // Post-approval landing. An in-onboarding connect goes straight to
+      // /onboard/stack — the next step, since WooCommerce has no Shopify-style
+      // embed step and the callback advances created → platforms_connected. A
+      // /connectors-initiated connect stashes onboard_oauth_return="/connectors"
+      // first, so ready super_admins still return there.
+      const returnTo = sessionStorage.getItem("onboard_oauth_return") || "/onboard/stack";
       const res = await fetch(
         `${host}/bratrax/onboard/woocommerce/auth-url?store_url=${encodeURIComponent(url)}&return=${encodeURIComponent(returnTo)}`,
         { credentials: "include" },

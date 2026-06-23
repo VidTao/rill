@@ -455,6 +455,22 @@
     isOAuthBounce =
       hasCallback && returnTo !== null && returnTo !== "/onboard/stack";
 
+    // 0b. WooCommerce wc-auth returns here (when initiated during onboarding)
+    //     with ?success=…&user_id=<signed token> appended. The key pair already
+    //     arrived via the server-to-server callback and the step advanced to
+    //     platforms_connected, so just scrub the params so a refresh / back
+    //     button doesn't carry the token around. Not an OAuth callback (no
+    //     code/auth_code), so this never collides with the handlers below.
+    if (
+      $page.url.searchParams.has("user_id") ||
+      $page.url.searchParams.has("success")
+    ) {
+      const wooUrl = new URL(window.location.href);
+      wooUrl.searchParams.delete("success");
+      wooUrl.searchParams.delete("user_id");
+      window.history.replaceState({}, "", wooUrl.toString());
+    }
+
     // 0a. OAuth providers return ?error=…&error_description=… when the user
     //     cancels, the consent fails, or — most commonly for Microsoft —
     //     the user's tenant lacks a service principal for the requested
