@@ -55,13 +55,13 @@
     { id: "facebook_ads",   name: "Facebook Ads",           type: "client_sdk",                                                       color: "#1877F2" },
     { id: "tiktok_ads",     name: "TikTok Ads",             type: "oauth",            authUrlPath: "/bratrax/onboard/tiktok/auth-url",      color: "#000000" },
     { id: "bing_ads",       name: "Microsoft Bing Ads",     type: "oauth",            authUrlPath: "/bratrax/onboard/bing-ads/auth-url",    color: "#00A4EF" },
+    { id: "pinterest_ads",  name: "Pinterest",              type: "oauth",            authUrlPath: "/bratrax/onboard/pinterest/auth-url",   color: "#E60023" },
     { id: "klaviyo",        name: "Klaviyo",                type: "oauth",            authUrlPath: "/bratrax/onboard/klaviyo/auth-url",     color: "#2D2D2D" },
     { id: "taboola",        name: "Taboola",                type: "credential_modal",                                                 color: "#1376DC" },
     { id: "outbrain",       name: "Outbrain",               type: "credential_modal",                                                 color: "#EE6E33" },
     { id: "external_pages", name: "External Landing Pages", type: "snippet_install",                                                  color: "#F59E0B" },
 
     // --- Re-enable as each platform is migrated to rill_onboarding_state ---
-    // { id: "pinterest_ads", name: "Pinterest",   type: "oauth", authUrlPath: "/bratrax/connectors/pinterest/auth-url",   color: "#E60023" },
     // { id: "amazon_ads",    name: "Amazon Ads",  type: "oauth", authUrlPath: "/bratrax/connectors/amazon-ads/auth-url",  color: "#FF9900" },
   ];
 

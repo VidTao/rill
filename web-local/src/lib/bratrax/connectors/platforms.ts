@@ -27,7 +27,7 @@ export const PLATFORMS: PlatformConfig[] = [
     detailType: "ad",
   },
   {
-    id: "pinterest",
+    id: "pinterest_ads",
     name: "Pinterest",
     logo: "pinterest-logo.png",
     description: "Connect your Pinterest ad account for campaign tracking",

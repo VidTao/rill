@@ -115,7 +115,8 @@
         {
           id: "pinterest_ads",
           name: "Pinterest",
-          type: "coming_soon",
+          type: "oauth",
+          authUrlPath: "/bratrax/onboard/pinterest/auth-url",
           color: "#E60023",
         },
         {
@@ -303,6 +304,7 @@
   let tiktokState = "";
   let klaviyoState = "";
   let bingAdsState = "";
+  let pinterestAdsState = "";
   let taboolaState = "";
   let outbrainState = "";
 
@@ -553,6 +555,19 @@
       await handleBingAdsReturn(bingCode, bingStateParam);
     }
 
+    // 3d. Pinterest redirects back with ?code=…&state=… (same param names as
+    //     Klaviyo/Bing). Disambiguated by the sessionStorage state-key match.
+    const pinterestCode = $page.url.searchParams.get("code");
+    const pinterestStateParam = $page.url.searchParams.get("state");
+    const expectedPinterestState = sessionStorage.getItem("pinterest_ads_oauth_state");
+    if (
+      pinterestCode &&
+      pinterestStateParam &&
+      expectedPinterestState === pinterestStateParam
+    ) {
+      await handlePinterestReturn(pinterestCode, pinterestStateParam);
+    }
+
     // 4. Load Google Identity Services SDK (Google Ads popup OAuth).
     if (!document.getElementById("gis-sdk")) {
       const script = document.createElement("script");
@@ -674,6 +689,43 @@
         name: a.name || a.id,
       }));
       accountModalPlatform = "Microsoft Bing Ads";
+      showAccountModal = true;
+
+      // Strip the callback params so a refresh doesn't re-trigger.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("code");
+      url.searchParams.delete("state");
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loading = "";
+    }
+  }
+
+  async function handlePinterestReturn(code: string, state: string) {
+    error = "";
+    loading = "pinterest_ads";
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(
+        `${host}/bratrax/onboard/pinterest/accounts?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? "Failed to list Pinterest accounts");
+      }
+      const body = (await res.json()) as {
+        state: string;
+        accounts: Array<{ id: string; name: string }>;
+      };
+      pinterestAdsState = body.state;
+      accountModalAccounts = body.accounts.map((a) => ({
+        id: a.id,
+        name: a.name || a.id,
+      }));
+      accountModalPlatform = "Pinterest";
       showAccountModal = true;
 
       // Strip the callback params so a refresh doesn't re-trigger.
@@ -1258,6 +1310,7 @@
       const isBingAds = accountModalPlatform === "Microsoft Bing Ads";
       const isTaboola = accountModalPlatform === "Taboola";
       const isOutbrain = accountModalPlatform === "Outbrain";
+      const isPinterest = accountModalPlatform === "Pinterest";
 
       let endpoint: string;
       let body: Record<string, unknown>;
@@ -1287,6 +1340,14 @@
           selectedAccounts: selected,
         };
         connectedKey = "bing_ads";
+      } else if (isPinterest) {
+        endpoint = `${host}/bratrax/onboard/pinterest/connect`;
+        body = {
+          state: pinterestAdsState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "pinterest_ads";
       } else if (isKlaviyo) {
         endpoint = `${host}/bratrax/onboard/klaviyo/connect`;
         body = {
@@ -1373,6 +1434,10 @@
       if (isBingAds) {
         sessionStorage.removeItem("bing_ads_oauth_state");
         bingAdsState = "";
+      }
+      if (isPinterest) {
+        sessionStorage.removeItem("pinterest_ads_oauth_state");
+        pinterestAdsState = "";
       }
       if (isTaboola) taboolaState = "";
       if (isOutbrain) outbrainState = "";
