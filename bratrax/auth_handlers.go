@@ -306,6 +306,11 @@ func (s *AuthService) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-subscribe the new user to the beehiiv newsletter via Flask
+	// (fire-and-forget; Flask owns the API key + on/off flag). Must never
+	// block or fail this response.
+	go notifyNewsletterSignup(user.Email, s.logger)
+
 	writeJSON(w, http.StatusCreated, map[string]any{"user": user})
 }
 
