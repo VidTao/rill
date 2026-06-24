@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { goto } from "$app/navigation";
   import { get } from "svelte/store";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
@@ -18,6 +18,15 @@
   import OutbrainLoginModal from "./OutbrainLoginModal.svelte";
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
   import { getAuthConfig } from "$lib/bratrax/auth";
+  import ConnectorPill from "$lib/bratrax/connectors/ConnectorPill.svelte";
+  import {
+    fetchSyncStatus,
+    aggregateBySource,
+    anyBackfilling,
+    backfillLabel,
+    relativeTime,
+    type SourceSyncStatus,
+  } from "$lib/bratrax/syncStatus";
 
   // Public OAuth client IDs — fetched from /onboard/oauth-config on mount
   // (BUG-01: not hardcoded in source). Empty until the fetch completes;
@@ -34,32 +43,91 @@
   // bratrax_advertising_connections + bratrax_user_platform_credentials path.
   // ---------------------------------------------------------------------------
   interface Platform {
-    id: string;          // matches connected_platforms[].platform + stack_selections key prefix
+    id: string; // matches connected_platforms[].platform + stack_selections key prefix
     name: string;
     // "shopify" needs a shop-domain input page first; "snippet_install" is a
     // copy-paste pixel (no OAuth) — flagged installed when the user clicks
     // "I've installed it" in the snippet modal. "credential_modal" opens a
     // username/password (or client_id/secret) form whose submit triggers a
     // direct credential→token exchange on the backend (Taboola, Outbrain).
-    type: "oauth" | "client_sdk" | "shopify" | "snippet_install" | "credential_modal";
-    authUrlPath?: string;  // for redirect OAuth (TikTok / Klaviyo)
+    type:
+      | "oauth"
+      | "client_sdk"
+      | "shopify"
+      | "snippet_install"
+      | "credential_modal";
+    authUrlPath?: string; // for redirect OAuth (TikTok / Klaviyo)
     color: string;
   }
 
   const platforms: Platform[] = [
-    { id: "shopify",        name: "Shopify",                type: "shopify",                                                          color: "#95BF47" },
+    { id: "shopify", name: "Shopify", type: "shopify", color: "#95BF47" },
     // WooCommerce is gated behind the ALLOW_WOOCOMMERCE env flag. It is
     // filtered out of `visiblePlatforms` below when the flag is off.
-    { id: "woocommerce",    name: "WooCommerce",            type: "credential_modal",                                                 color: "#7F54B3" },
-    { id: "google_ads",     name: "Google Ads",             type: "client_sdk",                                                       color: "#4285F4" },
-    { id: "facebook_ads",   name: "Facebook Ads",           type: "client_sdk",                                                       color: "#1877F2" },
-    { id: "tiktok_ads",     name: "TikTok Ads",             type: "oauth",            authUrlPath: "/bratrax/onboard/tiktok/auth-url",      color: "#000000" },
-    { id: "bing_ads",       name: "Microsoft Bing Ads",     type: "oauth",            authUrlPath: "/bratrax/onboard/bing-ads/auth-url",    color: "#00A4EF" },
-    { id: "pinterest_ads",  name: "Pinterest",              type: "oauth",            authUrlPath: "/bratrax/onboard/pinterest/auth-url",   color: "#E60023" },
-    { id: "klaviyo",        name: "Klaviyo",                type: "oauth",            authUrlPath: "/bratrax/onboard/klaviyo/auth-url",     color: "#2D2D2D" },
-    { id: "taboola",        name: "Taboola",                type: "credential_modal",                                                 color: "#1376DC" },
-    { id: "outbrain",       name: "Outbrain",               type: "credential_modal",                                                 color: "#EE6E33" },
-    { id: "external_pages", name: "External Landing Pages", type: "snippet_install",                                                  color: "#F59E0B" },
+    {
+      id: "woocommerce",
+      name: "WooCommerce",
+      type: "credential_modal",
+      color: "#7F54B3",
+    },
+    {
+      id: "google_ads",
+      name: "Google Ads",
+      type: "client_sdk",
+      color: "#4285F4",
+    },
+    {
+      id: "facebook_ads",
+      name: "Facebook Ads",
+      type: "client_sdk",
+      color: "#1877F2",
+    },
+    {
+      id: "tiktok_ads",
+      name: "TikTok Ads",
+      type: "oauth",
+      authUrlPath: "/bratrax/onboard/tiktok/auth-url",
+      color: "#000000",
+    },
+    {
+      id: "bing_ads",
+      name: "Microsoft Bing Ads",
+      type: "oauth",
+      authUrlPath: "/bratrax/onboard/bing-ads/auth-url",
+      color: "#00A4EF",
+    },
+    {
+      id: "pinterest_ads",
+      name: "Pinterest",
+      type: "oauth",
+      authUrlPath: "/bratrax/onboard/pinterest/auth-url",
+      color: "#E60023",
+    },
+    {
+      id: "klaviyo",
+      name: "Klaviyo",
+      type: "oauth",
+      authUrlPath: "/bratrax/onboard/klaviyo/auth-url",
+      color: "#2D2D2D",
+    },
+    {
+      id: "taboola",
+      name: "Taboola",
+      type: "credential_modal",
+      color: "#1376DC",
+    },
+    {
+      id: "outbrain",
+      name: "Outbrain",
+      type: "credential_modal",
+      color: "#EE6E33",
+    },
+    {
+      id: "external_pages",
+      name: "External Landing Pages",
+      type: "snippet_install",
+      color: "#F59E0B",
+    },
 
     // --- Re-enable as each platform is migrated to rill_onboarding_state ---
     // { id: "amazon_ads",    name: "Amazon Ads",  type: "oauth", authUrlPath: "/bratrax/connectors/amazon-ads/auth-url",  color: "#FF9900" },
@@ -83,13 +151,37 @@
   let loading = "";
   let error = "";
 
+  // Per-source backfill/sync status, keyed by source (=== platform.id), from
+  // /bratrax/sync-status. Drives the pill fill, the "Last sync" label, the
+  // reassurance copy, and the per-account detail in the View Accounts pop-up.
+  // Polled every 10s while this page is open (see SYNC_POLL_MS) so the pill
+  // fills live without a reload; the timer is cleared on destroy.
+  let syncBySource: Map<string, SourceSyncStatus> = new Map();
+  $: showBackfillReassurance = anyBackfilling(syncBySource);
+  const SYNC_POLL_MS = 10_000;
+  let syncPollTimer: ReturnType<typeof setInterval> | undefined;
+
   // "View accounts" modal — generic shape for ad platforms (accounts list)
   // plus a Shopify-specific shape (single store with shop + name + currency).
   let showInfoModal = false;
   let infoModalPlatform = "";
-  let infoModalAccounts: Array<{ id: string; name: string }> = [];
+  let infoModalAccounts: Array<{
+    id: string;
+    name: string;
+    progressPct?: number;
+    lastSyncAt?: string | null;
+  }> = [];
   let infoModalConnectedAt = "";
-  let infoModalShopify: { shop: string; shopName: string; currency: string } | null = null;
+  let infoModalShopify: {
+    shop: string;
+    shopName: string;
+    currency: string;
+  } | null = null;
+  // Single-store (Shopify / Woo) backfill card data, null when no sync row.
+  let infoModalBackfill: {
+    progressPct: number;
+    lastSyncAt: string | null;
+  } | null = null;
 
   // Disconnect confirmation modal — replaces the browser-native confirm() so
   // the prompt matches Bratrax styling.
@@ -100,7 +192,11 @@
   // Klaviyo use redirect → land on /onboard/stack → bounce back here).
   let showAccountModal = false;
   let accountModalPlatform = "";
-  let accountModalAccounts: Array<{ id: string; name: string; group?: string }> = [];
+  let accountModalAccounts: Array<{
+    id: string;
+    name: string;
+    group?: string;
+  }> = [];
   let accountModalLoading = false;
   let googleAuthCode = "";
   let fbAccessToken = "";
@@ -183,6 +279,10 @@
     connectedPlatforms = next;
     connectedAt = dates;
 
+    // Backfill/sync status — informational, non-fatal. Also polled on an
+    // interval (see startSyncPolling) so the pill fills live without a reload.
+    await refreshSyncStatus();
+
     // Live-check the embed when Shopify is connected. The cached
     // me.shopify_embed_enabled flag only ever ticks from false → true (the
     // verify endpoint flips it on detection, nothing flips it back), so a
@@ -197,6 +297,22 @@
       } catch {
         // Non-fatal: keep the cached value from onboardMe.
       }
+    }
+  }
+
+  // Re-fetch ONLY the backfill/sync status (not the heavier onboardMe +
+  // embed-status round trips — connections don't change without a user action,
+  // which already calls refreshFromServer). Reassigning syncBySource drives the
+  // pill fill, "Last sync", and reassurance copy reactively. In-flight guard so
+  // a slow request can't stack up behind the 10s interval.
+  let syncPolling = false;
+  async function refreshSyncStatus() {
+    if (syncPolling) return;
+    syncPolling = true;
+    try {
+      syncBySource = aggregateBySource(await fetchSyncStatus());
+    } finally {
+      syncPolling = false;
     }
   }
 
@@ -268,7 +384,8 @@
       const res = await fetch(`${host}${platform.authUrlPath}`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error(`Failed to get auth URL for ${platform.name}`);
+      if (!res.ok)
+        throw new Error(`Failed to get auth URL for ${platform.name}`);
       const data = await res.json();
 
       sessionStorage.setItem("onboard_oauth_platform", platform.id);
@@ -393,10 +510,7 @@
     let nextPath: string | undefined = path;
     let nextParams: Record<string, unknown> | undefined = params;
     for (let i = 0; i < 50 && nextPath; i++) {
-      const resp: FbPagedResponse<T> = await fbApi(
-        nextPath,
-        nextParams ?? {},
-      );
+      const resp: FbPagedResponse<T> = await fbApi(nextPath, nextParams ?? {});
       if (resp?.error) {
         throw resp.error;
       }
@@ -506,7 +620,9 @@
     children?: GoogleAdAccountNode[];
   }
 
-  function flattenAccounts(accounts: GoogleAdAccountNode[]): Array<{ id: string; name: string }> {
+  function flattenAccounts(
+    accounts: GoogleAdAccountNode[],
+  ): Array<{ id: string; name: string }> {
     const flat: Array<{ id: string; name: string }> = [];
     googleManagerMap = {};
     function walk(list: GoogleAdAccountNode[]) {
@@ -661,7 +777,10 @@
   // accounts + a state token, then open AccountSelectionModal — which
   // routes selection through the existing handleAccountSelection above.
   // ---------------------------------------------------------------------------
-  async function handleTaboolaCredentials(creds: { clientId: string; clientSecret: string }) {
+  async function handleTaboolaCredentials(creds: {
+    clientId: string;
+    clientSecret: string;
+  }) {
     taboolaModalError = "";
     taboolaModalLoading = true;
     try {
@@ -677,7 +796,9 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error((data as any).error || "Failed to list Taboola accounts");
+        throw new Error(
+          (data as any).error || "Failed to list Taboola accounts",
+        );
       }
       taboolaState = (data as any).state;
       accountModalAccounts = ((data as any).accounts || []).map((a: any) => ({
@@ -707,7 +828,9 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error((data as any).error || "Failed to list Outbrain marketers");
+        throw new Error(
+          (data as any).error || "Failed to list Outbrain marketers",
+        );
       }
       outbrainState = (data as any).state;
       accountModalAccounts = ((data as any).accounts || []).map((a: any) => ({
@@ -778,6 +901,13 @@
     infoModalConnectedAt = connectedAt[platform.id] || cred.connected_at || "";
     infoModalPlatform = platform.name;
 
+    // Backfill rows for this source, keyed by account_id for per-card merge.
+    const sync = syncBySource.get(platform.id);
+    const syncByAccount = new Map(
+      (sync?.accounts ?? []).map((a) => [a.account_id, a]),
+    );
+    infoModalBackfill = null;
+
     if (platform.id === "shopify") {
       // Single-store shape — no accounts list.
       infoModalShopify = {
@@ -786,6 +916,12 @@
         currency: cred.currency || "",
       };
       infoModalAccounts = [];
+      if (sync) {
+        infoModalBackfill = {
+          progressPct: sync.progressPct,
+          lastSyncAt: sync.lastSyncAt,
+        };
+      }
     } else if (platform.id === "woocommerce") {
       // Single-store shape, WooCommerce field names.
       infoModalShopify = {
@@ -794,13 +930,26 @@
         currency: cred.currency || "",
       };
       infoModalAccounts = [];
+      if (sync) {
+        infoModalBackfill = {
+          progressPct: sync.progressPct,
+          lastSyncAt: sync.lastSyncAt,
+        };
+      }
     } else {
       // Multi-account shape: TikTok stores them under `advertisers`; everyone else uses `accounts`.
       const list: any[] = cred.accounts || cred.advertisers || [];
-      infoModalAccounts = list.map((a: any) => ({
-        id: String(a.accountId || a.id || a.account_id || ""),
-        name: a.accountName || a.name || a.account_name || a.id || "(unnamed)",
-      }));
+      infoModalAccounts = list.map((a: any) => {
+        const id = String(a.accountId || a.id || a.account_id || "");
+        const row = syncByAccount.get(id);
+        return {
+          id,
+          name:
+            a.accountName || a.name || a.account_name || a.id || "(unnamed)",
+          progressPct: row?.progress_pct,
+          lastSyncAt: row?.last_sync_at,
+        };
+      });
       infoModalShopify = null;
     }
     showInfoModal = true;
@@ -895,13 +1044,20 @@
       if (wooReturn.get("success") === "0") {
         error = "WooCommerce connection was cancelled or didn't complete.";
       }
-      window.history.replaceState(window.history.state, "", window.location.pathname);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname,
+      );
     }
 
     // ALLOW_WOOCOMMERCE gate (Go proxy env, via /bratrax/auth/config).
     allowWoocommerce = (await getAuthConfig()).allow_woocommerce;
 
     await refreshFromServer();
+    // Poll backfill status every 10s so the pill fills live while the user
+    // watches this page. Cleared in onDestroy below.
+    syncPollTimer = setInterval(refreshSyncStatus, SYNC_POLL_MS);
     // Public OAuth client IDs (BUG-01: not hardcoded in source).
     try {
       const cfg = await getOAuthConfig();
@@ -919,6 +1075,12 @@
       document.head.appendChild(script);
     }
   });
+
+  // Stop the 10s backfill poll when the page is torn down so it doesn't keep
+  // hitting /bratrax/sync-status after the user navigates away.
+  onDestroy(() => {
+    if (syncPollTimer) clearInterval(syncPollTimer);
+  });
 </script>
 
 <div class="connectors-canvas">
@@ -926,27 +1088,46 @@
     <div class="mb-7">
       <h1 class="connectors-title">Manage your connections</h1>
       <p class="connectors-subhead">
-        Connect, view, or disconnect your data sources. Changes apply immediately.
+        Connect, view, or disconnect your data sources. Changes apply
+        immediately.
       </p>
     </div>
 
+    {#if showBackfillReassurance}
+      <div
+        class="mb-5 border-l-[3px] border-bratrax-acid bg-bratrax-surface px-4 py-3 text-sm text-bratrax-text-body"
+      >
+        <strong class="text-bratrax-text-headline"
+          >Historical data is still loading.</strong
+        >
+        This can take a few days for larger accounts. If sync isn't complete within
+        3 business days, reach out to
+        <span class="underline">support@bratrax.com</span>.
+      </div>
+    {/if}
+
     {#if error}
-      <div class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+      <div
+        class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+      >
         {error}
       </div>
     {/if}
 
     {#if showShopifyEmbedBanner}
-      <div class="mb-4 border border-bratrax-acid/40 bg-bratrax-acid/10 px-4 py-3">
+      <div
+        class="mb-4 border border-bratrax-acid/40 bg-bratrax-acid/10 px-4 py-3"
+      >
         <div class="flex items-start justify-between gap-4">
           <div class="flex-1">
-            <p class="mb-1 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-acid">
+            <p
+              class="mb-1 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-acid"
+            >
               Action required
             </p>
             <p class="text-sm text-bratrax-text-body">
-              Enable the Bratrax tracker in your Shopify Theme Editor so we
-              can capture email signups and on-site events. Takes about 30
-              seconds.
+              Enable the Bratrax tracker in your Shopify Theme Editor so we can
+              capture email signups and on-site events. Takes about 30 seconds.
             </p>
             {#if embedRecheckMessage}
               <p class="mt-2 font-mono text-[11px] text-bratrax-text-muted">
@@ -982,11 +1163,23 @@
       {#each visiblePlatforms as platform}
         {@const connected = isConnected(platform.id)}
         <div class="connector-row" class:row-disconnected={!connected}>
-          <span class="connector-icon" style="background-color: {platform.color}"></span>
+          <span
+            class="connector-icon"
+            style="background-color: {platform.color}"
+          ></span>
           <div class="connector-mid">
             <span class="connector-name">{platform.name}</span>
             {#if connected}
-              <span class="connector-pill">Connected</span>
+              {@const sync = syncBySource.get(platform.id)}
+              <ConnectorPill fillPercentage={sync?.progressPct} />
+              {#if sync}
+                {@const rel = relativeTime(
+                  sync.lastSyncAt ?? connectedAt[platform.id],
+                )}
+                {#if rel}
+                  <span class="connector-lastsync">Last sync: {rel}</span>
+                {/if}
+              {/if}
             {:else}
               <span class="connector-status-muted">Not connected</span>
             {/if}
@@ -994,11 +1187,16 @@
           <div class="connector-actions">
             {#if connected}
               <button
-                on:click={() => platform.type === "snippet_install" ? openConnectedBuilderModal() : handleView(platform)}
+                on:click={() =>
+                  platform.type === "snippet_install"
+                    ? openConnectedBuilderModal()
+                    : handleView(platform)}
                 disabled={loading === platform.id}
                 class="btn-bratrax btn-neutral btn-compact"
               >
-                {platform.type === "snippet_install" ? "View snippet" : "View accounts"}
+                {platform.type === "snippet_install"
+                  ? "View snippet"
+                  : "View accounts"}
               </button>
               <button
                 on:click={() => requestDisconnect(platform)}
@@ -1037,7 +1235,9 @@
   platformName={accountModalPlatform}
   accounts={accountModalAccounts}
   onSubmit={handleAccountSelection}
-  onClose={() => { showAccountModal = false; }}
+  onClose={() => {
+    showAccountModal = false;
+  }}
 />
 
 {#if showInfoModal}
@@ -1069,58 +1269,123 @@
       </div>
 
       {#if infoModalConnectedAt}
-        <p class="mb-3 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
-          Connected: {new Date(infoModalConnectedAt).toLocaleString()}
+        <p
+          class="mb-3 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted"
+        >
+          Connected on: {new Date(infoModalConnectedAt).toLocaleString()}
         </p>
       {/if}
 
       {#if infoModalShopify}
-        <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px] text-bratrax-acid/70">
+        <div
+          class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px] text-bratrax-acid/70"
+        >
           Store
         </div>
         <ul class="flex flex-col gap-1.5">
           {#if infoModalShopify.shopName}
             <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
-              <div class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">Name</div>
-              <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
+              <div
+                class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted"
+              >
+                Name
+              </div>
+              <div
+                class="font-mono text-xs font-bold text-bratrax-text-headline truncate"
+              >
                 {infoModalShopify.shopName}
               </div>
             </li>
           {/if}
           {#if infoModalShopify.shop}
             <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
-              <div class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">Domain</div>
-              <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
+              <div
+                class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted"
+              >
+                Domain
+              </div>
+              <div
+                class="font-mono text-xs font-bold text-bratrax-text-headline truncate"
+              >
                 {infoModalShopify.shop}
               </div>
             </li>
           {/if}
           {#if infoModalShopify.currency}
             <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
-              <div class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">Currency</div>
-              <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
+              <div
+                class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted"
+              >
+                Currency
+              </div>
+              <div
+                class="font-mono text-xs font-bold text-bratrax-text-headline truncate"
+              >
                 {infoModalShopify.currency}
               </div>
             </li>
           {/if}
+          {#if infoModalBackfill}
+            <li
+              class="border border-bratrax-border border-l-[3px] border-l-bratrax-acid bg-bratrax-bg px-3 py-2"
+            >
+              <div
+                class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted"
+              >
+                Backfill
+              </div>
+              <div
+                class="font-mono text-xs font-bold text-bratrax-text-headline"
+              >
+                {backfillLabel(infoModalBackfill.progressPct)}
+              </div>
+              {#if infoModalBackfill.lastSyncAt}
+                <div class="mt-1 font-mono text-[10px] text-bratrax-text-muted">
+                  Last sync: {new Date(
+                    infoModalBackfill.lastSyncAt,
+                  ).toLocaleString()}
+                </div>
+              {/if}
+            </li>
+          {/if}
         </ul>
       {:else}
-        <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px] text-bratrax-acid/70">
+        <div
+          class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[1.5px] text-bratrax-acid/70"
+        >
           Accounts ({infoModalAccounts.length})
         </div>
 
         {#if infoModalAccounts.length === 0}
-          <p class="font-mono text-xs text-bratrax-text-muted">No accounts on file.</p>
+          <p class="font-mono text-xs text-bratrax-text-muted">
+            No accounts on file.
+          </p>
         {:else}
           <ul class="flex max-h-80 flex-col gap-1.5 overflow-y-auto">
             {#each infoModalAccounts as acct}
               <li class="border border-bratrax-border bg-bratrax-bg px-3 py-2">
-                <div class="font-mono text-xs font-bold text-bratrax-text-headline truncate">
+                <div
+                  class="font-mono text-xs font-bold text-bratrax-text-headline truncate"
+                >
                   {acct.name}
                 </div>
-                <div class="font-mono text-[10px] text-bratrax-text-muted truncate">
+                <div
+                  class="font-mono text-[10px] text-bratrax-text-muted truncate"
+                >
                   {acct.id}
                 </div>
+                {#if acct.progressPct !== undefined}
+                  <div
+                    class="mt-1.5 font-mono text-[11px] text-bratrax-text-body"
+                  >
+                    {backfillLabel(acct.progressPct)}
+                  </div>
+                {/if}
+                {#if acct.lastSyncAt}
+                  <div class="font-mono text-[10px] text-bratrax-text-muted">
+                    Last sync: {new Date(acct.lastSyncAt).toLocaleString()}
+                  </div>
+                {/if}
               </li>
             {/each}
           </ul>
@@ -1147,14 +1412,17 @@
     >
       <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-tomato"></div>
 
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80">
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80"
+      >
         Confirm disconnect
       </div>
       <h2 class="text-lg font-black text-bratrax-text-headline">
         Disconnect {confirmPlatform.name}?
       </h2>
       <p class="mt-3 text-sm font-light text-bratrax-text-body">
-        This removes all stored credentials and account selections for {confirmPlatform.name} from your workspace. You can reconnect at any time.
+        This removes all stored credentials and account selections for {confirmPlatform.name}
+        from your workspace. You can reconnect at any time.
       </p>
 
       <div class="mt-6 flex items-center justify-end gap-2">
@@ -1198,7 +1466,10 @@
   loading={taboolaModalLoading}
   error={taboolaModalError}
   onSubmit={handleTaboolaCredentials}
-  onClose={() => { showTaboolaModal = false; taboolaModalError = ""; }}
+  onClose={() => {
+    showTaboolaModal = false;
+    taboolaModalError = "";
+  }}
 />
 
 <OutbrainLoginModal
@@ -1206,7 +1477,10 @@
   loading={outbrainModalLoading}
   error={outbrainModalError}
   onSubmit={handleOutbrainCredentials}
-  onClose={() => { showOutbrainModal = false; outbrainModalError = ""; }}
+  onClose={() => {
+    showOutbrainModal = false;
+    outbrainModalError = "";
+  }}
 />
 
 <style lang="postcss">
@@ -1243,7 +1517,9 @@
   .connector-list-card::before {
     content: "";
     position: absolute;
-    top: 0; left: 0; right: 0;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 4px;
     background: var(--color-acid);
     pointer-events: none;
@@ -1303,7 +1579,7 @@
     text-transform: uppercase;
     padding: 3px 8px;
     background: var(--color-acid);
-    color: #0A0A0A;
+    color: #0a0a0a;
   }
 
   .connector-status-muted {
@@ -1312,6 +1588,13 @@
     font-weight: 700;
     letter-spacing: 1.5px;
     text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .connector-lastsync {
+    font-family: "Space Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.4px;
     color: var(--color-text-muted);
   }
 

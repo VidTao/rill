@@ -11,6 +11,12 @@
   } from "$lib/bratrax/onboarding/checklist";
   import Section from "$lib/bratrax/onboarding/Section.svelte";
   import ResourcesBlock from "$lib/bratrax/onboarding/ResourcesBlock.svelte";
+  import BackfillCallout from "$lib/bratrax/onboarding/BackfillCallout.svelte";
+  import {
+    fetchSyncStatus,
+    aggregateBySource,
+    anyBackfilling,
+  } from "$lib/bratrax/syncStatus";
 
   // Fixed section numbering (Section 3 is conditional, so we can't derive it
   // from array position — the numbers must stay stable per the spec mock).
@@ -29,8 +35,13 @@
   let loading = true;
   let errorMessage = "";
   let dismissing = false;
+  // Show the backfill callout while any connected source is still loading
+  // history. Informational only — independent of checklist completion.
+  let showBackfillCallout = false;
 
-  $: firstName = ($bratraxUser?.name || $bratraxUser?.email || "").split(" ")[0];
+  $: firstName = ($bratraxUser?.name || $bratraxUser?.email || "").split(
+    " ",
+  )[0];
   $: isAdmin = result?.role === "admin" || result?.role === "super_admin";
   $: counts = result ? progressCounts(result) : { done: 0, total: 0 };
   $: canHide = result ? !coreSetupIncomplete(result) : false;
@@ -41,10 +52,16 @@
       result = await getChecklist();
       errorMessage = "";
     } catch (e) {
-      errorMessage = e instanceof Error ? e.message : "Failed to load checklist";
+      errorMessage =
+        e instanceof Error ? e.message : "Failed to load checklist";
     } finally {
       loading = false;
     }
+    // Backfill callout visibility — non-fatal; fetchSyncStatus() returns []
+    // on error so a failure just hides the callout.
+    showBackfillCallout = anyBackfilling(
+      aggregateBySource(await fetchSyncStatus()),
+    );
     await tick();
     scrollToHash();
   }
@@ -78,7 +95,8 @@
     {:else if result}
       <h1 class="headline">
         {#if isAdmin}
-          Welcome back{firstName ? `, ${firstName}` : ""}. Let's finish setting up
+          Welcome back{firstName ? `, ${firstName}` : ""}. Let's finish setting
+          up
           <span class="accent">{result.workspace_name}</span>.
         {:else}
           <span class="accent">{result.workspace_name}</span> — Getting started.
@@ -93,10 +111,18 @@
           <div class="progress-meta">
             {counts.done} of {counts.total} steps complete
           </div>
-          <button class="hide" disabled={!canHide || dismissing} on:click={hideForNow}>
+          <button
+            class="hide"
+            disabled={!canHide || dismissing}
+            on:click={hideForNow}
+          >
             Hide for now
           </button>
         </div>
+      {/if}
+
+      {#if showBackfillCallout}
+        <BackfillCallout />
       {/if}
 
       {#each result.sections as section (section.key)}
