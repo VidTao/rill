@@ -68,6 +68,7 @@
       subtitle: "",
       platforms: [
         { id: "shopify", name: "Shopify", type: "selection", color: "#95BF47" },
+        { id: "woocommerce", name: "WooCommerce", type: "selection", color: "#7F54B3" },
       ],
     },
     {
@@ -1712,7 +1713,7 @@
             {#each category.platforms as platform}
               <button
                 on:click={() => handleCardClick(platform)}
-                disabled={loading === platform.id || platform.id === "shopify" || platform.type === "coming_soon"}
+                disabled={loading === platform.id || platform.id === "shopify" || platform.id === "woocommerce" || platform.type === "coming_soon"}
                 class="flex items-center gap-2 border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-all
                   {radioToggleIds.has(platform.id)
                     ? isSelected(platform.id)
@@ -1726,7 +1727,7 @@
                           ? 'border-bratrax-border bg-bratrax-bg text-bratrax-text-muted cursor-not-allowed'
                           : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}
                   {loading === platform.id ? 'opacity-50' : ''}
-                  {platform.id === 'shopify' ? 'cursor-default' : ''}"
+                  {platform.id === 'shopify' || platform.id === 'woocommerce' ? 'cursor-default' : ''}"
               >
                 <span
                   class="h-3 w-3"
