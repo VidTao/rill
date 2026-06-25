@@ -35,7 +35,13 @@ function toStr(v: unknown): string | null {
 export function buildMetricTree(
   rows: Row[],
   cols: ResolvedColumns,
-  opts: { tree?: string } = {},
+  opts: {
+    tree?: string;
+    value2Unit?: string | null;
+    value2Label?: string | null;
+    value3Unit?: string | null;
+    value3Label?: string | null;
+  } = {},
 ): MetricTree {
   const warnings: string[] = [];
 
@@ -65,6 +71,12 @@ export function buildMetricTree(
       depth: 0,
       value: (r[cols.value] as number | string | null | undefined) ?? null,
       unit: toStr(r[cols.unit]),
+      value2: (r[cols.value2] as number | string | null | undefined) ?? null,
+      value2Unit: toStr(r[cols.value2_unit]) ?? opts.value2Unit ?? null,
+      value2Label: toStr(r[cols.value2_label]) ?? opts.value2Label ?? null,
+      value3: (r[cols.value3] as number | string | null | undefined) ?? null,
+      value3Unit: toStr(r[cols.value3_unit]) ?? opts.value3Unit ?? null,
+      value3Label: toStr(r[cols.value3_label]) ?? opts.value3Label ?? null,
       delta: toNum(r[cols.delta_value]),
       status: toStr(r[cols.status]),
       sortOrder: toNum(r[cols.sort_order]),

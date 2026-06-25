@@ -1,7 +1,10 @@
 <script lang="ts">
   import LoadingSpinner from "@rilldata/web-common/components/icons/LoadingSpinner.svelte";
   import ComponentError from "@rilldata/web-common/features/components/ComponentError.svelte";
-  import { createInExpression } from "@rilldata/web-common/features/dashboards/stores/filter-utils";
+  import {
+    createAndExpression,
+    createInExpression,
+  } from "@rilldata/web-common/features/dashboards/stores/filter-utils";
   import { createQueryServiceMetricsViewAggregation } from "@rilldata/web-common/runtime-client";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import ComponentHeader from "../../ComponentHeader.svelte";
@@ -19,10 +22,12 @@
   $: ({ instanceId } = $runtime);
   $: ({
     specStore,
+    timeAndFilterStore,
     visible,
     parent: { name: canvasName },
   } = component);
   $: spec = $specStore;
+  $: ({ timeRange, where, hasTimeSeries } = $timeAndFilterStore);
 
   $: ctx = getCanvasStore(canvasName, instanceId);
   $: ({
@@ -49,6 +54,12 @@
         cols.parent_node_id,
         cols.label,
         cols.value,
+        cols.value2,
+        cols.value3,
+        cols.value2_label,
+        cols.value3_label,
+        cols.value2_unit,
+        cols.value3_unit,
         cols.unit,
         cols.delta_value,
         cols.status,
@@ -75,6 +86,9 @@
     spec.tree_name && dimNameSet.has(cols.tree_column)
       ? createInExpression(cols.tree_column, [spec.tree_name])
       : undefined;
+  $: combinedWhere = treeWhere
+    ? createAndExpression(where ? [where, treeWhere] : [treeWhere])
+    : where;
 
   $: rowsQuery = createQueryServiceMetricsViewAggregation(
     instanceId,
@@ -82,27 +96,65 @@
     {
       dimensions,
       measures,
-      where: treeWhere,
+      where: combinedWhere,
+      timeRange,
       limit: "1000",
       priority: 30,
     },
     {
       query: {
-        enabled: isValid && $visible && dimensions.length > 0,
+        enabled:
+          isValid &&
+          $visible &&
+          dimensions.length > 0 &&
+          (!hasTimeSeries || !!timeRange),
       },
     },
   );
   $: ({ isLoading: rowsLoading, data: rowsData } = $rowsQuery);
 
   $: rows = (rowsData?.data ?? []) as unknown as Record<string, unknown>[];
-  $: tree = buildMetricTree(rows, cols, { tree: spec.tree_name });
+  $: fullTree = buildMetricTree(rows, cols, { tree: spec.tree_name });
 
-  // Detail panel selection. Drop it if the selected node leaves the tree
-  // (e.g. metrics_view or tree changed).
+  // Drill-down: focus a node's subtree. Cleared when its node leaves the tree.
+  let focusId: string | null = null;
+  $: if (focusId && !fullTree.nodes.some((n) => n.id === focusId)) focusId = null;
+  $: focusNode = focusId
+    ? (fullTree.nodes.find((n) => n.id === focusId) ?? null)
+    : null;
+  $: tree = focusId ? subtreeFrom(fullTree, focusId) : fullTree;
+
+  function subtreeFrom(t: typeof fullTree, rootId: string): typeof fullTree {
+    const keep = new Set<string>([rootId]);
+    let added = true;
+    while (added) {
+      added = false;
+      for (const e of t.edges) {
+        if (keep.has(e.source) && !keep.has(e.target)) {
+          keep.add(e.target);
+          added = true;
+        }
+      }
+    }
+    const nodes = t.nodes
+      .filter((n) => keep.has(n.id))
+      .map((n) => (n.id === rootId ? { ...n, parentId: null } : n));
+    const edges = t.edges.filter(
+      (e) => keep.has(e.source) && keep.has(e.target),
+    );
+    return { ...t, nodes, edges, isEmpty: nodes.length === 0 };
+  }
+
+  // Detail panel selection. Drop it if the selected node leaves the full tree.
   let selectedNode: MetricTreeNodeData | null = null;
-  $: if (selectedNode && !tree.nodes.some((n) => n.id === selectedNode?.id)) {
+  $: if (
+    selectedNode &&
+    !fullTree.nodes.some((n) => n.id === selectedNode?.id)
+  ) {
     selectedNode = null;
   }
+  $: selectedHasChildren =
+    !!selectedNode && fullTree.edges.some((e) => e.source === selectedNode?.id);
 
   function handleSelect(n: MetricTreeNodeData) {
     selectedNode = n;
@@ -134,6 +186,23 @@
     </div>
   {:else}
     <div class="relative size-full grow">
+      {#if focusId || selectedHasChildren}
+        <div class="mt-toolbar">
+          {#if focusId}
+            <button class="mt-btn" on:click={() => (focusId = null)}>
+              ← Full tree
+            </button>
+            <span class="mt-crumb">{focusNode?.label ?? ""}</span>
+          {:else if selectedHasChildren}
+            <button
+              class="mt-btn"
+              on:click={() => (focusId = selectedNode?.id ?? null)}
+            >
+              ⤢ Focus: {selectedNode?.label}
+            </button>
+          {/if}
+        </div>
+      {/if}
       <MetricTreeGraph
         nodes={tree.nodes}
         edges={tree.edges}
@@ -155,5 +224,14 @@
   }
   .empty {
     @apply rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm text-fg-muted;
+  }
+  .mt-toolbar {
+    @apply absolute left-2 top-2 z-10 flex items-center gap-2;
+  }
+  .mt-btn {
+    @apply rounded border border-gray-300 bg-surface px-2 py-1 text-xs font-medium text-fg shadow-sm hover:bg-gray-100;
+  }
+  .mt-crumb {
+    @apply text-xs font-semibold text-fg-muted;
   }
 </style>

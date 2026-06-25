@@ -82,6 +82,18 @@
   {/if}
   <div class="label" title={data.label}>{data.label}</div>
   <div class="value">{fmtValue(data.value, data.unit)}</div>
+  {#if data.value2 != null}
+    <div class="metric2">
+      {#if data.value2Label}<span class="m2-label">{data.value2Label}</span>{/if}
+      <span class="m2-val">{fmtValue(data.value2, data.value2Unit)}</span>
+    </div>
+  {/if}
+  {#if data.value3 != null}
+    <div class="metric2">
+      {#if data.value3Label}<span class="m2-label">{data.value3Label}</span>{/if}
+      <span class="m2-val">{fmtValue(data.value3, data.value3Unit)}</span>
+    </div>
+  {/if}
   {#if data.delta != null}
     <div class="delta">
       {data.delta > 0 ? "▲" : data.delta < 0 ? "▼" : "•"}
@@ -94,7 +106,7 @@
   .mtnode {
     box-sizing: border-box;
     width: 220px;
-    height: 96px;
+    height: 144px;
     padding: 8px 12px;
     display: flex;
     flex-direction: column;
@@ -153,6 +165,24 @@
     line-height: 1.2;
     color: var(--color-text, #1a1a18);
   }
+  .metric2 {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--color-text-muted, #6b7280);
+  }
+  .m2-label {
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 700;
+    font-size: 9px;
+  }
+  .m2-val {
+    font-weight: 600;
+    color: var(--color-text, #1a1a18);
+  }
   .delta {
     font-size: 11px;
     color: var(--color-text-muted, #6b7280);
@@ -177,7 +207,8 @@
     background: var(--accent-dark);
   }
   :global(.dark) .label,
-  :global(.dark) .value {
+  :global(.dark) .value,
+  :global(.dark) .m2-val {
     color: #ece7dd;
   }
   :global(.dark) .delta {

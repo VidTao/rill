@@ -63,6 +63,20 @@ export class MetricTreeComponent extends BaseCanvasComponent<MetricTreeSpec> {
         label: { type: "dimension", label: "Label" },
 
         value: { type: "measure", optional: true, label: "Value" },
+        value2: {
+          type: "measure",
+          optional: true,
+          label: "Value 2 (face)",
+        },
+        value3: {
+          type: "measure",
+          optional: true,
+          label: "Value 3 (face)",
+        },
+        value2_label: { type: "text", optional: true, label: "Value 2 label" },
+        value2_unit: { type: "text", optional: true, label: "Value 2 unit" },
+        value3_label: { type: "text", optional: true, label: "Value 3 label" },
+        value3_unit: { type: "text", optional: true, label: "Value 3 unit" },
         delta_value: { type: "measure", optional: true, label: "Delta" },
         unit: { type: "dimension", optional: true, label: "Unit" },
         status: { type: "dimension", optional: true, label: "Status" },

@@ -9,7 +9,7 @@ import type { TreeOrientation } from "./columns";
 import type { MetricTreeEdgeData, MetricTreeNodeData } from "./types";
 
 export const NODE_W = 220;
-export const NODE_H = 96;
+export const NODE_H = 144;
 export const NODE_TYPE = "metric-tree-node";
 
 const NODESEP = 28;

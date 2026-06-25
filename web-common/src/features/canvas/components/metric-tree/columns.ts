@@ -37,6 +37,16 @@ export interface MetricTreeSpec
   status?: string;
   sort_order?: string;
 
+  // --- secondary metrics on the node face (optional, additive) ---
+  // Two extra measure columns rendered under the primary value. Their unit and
+  // label are display strings (the same for every node), not columns.
+  value2?: string;
+  value3?: string;
+  value2_unit?: string;
+  value2_label?: string;
+  value3_unit?: string;
+  value3_label?: string;
+
   // --- detail panel (optional) ---
   confidence?: string;
   limitation?: string;
@@ -53,6 +63,12 @@ export const METRIC_TREE_DEFAULT_COLUMNS = {
   parent_node_id: "parent_node_id",
   label: "label",
   value: "metric_value",
+  value2: "people",
+  value3: "rev_per_person",
+  value2_label: "value2_label",
+  value3_label: "value3_label",
+  value2_unit: "value2_unit",
+  value3_unit: "value3_unit",
   unit: "metric_unit",
   delta_value: "delta_value",
   status: "status",
@@ -72,6 +88,8 @@ export type ResolvedColumns = Record<MetricTreeRole, string>;
 // re-classifies against the metrics view so either modeling still works.
 export const MEASURE_ROLES: ReadonlySet<MetricTreeRole> = new Set([
   "value",
+  "value2",
+  "value3",
   "delta_value",
 ]);
 

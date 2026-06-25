@@ -13,6 +13,13 @@ export interface MetricTreeNodeData {
   depth: number;
   value: number | string | null;
   unit: string | null;
+  // Optional secondary metrics shown on the node face (e.g. # people, rev/person).
+  value2: number | string | null;
+  value2Unit: string | null;
+  value2Label: string | null;
+  value3: number | string | null;
+  value3Unit: string | null;
+  value3Label: string | null;
   delta: number | null;
   status: MetricTreeStatus | string | null;
   sortOrder: number | null;
