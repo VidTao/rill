@@ -133,17 +133,18 @@ func (p *Parser) parseComponentYAML(tmp *ComponentYAML) (*runtimev1.ComponentSpe
 		return nil, nil, errors.New(`multiple renderers are not allowed`)
 	}
 
-	// We generally treat the renderer props as untyped, but since "metrics_view" is a very common field,
-	// and adding it to refs generally makes for nicer error messages, we specifically search for and link it here.
+	// We generally treat renderer props as untyped, but metrics-view fields are common
+	// enough that linking them here gives better errors and powers canvas time controls.
 	var refs []ResourceName
 	if rendererProps != nil {
-		for k, v := range rendererProps.Fields {
-			if k == "metrics_view" {
-				name := v.GetStringValue()
-				if name != "" {
-					refs = append(refs, ResourceName{Kind: ResourceKindMetricsView, Name: name})
-				}
-				break
+		for _, key := range []string{"metrics_view", "context_metrics_view"} {
+			v := rendererProps.Fields[key]
+			if v == nil {
+				continue
+			}
+			name := v.GetStringValue()
+			if name != "" {
+				refs = append(refs, ResourceName{Kind: ResourceKindMetricsView, Name: name})
 			}
 		}
 	}

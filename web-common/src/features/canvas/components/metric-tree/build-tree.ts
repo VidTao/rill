@@ -4,6 +4,7 @@
 // duplicate / null ids, and sibling ordering via sort_order.
 
 import type { ResolvedColumns } from "./columns";
+import { isMetricTreeNodeType, type MetricTreeNodeType } from "./node-types";
 import type {
   MetricTree,
   MetricTreeEdgeData,
@@ -32,6 +33,16 @@ function toStr(v: unknown): string | null {
   return null;
 }
 
+function normalizeTreeName(v: string): string {
+  return v.trim().toLocaleLowerCase();
+}
+
+function nodeTypeForRow(row: Row, cols: ResolvedColumns): MetricTreeNodeType {
+  const explicit = toStr(row[cols.driver_type]);
+  if (isMetricTreeNodeType(explicit)) return explicit;
+  return toStr(row[cols.parent_node_id]) == null ? "output" : "driver";
+}
+
 export function buildMetricTree(
   rows: Row[],
   cols: ResolvedColumns,
@@ -49,7 +60,16 @@ export function buildMetricTree(
   // builder filters defensively in case it was queried without the filter.
   let scoped = rows;
   if (opts.tree != null && opts.tree !== "") {
-    scoped = rows.filter((r) => toStr(r[cols.tree_column]) === opts.tree);
+    const exact = rows.filter((r) => toStr(r[cols.tree_column]) === opts.tree);
+    if (exact.length > 0) {
+      scoped = exact;
+    } else {
+      const wantedTree = normalizeTreeName(opts.tree);
+      scoped = rows.filter((r) => {
+        const rowTree = toStr(r[cols.tree_column]);
+        return rowTree != null && normalizeTreeName(rowTree) === wantedTree;
+      });
+    }
   }
 
   // 2. Flat node map. Drop rows with no id; first occurrence of a dup id wins.
@@ -68,6 +88,7 @@ export function buildMetricTree(
       id,
       parentId: toStr(r[cols.parent_node_id]),
       label: toStr(r[cols.label]) ?? id,
+      nodeType: nodeTypeForRow(r, cols),
       depth: 0,
       value: (r[cols.value] as number | string | null | undefined) ?? null,
       unit: toStr(r[cols.unit]),
@@ -78,13 +99,37 @@ export function buildMetricTree(
       value3Unit: toStr(r[cols.value3_unit]) ?? opts.value3Unit ?? null,
       value3Label: toStr(r[cols.value3_label]) ?? opts.value3Label ?? null,
       delta: toNum(r[cols.delta_value]),
+      deltaPercent: null,
+      previousValue: null,
       status: toStr(r[cols.status]),
+      sourceLabel: null,
+      sourceStatus: null,
+      sourceContext: null,
+      formulaText: null,
+      computedValue: null,
+      previousComputedValue: null,
+      measuredValue: null,
+      previousMeasuredValue: null,
+      driftValue: null,
+      driftPercent: null,
+      sourceError: null,
       sortOrder: toNum(r[cols.sort_order]),
       confidence: toStr(r[cols.confidence]),
       limitation: toStr(r[cols.limitation]),
       observation: toStr(r[cols.observation]),
       suggestedTest: toStr(r[cols.suggested_test]),
       successMetric: toStr(r[cols.success_metric]),
+      driverType: toStr(r[cols.driver_type]),
+      attributionModel: toStr(r[cols.attribution_model]),
+      comparisonModel: toStr(r[cols.comparison_model]),
+      segment: toStr(r[cols.segment]),
+      recommendedAction: toStr(r[cols.recommended_action]),
+      evidenceLabel: toStr(r[cols.evidence_label]),
+      evidenceMetric: toStr(r[cols.evidence_metric]),
+      logFilterKey: toStr(r[cols.log_filter_key]),
+      logFilterValue: toStr(r[cols.log_filter_value]),
+      personaFilterKey: toStr(r[cols.persona_filter_key]),
+      personaFilterValue: toStr(r[cols.persona_filter_value]),
     });
   }
 

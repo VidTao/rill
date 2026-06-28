@@ -12,6 +12,7 @@
   import { onDestroy, onMount } from "svelte";
   import { writable } from "svelte/store";
   import type { TreeOrientation } from "./columns";
+  import { NODE_TYPE_ORDER, nodeTypeTheme } from "./node-types";
   import { buildMetricTreeLayout, NODE_TYPE } from "./layout";
   import MetricTreeNode from "./MetricTreeNode.svelte";
   import type { MetricTreeEdgeData, MetricTreeNodeData } from "./types";
@@ -84,6 +85,15 @@
 </script>
 
 <div class="graph" bind:this={containerEl}>
+  <div class="legend" aria-label="Metric tree node types">
+    {#each NODE_TYPE_ORDER as nodeType (nodeType)}
+      {@const theme = nodeTypeTheme(nodeType)}
+      <span class="legend-item" style:--legend-color={theme.color}>
+        <span class="swatch" />
+        {theme.label}
+      </span>
+    {/each}
+  </div>
   {#key flowKey}
     <SvelteFlow
       nodes={nodesStore}
@@ -114,6 +124,28 @@
 
 <style lang="postcss">
   .graph {
-    @apply size-full overflow-hidden;
+    @apply relative size-full overflow-hidden;
+  }
+  .legend {
+    @apply absolute left-2 top-2 z-10 flex flex-wrap items-center gap-1.5 rounded border border-gray-200 bg-surface/95 px-2 py-1 shadow-sm;
+    max-width: calc(100% - 16px);
+  }
+  .legend-item {
+    @apply inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-semibold;
+    color: var(--color-text-muted, #6b7280);
+  }
+  .swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--legend-color);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--legend-color) 45%, transparent);
+  }
+  :global(.dark) .legend {
+    background: rgba(22, 22, 22, 0.94);
+    border-color: #2a2a2a;
+  }
+  :global(.dark) .legend-item {
+    color: #a39d90;
   }
 </style>

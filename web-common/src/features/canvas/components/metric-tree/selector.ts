@@ -1,5 +1,5 @@
 import type { CanvasStore } from "@rilldata/web-common/features/canvas/state-managers/state-managers";
-import { derived, type Readable } from "svelte/store";
+import { derived, readable, type Readable } from "svelte/store";
 import {
   REQUIRED_ROLES,
   resolveTreeColumns,
@@ -14,8 +14,12 @@ export function validateMetricTreeSchema(
   ctx: CanvasStore,
   spec: MetricTreeSpec,
 ): Readable<{ isValid: boolean; error?: string; isLoading?: boolean }> {
+  if (spec.tree_id) {
+    return readable({ isValid: true });
+  }
+
   return derived(
-    ctx.canvasEntity.metricsView.getMetricsViewFromName(spec.metrics_view),
+    ctx.canvasEntity.metricsView.getMetricsViewFromName(spec.metrics_view ?? ""),
     ({ metricsView, isLoading }) => {
       if (isLoading) {
         return { isValid: true, isLoading: true };
@@ -23,7 +27,7 @@ export function validateMetricTreeSchema(
       if (!metricsView) {
         return {
           isValid: false,
-          error: `Metrics view ${spec.metrics_view} not found`,
+          error: `Metrics view ${spec.metrics_view ?? ""} not found`,
         };
       }
 
@@ -41,14 +45,14 @@ export function validateMetricTreeSchema(
           isValid: false,
           error:
             `Metric tree is missing required column(s): ${human}. ` +
-            `Map them in the sidebar or expose them as dimensions in "${spec.metrics_view}".`,
+            `Map them in the sidebar or expose them as dimensions in "${spec.metrics_view ?? ""}".`,
         };
       }
 
       if (spec.value && !isMeasure(spec.value)) {
         return {
           isValid: false,
-          error: `Value column "${spec.value}" is not a measure in ${spec.metrics_view}`,
+          error: `Value column "${spec.value}" is not a measure in ${spec.metrics_view ?? ""}`,
         };
       }
 

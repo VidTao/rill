@@ -66,6 +66,10 @@ export abstract class BaseCanvasComponent<T = ComponentSpec> {
 
   getExploreTransformerProperties?(): Partial<ExploreState>;
 
+  protected getMetricsViewName(spec: T): string {
+    return (spec as Record<string, unknown>)["metrics_view"] as string;
+  }
+
   metricsViewName: string;
 
   constructor(
@@ -76,8 +80,8 @@ export abstract class BaseCanvasComponent<T = ComponentSpec> {
   ) {
     const yamlSpec = resource.component?.state?.validSpec?.rendererProperties;
 
-    const mergedSpec = { ...defaultSpec, ...yamlSpec };
-    this.metricsViewName = mergedSpec["metrics_view"] as string;
+    const mergedSpec = { ...defaultSpec, ...yamlSpec } as T;
+    this.metricsViewName = this.getMetricsViewName(mergedSpec);
     this.specStore = writable(mergedSpec);
     this.pathInYAML = path;
 
@@ -148,6 +152,7 @@ export abstract class BaseCanvasComponent<T = ComponentSpec> {
       ?.rendererProperties as T;
     this.resource.set(resource);
     this.pathInYAML = path;
+    this.metricsViewName = this.getMetricsViewName(yamlSpec);
     this.specStore.set(yamlSpec);
   }
 
@@ -191,10 +196,10 @@ export abstract class BaseCanvasComponent<T = ComponentSpec> {
         ],
         set,
       ) => {
-        const hasTimeSeries =
-          hasTimeSeriesMap.get(this.metricsViewName) ?? false;
+        const metricsViewName = this.getMetricsViewName(componentSpec);
+        const hasTimeSeries = hasTimeSeriesMap.get(metricsViewName) ?? false;
 
-        const mvFilters = metricsViewFilters.get(this.metricsViewName);
+        const mvFilters = metricsViewFilters.get(metricsViewName);
 
         let timeGrain = globalGrainStore;
 
@@ -243,7 +248,6 @@ export abstract class BaseCanvasComponent<T = ComponentSpec> {
         }
 
         derived([mvFilters.parsed], ([parsedFilter]) => {
-          const metricsViewName = componentSpec["metrics_view"];
           const metricsView = canvasData.data?.metricsViews?.[metricsViewName];
           const dimensions = metricsView?.state?.validSpec?.dimensions ?? [];
           const measures = metricsView?.state?.validSpec?.measures ?? [];

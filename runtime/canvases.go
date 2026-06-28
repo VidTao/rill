@@ -78,7 +78,7 @@ func (r *Runtime) ResolveCanvas(ctx context.Context, instanceID, canvas string, 
 
 		for k, v := range validSpec.RendererProperties.Fields {
 			switch k {
-			case "metrics_view":
+			case "metrics_view", "context_metrics_view":
 				if name := v.GetStringValue(); name != "" {
 					metricsViews[name] = true
 				}

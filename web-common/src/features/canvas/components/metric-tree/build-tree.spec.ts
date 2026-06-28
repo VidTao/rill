@@ -147,6 +147,58 @@ describe("buildMetricTree", () => {
     expect(none.isEmpty).toBe(true);
   });
 
+  it("matches tree names case-insensitively", () => {
+    const rows = [
+      row({
+        tree_name: "email revenue",
+        node_id: "email",
+        parent_node_id: "",
+        label: "Email",
+      }),
+      row({
+        tree_name: "Retention",
+        node_id: "retention",
+        parent_node_id: "",
+        label: "Retention",
+      }),
+    ];
+
+    const tree = buildMetricTree(rows, COLS, { tree: "Email Revenue" });
+
+    expect(tree.isEmpty).toBe(false);
+    expect(tree.nodes.map((n) => n.id)).toEqual(["email"]);
+  });
+
+  it("prefers the exact tree when unfiltered rows include case aliases", () => {
+    const rows = [
+      row({
+        tree_name: "email revenue",
+        node_id: "email",
+        parent_node_id: "",
+        label: "Lower alias",
+      }),
+      row({
+        tree_name: "Email Revenue",
+        node_id: "email",
+        parent_node_id: "",
+        label: "Exact tree",
+      }),
+      row({
+        tree_name: "Email List Revenue",
+        node_id: "email_list",
+        parent_node_id: "",
+        label: "Other tree",
+      }),
+    ];
+
+    const tree = buildMetricTree(rows, COLS, { tree: "Email Revenue" });
+
+    expect(tree.nodes.map((n) => [n.id, n.label])).toEqual([
+      ["email", "Exact tree"],
+    ]);
+    expect(tree.warnings).toEqual([]);
+  });
+
   it("returns an empty tree for empty input without throwing", () => {
     const tree = buildMetricTree([], COLS);
     expect(tree).toMatchObject({
@@ -213,6 +265,78 @@ describe("buildMetricTree", () => {
       sortOrder: 2,
     });
   });
+
+  it("passes optional decision-layer fields through to node data", () => {
+    const rows = [
+      row({
+        node_id: "email_credit_gap",
+        parent_node_id: "buyers",
+        label: "Email credit gap",
+        driver_type: "model_delta",
+        attribution_model: "last_touch",
+        comparison_model: "first_touch",
+        segment: "email_credit_gap",
+        recommended_action: "Audit final-click overlap",
+        evidence_label: "Model delta",
+        evidence_metric: "last_touch - first_touch",
+        log_filter_key: "channel_group",
+        log_filter_value: "Email",
+        persona_filter_key: "segment",
+        persona_filter_value: "email_credit_gap",
+      }),
+    ];
+
+    const tree = buildMetricTree(rows, COLS);
+
+    expect(tree.nodes[0]).toMatchObject({
+      driverType: "model_delta",
+      attributionModel: "last_touch",
+      comparisonModel: "first_touch",
+      segment: "email_credit_gap",
+      recommendedAction: "Audit final-click overlap",
+      evidenceLabel: "Model delta",
+      evidenceMetric: "last_touch - first_touch",
+      logFilterKey: "channel_group",
+      logFilterValue: "Email",
+      personaFilterKey: "segment",
+      personaFilterValue: "email_credit_gap",
+    });
+  });
+
+  it("maps PRD driver_type values to canonical node types", () => {
+    const rows = [
+      row({ node_id: "revenue", parent_node_id: "", label: "Revenue", driver_type: "output" }),
+      row({ node_id: "stream", parent_node_id: "revenue", label: "One-time", driver_type: "revenue_stream" }),
+      row({ node_id: "conversion", parent_node_id: "stream", label: "Conversion", driver_type: "lever" }),
+      row({ node_id: "pdp", parent_node_id: "conversion", label: "PDP", driver_type: "surface" }),
+      row({ node_id: "test", parent_node_id: "pdp", label: "Test", driver_type: "experiment" }),
+    ];
+
+    const tree = buildMetricTree(rows, COLS);
+
+    expect(tree.nodes.map((n) => [n.id, n.nodeType])).toEqual([
+      ["revenue", "output"],
+      ["stream", "revenue_stream"],
+      ["conversion", "lever"],
+      ["pdp", "surface"],
+      ["test", "experiment"],
+    ]);
+  });
+
+  it("falls back to output for roots and driver for legacy non-PRD tags", () => {
+    const rows = [
+      row({ node_id: "email", parent_node_id: "", label: "Email", driver_type: "population" }),
+      row({ node_id: "gap", parent_node_id: "email", label: "Gap", driver_type: "model_delta" }),
+    ];
+
+    const tree = buildMetricTree(rows, COLS);
+
+    expect(tree.nodes.map((n) => [n.id, n.nodeType, n.driverType])).toEqual([
+      ["email", "output", "population"],
+      ["gap", "driver", "model_delta"],
+    ]);
+  });
+
 });
 
 describe("resolveTreeColumns", () => {

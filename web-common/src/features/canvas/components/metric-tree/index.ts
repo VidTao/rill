@@ -13,16 +13,23 @@ import {
   type MetricTreeRole,
   type MetricTreeSpec,
 } from "./columns";
+import { getMetricTreeContextMetricsView } from "./context";
 import MetricTreeDisplay from "./MetricTreeDisplay.svelte";
 
 export { default as MetricTreeDisplay } from "./MetricTreeDisplay.svelte";
 export * from "./columns";
+export * from "./context";
 
 // Role fields that reference columns of the old metrics view and must be
 // cleared when the metrics_view changes.
 const COLUMN_ROLE_PARAMS: string[] = [
   ...(Object.keys(METRIC_TREE_DEFAULT_COLUMNS) as MetricTreeRole[]),
   "tree_name",
+  "context_metrics_view",
+  "relationships_view",
+  "evidence_view",
+  "personas_view",
+  "logs_view",
 ];
 
 export class MetricTreeComponent extends BaseCanvasComponent<MetricTreeSpec> {
@@ -36,14 +43,50 @@ export class MetricTreeComponent extends BaseCanvasComponent<MetricTreeSpec> {
     super(resource, parent, path, { metrics_view: "" });
   }
 
+  protected getMetricsViewName(spec: MetricTreeSpec): string {
+    return getMetricTreeContextMetricsView(spec);
+  }
+
   isValid(spec: MetricTreeSpec): boolean {
-    return typeof spec.metrics_view === "string";
+    return typeof spec.tree_id === "string" || typeof spec.metrics_view === "string";
   }
 
   inputParams(): InputParams<MetricTreeSpec> {
     return {
       options: {
-        metrics_view: { type: "metrics", label: "Metrics view" },
+        tree_id: {
+          type: "text",
+          optional: true,
+          label: "Authored tree ID",
+          description: "Use a Bratrax-authored metric tree instead of a metrics view",
+        },
+        metrics_view: { type: "metrics", optional: true, label: "Metrics view" },
+        context_metrics_view: {
+          type: "metrics",
+          optional: true,
+          label: "Time context metrics view",
+          description: "Metrics view used to expose canvas time controls for authored metric trees",
+        },
+        relationships_view: {
+          type: "metrics",
+          optional: true,
+          label: "Relationships view",
+        },
+        evidence_view: {
+          type: "metrics",
+          optional: true,
+          label: "Evidence view",
+        },
+        personas_view: {
+          type: "metrics",
+          optional: true,
+          label: "Personas view",
+        },
+        logs_view: {
+          type: "metrics",
+          optional: true,
+          label: "Logs view",
+        },
 
         tree_column: {
           type: "dimension",
@@ -98,6 +141,53 @@ export class MetricTreeComponent extends BaseCanvasComponent<MetricTreeSpec> {
           type: "dimension",
           optional: true,
           label: "Success metric",
+        },
+        driver_type: { type: "dimension", optional: true, label: "Driver type" },
+        attribution_model: {
+          type: "dimension",
+          optional: true,
+          label: "Attribution model",
+        },
+        comparison_model: {
+          type: "dimension",
+          optional: true,
+          label: "Comparison model",
+        },
+        segment: { type: "dimension", optional: true, label: "Segment" },
+        recommended_action: {
+          type: "dimension",
+          optional: true,
+          label: "Recommended action",
+        },
+        evidence_label: {
+          type: "dimension",
+          optional: true,
+          label: "Evidence label",
+        },
+        evidence_metric: {
+          type: "dimension",
+          optional: true,
+          label: "Evidence metric",
+        },
+        log_filter_key: {
+          type: "dimension",
+          optional: true,
+          label: "Log filter key",
+        },
+        log_filter_value: {
+          type: "dimension",
+          optional: true,
+          label: "Log filter value",
+        },
+        persona_filter_key: {
+          type: "dimension",
+          optional: true,
+          label: "Persona filter key",
+        },
+        persona_filter_value: {
+          type: "dimension",
+          optional: true,
+          label: "Persona filter value",
         },
 
         orientation: {

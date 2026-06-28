@@ -27,8 +27,17 @@ export const RILL_DEMO_CANVAS_NAMES: ReadonlySet<string> = new Set([
   "clickhouse_commits_explore",
 ]);
 
+export const INTERNAL_SUPERADMIN_CANVAS_NAMES: ReadonlySet<string> = new Set([
+  "email_revenue_metric_tree",
+  "d2c_hybrid_metric_tree",
+]);
+
 export function isRillDemoCanvas(name: string | undefined | null): boolean {
   return !!name && RILL_DEMO_CANVAS_NAMES.has(name);
+}
+
+export function isInternalSuperadminCanvas(name: string | undefined | null): boolean {
+  return !!name && INTERNAL_SUPERADMIN_CANVAS_NAMES.has(name);
 }
 
 export interface DashboardPref {

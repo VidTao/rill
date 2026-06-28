@@ -324,13 +324,14 @@ type rendererRefs struct {
 
 // populateRendererRefs discovers and tracks all metrics views referenced in the renderer properties.
 func (r *rendererRefs) populateRendererRefs(_ string, rendererProps map[string]any) error {
-	mv, ok := pathutil.GetPath(rendererProps, "metrics_view")
-	if !ok {
-		return nil
-	}
-	err := r.metricsView(mv)
-	if err != nil {
-		return err
+	for _, path := range []string{"metrics_view", "context_metrics_view"} {
+		mv, ok := pathutil.GetPath(rendererProps, path)
+		if !ok {
+			continue
+		}
+		if err := r.metricsView(mv); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Handle, Position } from "@xyflow/svelte";
-  import { statusTheme } from "./status";
+  import { nodeTypeTheme } from "./node-types";
+  import { statusLabel, statusTheme } from "./status";
   import type { MetricTreeNodeData } from "./types";
 
   export let data: MetricTreeNodeData;
@@ -44,7 +45,20 @@
     positionAbsoluteY,
   );
 
-  $: theme = statusTheme(data.status);
+  $: typeTheme = nodeTypeTheme(data.nodeType);
+  $: healthTheme = statusTheme(data.status);
+  $: healthLabel = statusLabel(data.status);
+  $: sourceText = data.sourceStatus === "live"
+    ? "Live"
+    : data.sourceStatus === "computed"
+      ? "Computed"
+      : data.sourceStatus === "fallback"
+        ? "Fallback"
+        : data.sourceStatus === "error"
+          ? "Source error"
+          : data.sourceStatus === "unbound"
+            ? "Unbound"
+            : null;
 
   function fmtValue(v: number | string | null, unit: string | null): string {
     if (v == null || v === "") return "—";
@@ -68,20 +82,27 @@
 <div
   class="mtnode"
   class:selected
-  style:--accent={theme.light}
-  style:--accent-dark={theme.dark}
+  style:--type-color={typeTheme.color}
+  style:--status-color={healthTheme.light}
+  style:--status-color-dark={healthTheme.dark}
 >
   <Handle type="target" position={targetPosition} isConnectable={false} />
   <Handle type="source" position={sourcePosition} isConnectable={false} />
 
-  {#if data.status}
-    <div class="top">
-      <span class="dot" />
-      <span class="status">{theme.label}</span>
-    </div>
-  {/if}
+  <div class="top">
+    <span class="type-pill">{typeTheme.label}</span>
+    {#if healthLabel}
+      <span class="status-pill">
+        <span class="dot" />
+        {healthLabel}
+      </span>
+    {/if}
+  </div>
   <div class="label" title={data.label}>{data.label}</div>
   <div class="value">{fmtValue(data.value, data.unit)}</div>
+  {#if sourceText}
+    <div class:error={data.sourceStatus === "error"} class="source">{sourceText}{data.sourceContext ? ` · ${data.sourceContext}` : ""}</div>
+  {/if}
   {#if data.value2 != null}
     <div class="metric2">
       {#if data.value2Label}<span class="m2-label">{data.value2Label}</span>{/if}
@@ -97,7 +118,7 @@
   {#if data.delta != null}
     <div class="delta">
       {data.delta > 0 ? "▲" : data.delta < 0 ? "▼" : "•"}
-      {Math.abs(data.delta).toLocaleString()}
+      {fmtValue(Math.abs(data.delta), data.unit)}{data.deltaPercent != null ? ` (${(data.deltaPercent * 100).toFixed(1)}%)` : ""}
     </div>
   {/if}
 </div>
@@ -110,12 +131,12 @@
     padding: 8px 12px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     overflow: hidden;
     border-radius: 8px;
-    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-    border-left: 4px solid var(--accent);
-    background: var(--color-surface, #ffffff);
+    border: 1px solid color-mix(in srgb, var(--type-color) 38%, transparent);
+    border-left: 5px solid var(--type-color);
+    background: color-mix(in srgb, var(--type-color) 5%, var(--color-surface, #ffffff));
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
     cursor: pointer;
     transition:
@@ -127,30 +148,60 @@
     transform: translateY(-1px);
   }
   .mtnode.selected {
-    box-shadow: 0 0 0 2px var(--accent);
+    box-shadow: 0 0 0 2px var(--type-color);
   }
   .top {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 6px;
+    min-height: 18px;
+  }
+  .type-pill,
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    border-radius: 9999px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .type-pill {
+    color: var(--type-color);
+  }
+  .status-pill {
+    max-width: 94px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--status-color);
   }
   .dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 9999px;
-    background: var(--accent);
+    background: var(--status-color);
     flex-shrink: 0;
   }
-  .status {
-    font-size: 9px;
+  .source {
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: var(--accent);
+    color: var(--type-color);
+    opacity: 0.78;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .source.error {
+    color: var(--status-color);
   }
   .label {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 650;
     line-height: 1.2;
     color: var(--color-text, #1a1a18);
     display: -webkit-box;
@@ -161,7 +212,7 @@
   }
   .value {
     font-size: 18px;
-    font-weight: 700;
+    font-weight: 750;
     line-height: 1.2;
     color: var(--color-text, #1a1a18);
   }
@@ -188,23 +239,19 @@
     color: var(--color-text-muted, #6b7280);
   }
 
-  /* Canvas dashboards pin --color-* to the theme's light values, so dark mode
-     needs explicit readable colors (same gotcha the order-attribution graph
-     documents). */
   :global(.dark) .mtnode {
-    background: #161616;
-    border-color: color-mix(in srgb, var(--accent-dark) 55%, #2a2a2a);
-    border-left-color: var(--accent-dark);
+    background: color-mix(in srgb, var(--type-color) 13%, #161616);
+    border-color: color-mix(in srgb, var(--type-color) 60%, #2a2a2a);
+    border-left-color: var(--type-color);
   }
   :global(.dark) .mtnode.selected {
-    box-shadow: 0 0 0 2px var(--accent-dark);
+    box-shadow: 0 0 0 2px var(--type-color);
   }
-  :global(.dark) .status,
-  :global(.dark) .dot {
-    color: var(--accent-dark);
+  :global(.dark) .status-pill {
+    color: var(--status-color-dark);
   }
   :global(.dark) .dot {
-    background: var(--accent-dark);
+    background: var(--status-color-dark);
   }
   :global(.dark) .label,
   :global(.dark) .value,
@@ -220,8 +267,8 @@
     min-width: 6px;
     min-height: 6px;
     border-radius: 9999px;
-    background: color-mix(in srgb, var(--accent) 30%, #ffffff);
-    border: 1px solid var(--accent);
+    background: color-mix(in srgb, var(--type-color) 30%, #ffffff);
+    border: 1px solid var(--type-color);
     opacity: 1;
   }
 </style>

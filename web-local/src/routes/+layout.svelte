@@ -12,6 +12,7 @@
   import {
     dashboardPrefs,
     dashboardPrefsLoaded,
+    isInternalSuperadminCanvas,
     isRillDemoCanvas,
     loadDashboardPrefs,
     mergeDashboardPrefs,
@@ -131,9 +132,10 @@
   // Demo canvases (Rill upstream bundled examples) are dropped at the source
   // so they can never leak into the tab strip during runtime warm-up — see
   // RILL_DEMO_CANVAS_NAMES in dashboardPrefs.ts.
-  $: realCanvases = ($canvasListQuery?.data?.resources ?? []).filter(
-    (r) => !isRillDemoCanvas(r.meta?.name?.name),
-  );
+  $: realCanvases = ($canvasListQuery?.data?.resources ?? []).filter((r) => {
+    const name = r.meta?.name?.name;
+    return !isRillDemoCanvas(name) && (isSuper || !isInternalSuperadminCanvas(name));
+  });
   $: dashboardTabs = mergeDashboardPrefs(realCanvases, $dashboardPrefs)
     .filter((m) => m.visible)
     .map((m) => ({
@@ -147,6 +149,7 @@
   $: onSuperadminsPage = $page.url.pathname.startsWith("/superadmins");
   $: onClientsPage = $page.url.pathname.startsWith("/clients");
   $: onHelpPage = $page.url.pathname.startsWith("/help");
+  $: onMetricTreesPage = $page.url.pathname.startsWith("/metric-trees");
   // Used to hide the "Add store" button during onboarding. The nav strip
   // itself is no longer gated on this — $bratraxOnboarded (set by the
   // +layout.ts guard from the onboarding step) drives the minimal-vs-full
@@ -216,9 +219,10 @@
           const resources = (query?.state?.data?.resources ?? []) as {
             meta?: { name?: { name?: string } };
           }[];
-          const realCount = resources.filter(
-            (r) => !isRillDemoCanvas(r.meta?.name?.name),
-          ).length;
+          const realCount = resources.filter((r) => {
+            const name = r.meta?.name?.name;
+            return !isRillDemoCanvas(name) && (isSuper || !isInternalSuperadminCanvas(name));
+          }).length;
           return realCount > 0 ? false : 2000;
         },
       },
@@ -231,7 +235,7 @@
       const name = r.meta?.name?.name;
       // Skip Rill upstream demo dashboards so the DASHBOARDS link never
       // points at margin_scorecard / auction_explore / etc. during warm-up.
-      if (name && !isRillDemoCanvas(name)) return name;
+      if (name && !isRillDemoCanvas(name) && (isSuper || !isInternalSuperadminCanvas(name))) return name;
     }
     return null;
   })();
@@ -330,6 +334,13 @@
                   class:active={onCanvasPreview}
                 >
                   Dashboards
+                </a>
+                <a
+                  href="/metric-trees"
+                  class="bratrax-nav-link"
+                  class:active={onMetricTreesPage}
+                >
+                  Metric Trees
                 </a>
                 {#if isAdminOrSuper}
                   <SettingsDropdown />

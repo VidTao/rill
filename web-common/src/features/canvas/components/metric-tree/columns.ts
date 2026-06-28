@@ -13,7 +13,13 @@ export type TreeOrientation = "TB" | "LR";
 export interface MetricTreeSpec
   extends ComponentCommonProperties,
     ComponentFilterProperties {
-  metrics_view: string;
+  metrics_view?: string;
+  context_metrics_view?: string;
+  tree_id?: string;
+  relationships_view?: string;
+  evidence_view?: string;
+  personas_view?: string;
+  logs_view?: string;
 
   // --- tree selection ---
   // Column that names which tree each row belongs to (default "tree_name").
@@ -53,6 +59,19 @@ export interface MetricTreeSpec
   observation?: string;
   suggested_test?: string;
   success_metric?: string;
+
+  // --- decision-layer context (optional) ---
+  driver_type?: string;
+  attribution_model?: string;
+  comparison_model?: string;
+  segment?: string;
+  recommended_action?: string;
+  evidence_label?: string;
+  evidence_metric?: string;
+  log_filter_key?: string;
+  log_filter_value?: string;
+  persona_filter_key?: string;
+  persona_filter_value?: string;
 }
 
 // Roles that resolve to a metrics-view column (excludes tree_name [a value] and
@@ -78,6 +97,17 @@ export const METRIC_TREE_DEFAULT_COLUMNS = {
   observation: "observation",
   suggested_test: "suggested_test",
   success_metric: "success_metric",
+  driver_type: "driver_type",
+  attribution_model: "attribution_model",
+  comparison_model: "comparison_model",
+  segment: "segment",
+  recommended_action: "recommended_action",
+  evidence_label: "evidence_label",
+  evidence_metric: "evidence_metric",
+  log_filter_key: "log_filter_key",
+  log_filter_value: "log_filter_value",
+  persona_filter_key: "persona_filter_key",
+  persona_filter_value: "persona_filter_value",
 } as const;
 
 export type MetricTreeRole = keyof typeof METRIC_TREE_DEFAULT_COLUMNS;

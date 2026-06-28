@@ -26,7 +26,7 @@ import {
   type V1ListFilesResponse,
 } from "@rilldata/web-common/runtime-client/index.js";
 import { handleUninitializedProject } from "@rilldata/web-common/features/welcome/is-project-initialized.js";
-import { isRillDemoCanvas } from "$lib/bratrax/dashboardPrefs";
+import { isInternalSuperadminCanvas, isRillDemoCanvas } from "$lib/bratrax/dashboardPrefs";
 import { Settings } from "luxon";
 
 Settings.defaultLocale = "en";
@@ -59,7 +59,7 @@ export async function load({ url, depends, untrack, fetch }) {
             const name = r.meta?.name?.name;
             // Skip Rill upstream demo canvases (margin_scorecard etc.) — see
             // RILL_DEMO_CANVAS_NAMES in dashboardPrefs.ts for context.
-            if (name && !isRillDemoCanvas(name)) {
+            if (name && !isRillDemoCanvas(name) && (user.role === "super_admin" || !isInternalSuperadminCanvas(name))) {
               throw redirect(307, `/canvas/${name}`);
             }
           }
@@ -100,6 +100,13 @@ export async function load({ url, depends, untrack, fetch }) {
   if (!user) {
     const redirectTo = encodeURIComponent(url.pathname + url.search);
     throw redirect(307, `/login?redirect=${redirectTo}`);
+  }
+
+  if (url.pathname.startsWith("/canvas/")) {
+    const canvasName = decodeURIComponent(url.pathname.slice("/canvas/".length).split("/")[0] ?? "");
+    if (isInternalSuperadminCanvas(canvasName) && user.role !== "super_admin") {
+      throw redirect(307, "/developer");
+    }
   }
 
   // Resume incomplete onboarding: if the user's rill_onboarding_state.step

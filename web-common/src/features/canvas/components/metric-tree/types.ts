@@ -2,6 +2,7 @@
 // (graph, node, detail panel) consumes. Kept separate from the spec/config so
 // the presentation layer never touches column-mapping concerns.
 
+import type { MetricTreeNodeType } from "./node-types";
 import type { MetricTreeStatus } from "./status";
 
 export interface MetricTreeNodeData {
@@ -10,6 +11,7 @@ export interface MetricTreeNodeData {
   id: string;
   parentId: string | null;
   label: string;
+  nodeType: MetricTreeNodeType;
   depth: number;
   value: number | string | null;
   unit: string | null;
@@ -21,13 +23,47 @@ export interface MetricTreeNodeData {
   value3Unit: string | null;
   value3Label: string | null;
   delta: number | null;
+  deltaPercent: number | null;
+  previousValue: number | string | null;
   status: MetricTreeStatus | string | null;
+  sourceLabel: string | null;
+  sourceStatus: "live" | "computed" | "fallback" | "unbound" | "error" | null;
+  sourceContext: string | null;
+  formulaText: string | null;
+  computedValue: number | null;
+  previousComputedValue: number | null;
+  measuredValue: number | null;
+  previousMeasuredValue: number | null;
+  driftValue: number | null;
+  driftPercent: number | null;
+  sourceError: string | null;
   sortOrder: number | null;
   confidence: string | null;
   limitation: string | null;
   observation: string | null;
   suggestedTest: string | null;
   successMetric: string | null;
+  driverType: string | null;
+  attributionModel: string | null;
+  comparisonModel: string | null;
+  segment: string | null;
+  recommendedAction: string | null;
+  evidenceLabel: string | null;
+  evidenceMetric: string | null;
+  logFilterKey: string | null;
+  logFilterValue: string | null;
+  personaFilterKey: string | null;
+  personaFilterValue: string | null;
+}
+
+export type MetricTreeDetailRow = Record<string, unknown>;
+
+export interface MetricTreeDetailData {
+  relationships: MetricTreeDetailRow[];
+  evidence: MetricTreeDetailRow[];
+  personas: MetricTreeDetailRow[];
+  logs: MetricTreeDetailRow[];
+  loading: boolean;
 }
 
 export interface MetricTreeEdgeData {

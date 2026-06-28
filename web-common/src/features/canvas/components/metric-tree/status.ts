@@ -24,3 +24,11 @@ export const STATUS_THEME: Record<MetricTreeStatus, StatusTheme> = {
 export function statusTheme(status: string | null | undefined): StatusTheme {
   return STATUS_THEME[status as MetricTreeStatus] ?? STATUS_THEME.neutral;
 }
+
+
+export function statusLabel(status: string | null | undefined): string | null {
+  if (!status) return null;
+  const known = STATUS_THEME[status as MetricTreeStatus];
+  if (known) return known.label;
+  return status.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}

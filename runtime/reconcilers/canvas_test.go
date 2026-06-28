@@ -106,6 +106,47 @@ rows:
 	require.Equal(t, 1, invalid)
 }
 
+
+func TestCanvasContextMetricsViewReference(t *testing.T) {
+	// Create an instance with StageChanges==true
+	rt, id := testruntime.NewInstanceWithOptions(t, testruntime.InstanceOptions{
+		Files:        map[string]string{"rill.yaml": ""},
+		StageChanges: true,
+	})
+
+	testruntime.PutFiles(t, rt, id, map[string]string{
+		"m1.sql": `SELECT TIMESTAMP '2026-01-01 00:00:00' as ts, 1 as x`,
+		"mv1.yaml": `
+version: 1
+type: metrics_view
+model: m1
+timeseries: ts
+measures:
+- name: x
+  expression: sum(x)
+`,
+		"c1.yaml": `
+type: canvas
+rows:
+  - items:
+      - metric_tree:
+          tree_id: starter-d2c-hybrid
+          context_metrics_view: mv1
+`,
+	})
+
+	testruntime.ReconcileParserAndWait(t, rt, id)
+	testruntime.RequireReconcileState(t, rt, id, 5, 0, 0)
+
+	c1 := testruntime.GetResource(t, rt, id, runtime.ResourceKindCanvas, "c1")
+	require.NotNil(t, c1.GetCanvas().State.ValidSpec)
+	require.Len(t, c1.Meta.Refs, 1)
+
+	component := testruntime.GetResource(t, rt, id, runtime.ResourceKindComponent, c1.Meta.Refs[0].Name)
+	require.NotNil(t, component.GetComponent().State.ValidSpec)
+	require.Contains(t, component.Meta.Refs, &runtimev1.ResourceName{Kind: runtime.ResourceKindMetricsView, Name: "mv1"})
+}
+
 func TestCanvasValidateMetricsViewTimeConsistency(t *testing.T) {
 	// Create an instance with StageChanges==true
 	rt, id := testruntime.NewInstanceWithOptions(t, testruntime.InstanceOptions{
