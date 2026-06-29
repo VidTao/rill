@@ -148,6 +148,45 @@ export interface CreateMetricTreeEventPayload {
   nextAction?: string;
 }
 
+export type MetricTreeReviewActionType = "none" | "log_decision" | "result_readout" | "create_traffic_source_test";
+
+export interface MetricTreeReviewSession {
+  session_id: string;
+  tree_id: string;
+  root_node_id: string;
+  selected_node_id: string;
+  chosen_lever_node_id?: string;
+  experiment_node_id?: string;
+  timeRange?: Record<string, unknown>;
+  reviewWalk?: Array<Record<string, unknown>>;
+  topLevers?: Array<Record<string, unknown>>;
+  evidenceSnapshot?: Record<string, unknown>;
+  action_type: MetricTreeReviewActionType;
+  decision_event_id?: string;
+  follow_up_node_id?: string;
+  note?: string;
+  outcome?: string;
+  next_action?: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export interface CreateMetricTreeReviewSessionPayload {
+  selectedNodeId: string;
+  chosenLeverNodeId?: string;
+  experimentNodeId?: string;
+  timeRange?: Record<string, unknown>;
+  reviewWalk?: Array<Record<string, unknown>>;
+  topLevers?: Array<Record<string, unknown>>;
+  evidenceSnapshot?: Record<string, unknown>;
+  actionType: MetricTreeReviewActionType;
+  note?: string;
+  outcome?: string;
+  nextAction?: string;
+  trafficSourceTest?: Record<string, unknown>;
+}
+
 export interface MetricTreeEvidence {
   status: "ok" | "unbound" | "unsupported";
   message?: string;

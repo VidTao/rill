@@ -1,6 +1,6 @@
 import { get } from "svelte/store";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
-import type { AuthoredMetricNode, AuthoredMetricTree, CreateMetricTreeEventPayload, MetricTreeEvent, MetricTreeEvidence, MetricTreeValidation } from "./types";
+import type { AuthoredMetricNode, AuthoredMetricTree, CreateMetricTreeEventPayload, CreateMetricTreeReviewSessionPayload, MetricTreeEvent, MetricTreeEvidence, MetricTreeReviewSession, MetricTreeValidation } from "./types";
 
 function getBaseUrl(): string {
   return get(runtime).host;
@@ -113,4 +113,19 @@ export async function createMetricTreeEvent(treeId: string, nodeId: string, payl
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+}
+
+
+export async function listMetricTreeReviewSessions(treeId: string): Promise<MetricTreeReviewSession[]> {
+  const res = await apiFetch<{ data: MetricTreeReviewSession[] }>(`/bratrax/metric-trees/${encodeURIComponent(treeId)}/review-sessions`);
+  return res.data;
+}
+
+export async function createMetricTreeReviewSession(treeId: string, payload: CreateMetricTreeReviewSessionPayload): Promise<MetricTreeReviewSession> {
+  const res = await apiFetch<{ data: MetricTreeReviewSession }>(`/bratrax/metric-trees/${encodeURIComponent(treeId)}/review-sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return res.data;
 }

@@ -44,6 +44,20 @@
     topLevers: Array<{ nodeId: string; label: string; rootImpact: number | null }>;
   };
 
+  type AuthoredReviewSession = {
+    session_id: string;
+    tree_id: string;
+    selected_node_id: string;
+    chosen_lever_node_id?: string;
+    experiment_node_id?: string;
+    action_type: string;
+    note?: string;
+    outcome?: string;
+    next_action?: string;
+    created_at: string;
+    created_by: string;
+  };
+
   export let node: MetricTreeNodeData | null;
   export let detailData: MetricTreeDetailData = {
     relationships: [],
@@ -58,11 +72,14 @@
   export let authoredEvidence: AuthoredEvidence | null = null;
   export let authoredEvidenceLoading = false;
   export let authoredEventsLoading = false;
+  export let authoredReviewSessions: AuthoredReviewSession[] = [];
+  export let authoredReviewSessionsLoading = false;
   export let authoredOperatingError: string | null = null;
   export let authoredOperatingSaving = false;
   export let authoredReviewSummary: ReviewSummary | null = null;
   export let onUpdateAuthoredNode: (nodeId: string, patch: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateAuthoredEvent: (nodeId: string, payload: Record<string, unknown>) => Promise<void> = async () => {};
+  export let onCreateReviewSession: (payload: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateTrafficSourceTest: (nodeId: string, payload: Record<string, unknown>) => Promise<void> = async () => {};
   export let onClose: () => void = () => {};
 
@@ -80,6 +97,9 @@
   let targetDraft: number | null = null;
   let targetDateDraft = "";
   let decisionNote = "";
+  let reviewNote = "";
+  let reviewNextAction = "";
+  let reviewAction = "log_decision";
   let readoutNote = "";
   let trafficLabel = "New traffic-source test";
   let trafficSource = "";
@@ -94,6 +114,9 @@
     targetDraft = authoredNode.target ?? null;
     targetDateDraft = authoredNode.targetDate ?? "";
     decisionNote = "";
+    reviewNote = "";
+    reviewNextAction = "";
+    reviewAction = authoredNode.type === "experiment" ? "result_readout" : "log_decision";
     readoutNote = "";
     trafficLabel = "New traffic-source test";
     trafficSource = "";
@@ -250,6 +273,33 @@
     };
   }
 
+  function reviewLeverId(): string {
+    if (authoredNode?.type === "lever") return authoredNode.id;
+    return authoredReviewSummary?.topLevers?.[0]?.nodeId ?? "";
+  }
+
+  function reviewPayload(extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      selectedNodeId: authoredNode?.id,
+      chosenLeverNodeId: reviewLeverId() || undefined,
+      experimentNodeId: authoredNode?.type === "experiment" ? authoredNode.id : undefined,
+      timeRange: authoredEvidence?.dateRange ?? {},
+      reviewWalk: authoredReviewSummary?.steps ?? [],
+      topLevers: authoredReviewSummary?.topLevers ?? [],
+      evidenceSnapshot: evidenceSnapshot() ?? undefined,
+      note: reviewNote.trim(),
+      nextAction: reviewNextAction.trim(),
+      ...extra,
+    };
+  }
+
+  function sessionText(session: AuthoredReviewSession): string {
+    const action = session.action_type.replaceAll("_", " ");
+    const outcome = session.outcome ? ` · ${session.outcome}` : "";
+    const note = session.note ? ` · ${session.note}` : "";
+    return `${action}${outcome}${note}`;
+  }
+
   function eventText(event: AuthoredEvent): string {
     const payload = event.payload as Record<string, unknown> | undefined;
     if (payload?.note) return String(payload.note);
@@ -270,6 +320,29 @@
   async function setExperimentStatus(status: string) {
     if (!authoredNode) return;
     await onUpdateAuthoredNode(authoredNode.id, { status });
+  }
+
+  async function saveReview() {
+    if (!authoredNode) return;
+    if ((reviewAction === "log_decision" || reviewAction === "result_readout") && !reviewNote.trim()) return;
+    if (reviewAction === "create_traffic_source_test" && !trafficSource.trim() && !trafficCampaign.trim() && !trafficChannel.trim()) return;
+    const actionPayload = reviewAction === "create_traffic_source_test"
+      ? {
+          actionType: reviewAction,
+          trafficSourceTest: {
+            label: trafficLabel.trim() || "New traffic-source test",
+            source: trafficSource.trim() || undefined,
+            campaign: trafficCampaign.trim() || undefined,
+            channel_group: trafficChannel.trim() || undefined,
+            startDate: trafficStartDate,
+            attributionModel: "first_touch",
+            primaryMeasure: "metric_nc_cpa",
+          },
+        }
+      : { actionType: reviewAction, outcome: authoredNode.type === "experiment" ? authoredNode.status || undefined : undefined };
+    await onCreateReviewSession(reviewPayload(actionPayload));
+    reviewNote = "";
+    reviewNextAction = "";
   }
 
   async function logDecision() {
@@ -416,6 +489,22 @@
         {/if}
       </section>
 
+      <section>
+        <div class="section-label">Save review</div>
+        <select bind:value={reviewAction}>
+          <option value="log_decision">Decision</option>
+          {#if authoredNode.type === "experiment"}
+            <option value="result_readout">Result readout</option>
+          {/if}
+          {#if authoredNode.type === "lever" || authoredNode.type === "surface"}
+            <option value="create_traffic_source_test">Create follow-up test</option>
+          {/if}
+        </select>
+        <textarea rows="3" bind:value={reviewNote} placeholder="What did we decide in this review?" />
+        <input bind:value={reviewNextAction} placeholder="Next action" />
+        <button class="op-primary" type="button" on:click={saveReview} disabled={authoredOperatingSaving || ((reviewAction === "log_decision" || reviewAction === "result_readout") && !reviewNote.trim())}>Save review</button>
+      </section>
+
       {#if authoredNode.type === "lever"}
         <section>
           <div class="section-label">Owner and target</div>
@@ -479,6 +568,22 @@
         <div class="section-label">Decision</div>
         <textarea rows="3" bind:value={decisionNote} placeholder="What did we decide?" />
         <button class="op-primary" type="button" on:click={logDecision} disabled={authoredOperatingSaving || !decisionNote.trim()}>Log decision</button>
+      </section>
+
+      <section>
+        <div class="section-label">Recent reviews</div>
+        {#if authoredReviewSessionsLoading}
+          <div class="op-muted">Loading reviews...</div>
+        {:else if !authoredReviewSessions.length}
+          <div class="op-muted">No saved reviews yet.</div>
+        {:else}
+          {#each authoredReviewSessions.filter((session) => session.selected_node_id === authoredNode?.id || session.chosen_lever_node_id === authoredNode?.id || session.experiment_node_id === authoredNode?.id).slice(0, 5) as session}
+            <div class="event-row">
+              <strong>{new Date(session.created_at).toLocaleDateString()}</strong>
+              <span>{sessionText(session)}</span>
+            </div>
+          {/each}
+        {/if}
       </section>
 
       <section>

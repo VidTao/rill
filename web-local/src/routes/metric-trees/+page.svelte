@@ -16,6 +16,7 @@
     getMetricTree,
     getMetricTreeEvents,
     getMetricTreeEvidence,
+    listMetricTreeReviewSessions,
     listMetricTreeTemplates,
     listMetricTrees,
     updateMetricNode,
@@ -35,6 +36,7 @@
     MetricTreeDecisionEventType,
     MetricTreeEvent,
     MetricTreeEvidence,
+    MetricTreeReviewSession,
     MetricUnit,
   } from "$lib/bratrax/metric-trees/types";
   import {
@@ -149,6 +151,8 @@
   let guardrailLiveKey = "";
   let events: MetricTreeEvent[] = [];
   let eventsLoading = false;
+  let reviewSessions: MetricTreeReviewSession[] = [];
+  let reviewSessionsLoading = false;
   let decisionEventType: MetricTreeDecisionEventType = "decision";
   let decisionNote = "";
   let decisionSaving = false;
@@ -443,6 +447,7 @@
     serverMessage = "";
     clearEvidence();
     await loadEvents(treeId);
+    await loadReviewSessions(treeId);
   }
 
   async function seedStarter() {
@@ -548,6 +553,17 @@
       events = [];
     } finally {
       eventsLoading = false;
+    }
+  }
+
+  async function loadReviewSessions(treeId: string) {
+    reviewSessionsLoading = true;
+    try {
+      reviewSessions = await listMetricTreeReviewSessions(treeId);
+    } catch {
+      reviewSessions = [];
+    } finally {
+      reviewSessionsLoading = false;
     }
   }
 
@@ -1732,6 +1748,32 @@
         {:else}
           <div class="empty">
             Select a node. Admins can log decisions against it.
+          </div>
+        {/if}
+      </section>
+
+      <section>
+        <div class="section-title">Recent reviews</div>
+        {#if reviewSessionsLoading}
+          <div class="muted">Loading reviews...</div>
+        {:else if !reviewSessions.length}
+          <div class="empty">No saved reviews yet.</div>
+        {:else}
+          <div class="event-log">
+            {#each reviewSessions.slice(0, 8) as session}
+              <button
+                type="button"
+                on:click={() =>
+                  setSelectedId(
+                    session.selected_node_id ||
+                      session.chosen_lever_node_id ||
+                      session.experiment_node_id,
+                  )}
+              >
+                <span>{session.action_type.replaceAll("_", " ")}</span>
+                <small>{session.outcome || session.note || session.next_action || session.created_at}</small>
+              </button>
+            {/each}
           </div>
         {/if}
       </section>

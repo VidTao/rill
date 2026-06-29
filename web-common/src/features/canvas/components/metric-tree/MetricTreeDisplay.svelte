@@ -53,6 +53,23 @@
     topLevers: Array<{ nodeId: string; label: string; rootImpact: number | null }>;
   };
 
+  type AuthoredReviewSession = {
+    session_id: string;
+    tree_id: string;
+    selected_node_id: string;
+    chosen_lever_node_id?: string;
+    experiment_node_id?: string;
+    action_type: string;
+    note?: string;
+    outcome?: string;
+    next_action?: string;
+    created_at: string;
+    created_by: string;
+    reviewWalk?: ReviewSummary["steps"];
+    topLevers?: ReviewSummary["topLevers"];
+    evidenceSnapshot?: Record<string, unknown>;
+  };
+
   $: ({ instanceId } = $runtime);
   $: ({
     specStore,
@@ -84,6 +101,9 @@
   let authoredEvents: AuthoredEvent[] = [];
   let authoredEventsKey: string | null = null;
   let authoredEventsLoading = false;
+  let authoredReviewSessions: AuthoredReviewSession[] = [];
+  let authoredReviewSessionsKey: string | null = null;
+  let authoredReviewSessionsLoading = false;
   let authoredEvidence: AuthoredEvidence | null = null;
   let authoredEvidenceKey: string | null = null;
   let authoredEvidenceLoading = false;
@@ -134,6 +154,8 @@
     authoredLiveKey = null;
     authoredEvents = [];
     authoredEventsKey = null;
+    authoredReviewSessions = [];
+    authoredReviewSessionsKey = null;
     authoredEvidence = null;
     authoredEvidenceKey = null;
     authoredOperatingError = null;
@@ -233,6 +255,20 @@
     }
   }
 
+  async function loadAuthoredReviewSessions(treeId: string) {
+    authoredReviewSessionsKey = treeId;
+    authoredReviewSessionsLoading = true;
+    try {
+      const res = await bratraxFetch<{ data: AuthoredReviewSession[] }>(`/bratrax/metric-trees/${encodeURIComponent(treeId)}/review-sessions`);
+      authoredReviewSessions = res.data ?? [];
+    } catch (err) {
+      authoredOperatingError = err instanceof Error ? err.message : "Could not load review sessions";
+      authoredReviewSessions = [];
+    } finally {
+      authoredReviewSessionsLoading = false;
+    }
+  }
+
   async function loadAuthoredEvidence(treeId: string, nodeId: string, key: string) {
     authoredEvidenceKey = key;
     authoredEvidenceLoading = true;
@@ -255,7 +291,10 @@
       const rendered = authoredTreeToRenderable(nextTree).nodes.find((n) => n.id === selectedId);
       if (rendered) selectedNode = rendered;
     }
-    if (nextTree.tree_id) await loadAuthoredEvents(nextTree.tree_id);
+    if (nextTree.tree_id) {
+      await loadAuthoredEvents(nextTree.tree_id);
+      await loadAuthoredReviewSessions(nextTree.tree_id);
+    }
   }
 
   async function updateAuthoredNode(nodeId: string, patch: Partial<AuthoredMetricNode>) {
@@ -294,6 +333,26 @@
     }
   }
 
+  async function createReviewSession(payload: Record<string, unknown>) {
+    if (!authoredTreeRaw) return;
+    authoredOperatingSaving = true;
+    authoredOperatingError = null;
+    try {
+      await bratraxFetch<{ data: AuthoredReviewSession }>(`/bratrax/metric-trees/${encodeURIComponent(authoredTreeRaw.tree_id)}/review-sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      await loadAuthoredTree(authoredTreeRaw.tree_id);
+      await loadAuthoredEvents(authoredTreeRaw.tree_id);
+      await loadAuthoredReviewSessions(authoredTreeRaw.tree_id);
+    } catch (err) {
+      authoredOperatingError = err instanceof Error ? err.message : "Could not save review";
+    } finally {
+      authoredOperatingSaving = false;
+    }
+  }
+
   async function createTrafficSourceTest(nodeId: string, payload: Record<string, unknown>) {
     if (!authoredTreeRaw) return;
     authoredOperatingSaving = true;
@@ -315,6 +374,9 @@
   $: authoredEventTreeKey = authoredMode && authoredTreeRaw?.tree_id ? authoredTreeRaw.tree_id : null;
   $: if (authoredEventTreeKey && authoredEventTreeKey !== authoredEventsKey) {
     void loadAuthoredEvents(authoredEventTreeKey);
+  }
+  $: if (authoredEventTreeKey && authoredEventTreeKey !== authoredReviewSessionsKey) {
+    void loadAuthoredReviewSessions(authoredEventTreeKey);
   }
 
   $: ctx = getCanvasStore(canvasName, instanceId);
@@ -787,11 +849,14 @@
         authoredEvidence={authoredEvidence}
         authoredEvidenceLoading={authoredEvidenceLoading}
         authoredEventsLoading={authoredEventsLoading}
+        authoredReviewSessions={authoredReviewSessions}
+        authoredReviewSessionsLoading={authoredReviewSessionsLoading}
         authoredOperatingError={authoredOperatingError}
         authoredOperatingSaving={authoredOperatingSaving}
         authoredReviewSummary={authoredReviewSummary}
         onUpdateAuthoredNode={updateAuthoredNode}
         onCreateAuthoredEvent={createAuthoredEvent}
+        onCreateReviewSession={createReviewSession}
         onCreateTrafficSourceTest={createTrafficSourceTest}
         onClose={() => (selectedNode = null)}
       />
