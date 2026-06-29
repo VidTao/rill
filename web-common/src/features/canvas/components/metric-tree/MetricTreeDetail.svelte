@@ -404,6 +404,11 @@
     return `${action}${outcome}${note}`;
   }
 
+  function reviewPageHref(session: AuthoredReviewSession | null): string | null {
+    if (!session?.tree_id || !session.session_id) return null;
+    return `/metric-trees/reviews/${encodeURIComponent(session.tree_id)}/${encodeURIComponent(session.session_id)}`;
+  }
+
   function eventText(event: AuthoredEvent): string {
     const payload = event.payload as Record<string, unknown> | undefined;
     if (payload?.note) return String(payload.note);
@@ -884,6 +889,7 @@
               <MetricTreeReviewReadout
                 session={selectedReadoutSession}
                 nodeLabel={labelFor}
+                reviewHref={reviewPageHref(selectedReadoutSession)}
                 compact
               />
             {/if}
@@ -1255,14 +1261,6 @@
   :global(.dark) .close {
     color: #a39d90;
   }
-  .nested {
-    margin-top: 12px;
-  }
-  .op-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
   .op-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1278,34 +1276,6 @@
     color: #64748b;
     font-size: 12px;
     margin-bottom: 8px;
-  }
-  .operating-context {
-    border: 1px solid #bbf0cf;
-    border-radius: 8px;
-    background: #f0fdf4;
-    padding: 10px;
-    color: #14532d;
-  }
-  .operating-context.error {
-    border-color: #f3c969;
-    background: #fff8df;
-    color: #6f4b00;
-  }
-  .operating-context strong {
-    display: block;
-    font-size: 13px;
-    margin-bottom: 2px;
-  }
-  .operating-context p,
-  .operating-context em,
-  .failed-bindings {
-    display: block;
-    margin: 0 0 7px;
-    font-size: 12px;
-  }
-  .operating-context em {
-    opacity: 0.75;
-    font-style: normal;
   }
   .status-metrics {
     display: grid;
@@ -1333,16 +1303,6 @@
     color: #6f4b00;
     background: #fff8df;
     font-size: 12px;
-  }
-  .op-row {
-    display: flex;
-    width: 100%;
-    justify-content: space-between;
-    border: 0;
-    border-bottom: 1px solid #edf0f4;
-    padding: 6px 0;
-    background: transparent;
-    color: #17202a;
   }
   .kv.compact {
     padding: 4px 0;
@@ -1475,15 +1435,5 @@
   }
   .event-row span {
     color: #64748b;
-  }
-  :global(.dark) .operating-context {
-    border-color: #235b38;
-    background: rgba(15, 44, 27, 0.94);
-    color: #bdf0ca;
-  }
-  :global(.dark) .operating-context.error {
-    border-color: #7a5a1d;
-    background: rgba(55, 39, 12, 0.94);
-    color: #f8dda2;
   }
 </style>
