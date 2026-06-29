@@ -2,6 +2,7 @@
   import MetricTreeReviewReadout from "./MetricTreeReviewReadout.svelte";
   import { nodeTypeTheme } from "./node-types";
   import { statusLabel, statusTheme } from "./status";
+  import { ownerCoverageLabel as ownershipCoverageLabel, ownerNodeText, type OwnershipPersona } from "./ownership";
   import type {
     MetricTreeDetailData,
     MetricTreeDetailRow,
@@ -111,16 +112,6 @@
     timeLabel: string | null;
     filterLabel: string | null;
     summary: string;
-  };
-
-  type OwnershipPersona = {
-    owner: string;
-    leverCount: number;
-    experimentCount: number;
-    runningCount: number;
-    backlogCount: number;
-    unassigned: boolean;
-    nodes: Array<{ id: string; label: string; type: string; status?: string | null }>;
   };
 
   export let node: MetricTreeNodeData | null;
@@ -420,20 +411,6 @@
     return `/metric-trees/reviews/${encodeURIComponent(session.tree_id)}/${encodeURIComponent(session.session_id)}`;
   }
 
-  function ownerCoverageLabel(): string {
-    const unassigned = authoredOwnershipRoster.find((owner) => owner.unassigned);
-    if (!authoredOwnershipRoster.length) return "No owned levers or experiments";
-    if (unassigned) {
-      const count = unassigned.leverCount + unassigned.experimentCount;
-      return `${count} unassigned action item${count === 1 ? "" : "s"}`;
-    }
-    return `${authoredOwnershipRoster.length} owner${authoredOwnershipRoster.length === 1 ? "" : "s"} accountable`;
-  }
-
-  function ownerNodeText(item: OwnershipPersona["nodes"][number]): string {
-    return [item.type, item.status].filter(Boolean).join(" · ");
-  }
-
   function eventText(event: AuthoredEvent): string {
     const payload = event.payload as Record<string, unknown> | undefined;
     if (payload?.note) return String(payload.note);
@@ -716,7 +693,7 @@
             </div>
             <div>
               <span>Owners</span>
-              <strong>{ownerCoverageLabel()}</strong>
+              <strong>{ownershipCoverageLabel(authoredOwnershipRoster)}</strong>
             </div>
           </div>
           {#if operatingStatus?.timeLabel || operatingStatus?.filterLabel}

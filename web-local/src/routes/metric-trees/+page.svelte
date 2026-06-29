@@ -7,6 +7,13 @@
   import MetricTreeGraph from "@rilldata/web-common/features/canvas/components/metric-tree/MetricTreeGraph.svelte";
   import MetricTreeReviewReadout from "@rilldata/web-common/features/canvas/components/metric-tree/MetricTreeReviewReadout.svelte";
   import { resolveMetricTreeLiveValues } from "@rilldata/web-common/features/canvas/components/metric-tree/live-tree";
+  import {
+    ownerCoverageLabel,
+    ownerMatchesNode,
+    ownerNodeText,
+    ownershipRosterFor,
+    type OwnershipPersona,
+  } from "@rilldata/web-common/features/canvas/components/metric-tree/ownership";
   import type { MetricTreeNodeResolution } from "@rilldata/web-common/features/canvas/components/metric-tree/live-tree";
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import {
@@ -163,6 +170,7 @@
   let reviewSessions: MetricTreeReviewSession[] = [];
   let selectedReviewSession: MetricTreeReviewSession | null = null;
   let reviewSessionsLoading = false;
+  let ownerFilter: string | null = null;
   let reviewDecisionQueue: MetricTreeReviewDecision[] = [];
   let reviewSaving = false;
   let reviewAction: Exclude<MetricTreeReviewActionType, "none" | "guided_review"> = "log_decision";
@@ -229,6 +237,10 @@
       if (aImpact != null && bImpact != null && bImpact !== aImpact) return bImpact - aImpact;
       return (b.score ?? -1) - (a.score ?? -1);
     });
+  $: ownershipRoster = ownershipRosterFor(storedNodes);
+  $: activeOwnerFilter = ownerFilter && ownershipRoster.some((owner) => owner.owner === ownerFilter) ? ownerFilter : null;
+  $: filteredRankedLevers = rankedLevers.filter((item) => ownerMatchesNode(activeOwnerFilter, nodeById(item.nodeId, nodes)));
+  $: filteredExperiments = experiments.filter((item) => ownerMatchesNode(activeOwnerFilter, item.node));
   $: selectedRankedLever = selectedDraft?.type === "lever"
     ? rankedLevers.find((r) => r.nodeId === selectedDraft?.id) ?? null
     : null;
@@ -241,6 +253,7 @@
   $: reviewLeverExperiments = suggestedReviewLever
     ? experimentsUnderLever(suggestedReviewLever.id, nodes)
     : [];
+  $: filteredReviewLeverExperiments = reviewLeverExperiments.filter((experiment) => ownerMatchesNode(activeOwnerFilter, experiment));
   $: reviewEvidenceWarnings = evidenceWarningsForReview(
     selectedNode,
     reviewWalk,
@@ -650,6 +663,14 @@
     } finally {
       evidenceLoading = false;
     }
+  }
+
+  function ownershipItemCount(owner: OwnershipPersona): number {
+    return owner.leverCount + owner.experimentCount;
+  }
+
+  function selectOwnerFilter(owner: string | null) {
+    ownerFilter = owner;
   }
 
   function resetReviewDraft() {
@@ -1429,6 +1450,37 @@
           <div class="empty">Tree passes local validation.</div>
         {/if}
       </section>
+
+      <section>
+        <div class="section-title">Ownership</div>
+        <div class="ownership-summary">{ownerCoverageLabel(ownershipRoster)}</div>
+        <div class="ownership-list">
+          <button
+            type="button"
+            class:active={!activeOwnerFilter}
+            on:click={() => selectOwnerFilter(null)}
+          >
+            <span>All owners</span>
+            <small>{ownershipRoster.reduce((sum, owner) => sum + ownershipItemCount(owner), 0)} action items</small>
+          </button>
+          {#each ownershipRoster as owner}
+            <button
+              type="button"
+              class:active={activeOwnerFilter === owner.owner}
+              class:warn={owner.unassigned}
+              on:click={() => selectOwnerFilter(owner.owner)}
+            >
+              <span>{owner.owner}</span>
+              <small>{owner.leverCount} levers · {owner.experimentCount} experiments</small>
+            </button>
+            <div class="owner-preview">
+              {#each owner.nodes.slice(0, 3) as item}
+                <span>{item.label}<em>{ownerNodeText(item)}</em></span>
+              {/each}
+            </div>
+          {/each}
+        </div>
+      </section>
     </aside>
 
     <main class="tree-panel">
@@ -1441,7 +1493,7 @@
           <div>
             <h2>{tree.name}</h2>
             <p>
-              {nodes.length} nodes · {timeContext.label}{liveLoading
+              {nodes.length} nodes · {timeContext.label}{activeOwnerFilter ? ` · owner: ${activeOwnerFilter}` : ""}{liveLoading
                 ? " · resolving live values"
                 : ""}{liveError ? " · live fallback" : ""}
             </p>
@@ -1474,6 +1526,10 @@
                 <span>Time context</span>
                 <strong>{timeContext.label}</strong>
               </div>
+              <div>
+                <span>Ownership</span>
+                <strong>{activeOwnerFilter ?? ownerCoverageLabel(ownershipRoster)}</strong>
+              </div>
             </section>
 
             <div class="review-grid">
@@ -1491,14 +1547,18 @@
 
               <section class="review-block">
                 <div class="section-title">Highest root-impact levers</div>
-                <div class="impact-list">
-                  {#each rankedLevers.slice(0, 8) as item}
-                    <button type="button" class:active={item.nodeId === suggestedReviewLever?.id} on:click={() => setSelectedId(item.nodeId)}>
-                      <span>{item.label}</span>
-                      <strong>{item.rootImpact == null ? "unsized" : formatValue(item.rootImpact, root?.unit)}</strong>
-                    </button>
-                  {/each}
-                </div>
+                {#if filteredRankedLevers.length}
+                  <div class="impact-list">
+                    {#each filteredRankedLevers.slice(0, 8) as item}
+                      <button type="button" class:active={item.nodeId === suggestedReviewLever?.id} on:click={() => setSelectedId(item.nodeId)}>
+                        <span>{item.label}</span>
+                        <strong>{item.rootImpact == null ? "unsized" : formatValue(item.rootImpact, root?.unit)}</strong>
+                      </button>
+                    {/each}
+                  </div>
+                {:else}
+                  <div class="empty">No levers match the selected owner.</div>
+                {/if}
               </section>
             </div>
 
@@ -1532,9 +1592,11 @@
               <div class="section-title">Experiments under lever</div>
               {#if !reviewLeverExperiments.length}
                 <div class="empty">No experiments under the chosen lever.</div>
+              {:else if !filteredReviewLeverExperiments.length}
+                <div class="empty">No experiments under the chosen lever match the selected owner.</div>
               {:else}
                 <div class="review-experiments">
-                  {#each reviewLeverExperiments as experiment}
+                  {#each filteredReviewLeverExperiments as experiment}
                     {@const readiness = measurementReadiness(experiment.measurementBinding)}
                     <button type="button" class:active={selectedNode?.id === experiment.id} on:click={() => setSelectedId(experiment.id)}>
                       <span>{experiment.label}</span>
@@ -2142,21 +2204,25 @@
       {#if experiments.length}
         <section>
           <div class="section-title">Experiment backlog</div>
-          <div class="backlog">
-            {#each experiments.slice(0, 8) as item}
-              <button
-                type="button"
-                on:click={() => setSelectedId(item.node.id)}
-              >
-                <span>{item.node.label}</span>
-                <strong
-                  >{item.rootImpact == null
-                    ? item.score ?? "-"
-                    : formatValue(item.rootImpact, root?.unit)}</strong
+          {#if filteredExperiments.length}
+            <div class="backlog">
+              {#each filteredExperiments.slice(0, 8) as item}
+                <button
+                  type="button"
+                  on:click={() => setSelectedId(item.node.id)}
                 >
-              </button>
-            {/each}
-          </div>
+                  <span>{item.node.label}</span>
+                  <strong
+                    >{item.rootImpact == null
+                      ? item.score ?? "-"
+                      : formatValue(item.rootImpact, root?.unit)}</strong
+                  >
+                </button>
+              {/each}
+            </div>
+          {:else}
+            <div class="empty">No experiments match the selected owner.</div>
+          {/if}
         </section>
       {/if}
 
@@ -2487,6 +2553,7 @@
 
   .tree-list,
   .issues,
+  .ownership-list,
   .backlog,
   .decision-lines,
   .impact-list,
@@ -2500,6 +2567,7 @@
 
   .tree-list button,
   .issues button,
+  .ownership-list button,
   .backlog button,
   .impact-list button,
   .review-walk button,
@@ -2510,12 +2578,49 @@
   }
 
   .tree-list button,
-  .issues button {
+  .issues button,
+  .ownership-list button {
     display: grid;
     gap: 3px;
   }
 
+  .ownership-summary {
+    border: 1px solid #edf0f4;
+    border-radius: 6px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    padding: 8px;
+  }
+
+  .ownership-list button.warn {
+    border-color: #f0cc78;
+    background: #fff9e8;
+  }
+
+  .owner-preview {
+    display: grid;
+    gap: 3px;
+    margin: -2px 0 5px 8px;
+  }
+
+  .owner-preview span {
+    color: #334155;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .owner-preview em {
+    color: #64748b;
+    display: block;
+    font-style: normal;
+  }
+
   .tree-list button.active,
+  .ownership-list button.active,
   .impact-list button.active,
   .review-experiments button.active {
     border-color: #245bdb;
@@ -2600,7 +2705,7 @@
 
   .review-summary {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
   }
 
