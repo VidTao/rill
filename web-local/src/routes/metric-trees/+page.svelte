@@ -5,6 +5,7 @@
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import { authoredTreeToRenderable } from "@rilldata/web-common/features/canvas/components/metric-tree/authored-tree";
   import MetricTreeGraph from "@rilldata/web-common/features/canvas/components/metric-tree/MetricTreeGraph.svelte";
+  import MetricTreeReviewReadout from "@rilldata/web-common/features/canvas/components/metric-tree/MetricTreeReviewReadout.svelte";
   import { resolveMetricTreeLiveValues } from "@rilldata/web-common/features/canvas/components/metric-tree/live-tree";
   import type { MetricTreeNodeResolution } from "@rilldata/web-common/features/canvas/components/metric-tree/live-tree";
   import { bratraxUser } from "$lib/bratrax/auth-store";
@@ -57,6 +58,8 @@
     rankLeversByRootImpact,
     rollupTree,
     validateTree,
+    type LeverRootImpactRank,
+    type ReviewWalk,
   } from "$lib/bratrax/metric-trees/engine";
 
   type TreeSummary = {
@@ -85,6 +88,8 @@
     status: "live" | "computed" | "fallback" | "unbound" | "error";
     error?: string | null;
   };
+
+  type WorkspaceMode = "canvas" | "review";
 
   const UNITS: MetricUnit[] = [
     "currency",
@@ -156,6 +161,7 @@
   let events: MetricTreeEvent[] = [];
   let eventsLoading = false;
   let reviewSessions: MetricTreeReviewSession[] = [];
+  let selectedReviewSession: MetricTreeReviewSession | null = null;
   let reviewSessionsLoading = false;
   let reviewDecisionQueue: MetricTreeReviewDecision[] = [];
   let reviewSaving = false;
@@ -182,8 +188,9 @@
   $: canEditWorkspace = role === "admin" || role === "super_admin";
   $: instanceId = $runtime.instanceId;
   $: timeContext = buildTimeContext(timePreset);
-  $: displayTree = liveTree ?? tree;
-  $: storedNodes = tree?.nodes ?? [];
+  $: displayTree = normalizeTree(liveTree ?? tree);
+  $: storedTree = normalizeTree(tree);
+  $: storedNodes = storedTree?.nodes ?? [];
   $: nodes = displayTree?.nodes ?? [];
   $: root = nodes.find((n) => !n.parentId) ?? null;
   $: storedRoot = storedNodes.find((n) => !n.parentId) ?? null;
@@ -225,9 +232,23 @@
   $: selectedRankedLever = selectedDraft?.type === "lever"
     ? rankedLevers.find((r) => r.nodeId === selectedDraft?.id) ?? null
     : null;
-  $: suggestedReviewLever = reviewLeverCandidate();
-  $: reviewLeverExperiments = suggestedReviewLever ? experimentsUnderLever(suggestedReviewLever.id) : [];
-  $: reviewEvidenceWarnings = evidenceWarningsForReview();
+  $: suggestedReviewLever = reviewLeverCandidate(
+    selectedNode,
+    reviewWalk,
+    rankedLevers,
+    nodes,
+  );
+  $: reviewLeverExperiments = suggestedReviewLever
+    ? experimentsUnderLever(suggestedReviewLever.id, nodes)
+    : [];
+  $: reviewEvidenceWarnings = evidenceWarningsForReview(
+    selectedNode,
+    reviewWalk,
+    suggestedReviewLever,
+    evidence,
+    evidenceLoading,
+    evidenceError,
+  );
   $: selectedMeasurementReadiness = selectedDraft?.type === "experiment"
     ? measurementReadiness(selectedDraft.measurementBinding)
     : null;
@@ -238,8 +259,8 @@
   $: selectedChildren = selectedDraft
     ? childrenOf(storedNodes, selectedDraft.id)
     : [];
-  $: formulaOperandsText = selectedDraft?.formula?.operands.join(", ") ?? "";
-  $: legalChildTypes = selectedDraft ? LEGAL_CHILDREN[selectedDraft.type] : [];
+  $: formulaOperandsText = selectedDraft?.formula?.operands?.join(", ") ?? "";
+  $: legalChildTypes = selectedDraft ? (LEGAL_CHILDREN[selectedDraft.type] ?? []) : [];
   $: if (!legalChildTypes.includes(newChildType) && legalChildTypes[0])
     newChildType = legalChildTypes[0];
   $: selectedEvidenceKey =
@@ -251,7 +272,7 @@
   $: if (!selectedEvidenceKey && evidenceKey) clearEvidence();
   $: workspaceLiveKey =
     tree && instanceId
-      ? `${tree.tree_id}:${tree.updated_at ?? ""}:${timeContext.key}:${tree.nodes.map((n) => `${n.id}:${n.updatedAt ?? ""}:${JSON.stringify(n.metricBinding ?? {})}`).join("|")}`
+      ? `${tree.tree_id}:${tree.updated_at ?? ""}:${timeContext.key}:${(tree.nodes ?? []).map((n) => `${n.id}:${n.updatedAt ?? ""}:${JSON.stringify(n.metricBinding ?? {})}`).join("|")}`
       : "";
   $: if (workspaceLiveKey && workspaceLiveKey !== liveKey)
     void loadLiveTree(workspaceLiveKey);
@@ -269,6 +290,19 @@
 
   function cloneNode(node: AuthoredMetricNode): AuthoredMetricNode {
     return JSON.parse(JSON.stringify(node)) as AuthoredMetricNode;
+  }
+
+  function normalizeArray<T>(value: T[] | null | undefined): T[] {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function normalizeTree(nextTree: AuthoredMetricTree | null | undefined): AuthoredMetricTree | null {
+    if (!nextTree) return null;
+    const safeNodes = normalizeArray(nextTree.nodes).filter(
+      (node): node is AuthoredMetricNode =>
+        !!node && typeof node.id === "string" && typeof node.label === "string",
+    );
+    return { ...nextTree, nodes: safeNodes };
   }
 
   function isoDate(date: Date): string {
@@ -446,8 +480,11 @@
     loading = true;
     error = "";
     try {
-      summaries = await listMetricTrees();
-      const treeId = preferredId ?? tree?.tree_id ?? summaries[0]?.tree_id;
+      summaries = normalizeArray(await listMetricTrees());
+      templates = normalizeArray(await listMetricTreeTemplates()).filter(
+        (template) => !!template?.templateId,
+      );
+      const treeId = preferredId ?? tree?.tree_id ?? summaries?.[0]?.tree_id;
       if (treeId) await loadTree(treeId, preferredNodeId);
       else tree = null;
     } catch (err) {
@@ -460,13 +497,14 @@
 
   async function loadTree(treeId: string, preferredNodeId?: string | null) {
     error = "";
-    tree = await getMetricTree(treeId);
+    tree = normalizeTree(await getMetricTree(treeId));
     liveTree = null;
     liveKey = "";
-    setSelectedId(resolveSelectedId(tree, preferredNodeId));
+    setSelectedId(tree ? resolveSelectedId(tree, preferredNodeId) : null);
     serverMessage = "";
     clearEvidence();
     resetReviewDraft();
+    selectedReviewSession = null;
     await loadEvents(treeId);
     await loadReviewSessions(treeId);
   }
@@ -475,7 +513,8 @@
     saving = true;
     error = "";
     try {
-      const seeded = await createStarterTree(selectedTemplateId);
+      const seeded = normalizeTree(await createStarterTree(selectedTemplateId));
+      if (!seeded) throw new Error("Starter tree response did not include a tree.");
       tree = seeded;
       setSelectedId(rootNodeId(seeded));
       await loadSummaries(seeded.tree_id);
@@ -506,14 +545,16 @@
     saving = true;
     error = "";
     try {
+      const treeId = tree.tree_id;
       const payload = normalizeNode(selectedDraft);
-      tree = await updateMetricNode(tree.tree_id, payload.id, payload);
+      tree = normalizeTree(await updateMetricNode(treeId, payload.id, payload));
+      if (!tree) throw new Error("Save response did not include a tree.");
       liveTree = null;
       liveKey = "";
       setSelectedId(payload.id);
       serverMessage = "Node saved.";
       clearEvidence();
-      await loadEvents(tree.tree_id);
+      await loadEvents(treeId);
     } catch (err) {
       error = err instanceof Error ? err.message : "Could not save node.";
     } finally {
@@ -526,8 +567,10 @@
     saving = true;
     error = "";
     try {
+      const treeId = tree.tree_id;
       const parentId = selectedDraft.parentId;
-      tree = await deleteMetricNode(tree.tree_id, selectedDraft.id);
+      tree = normalizeTree(await deleteMetricNode(treeId, selectedDraft.id));
+      if (!tree) throw new Error("Delete response did not include a tree.");
       liveTree = null;
       liveKey = "";
       setSelectedId(parentId);
@@ -544,13 +587,15 @@
     saving = true;
     error = "";
     try {
+      const treeId = tree.tree_id;
       const node = defaultChildNode(
         selectedDraft.id,
         newChildType,
         newChildLabel.trim(),
         selectedChildren.length,
       );
-      tree = await createMetricNode(tree.tree_id, node);
+      tree = normalizeTree(await createMetricNode(treeId, node));
+      if (!tree) throw new Error("Create response did not include a tree.");
       liveTree = null;
       liveKey = "";
       setSelectedId(
@@ -558,7 +603,7 @@
       );
       newChildLabel = "";
       serverMessage = "Child node added.";
-      await loadEvents(tree.tree_id);
+      await loadEvents(treeId);
     } catch (err) {
       error = err instanceof Error ? err.message : "Could not add child node.";
     } finally {
@@ -569,7 +614,7 @@
   async function loadEvents(treeId: string) {
     eventsLoading = true;
     try {
-      events = await getMetricTreeEvents(treeId);
+      events = normalizeArray(await getMetricTreeEvents(treeId));
     } catch {
       events = [];
     } finally {
@@ -580,7 +625,7 @@
   async function loadReviewSessions(treeId: string) {
     reviewSessionsLoading = true;
     try {
-      reviewSessions = await listMetricTreeReviewSessions(treeId);
+      reviewSessions = normalizeArray(await listMetricTreeReviewSessions(treeId));
     } catch {
       reviewSessions = [];
     } finally {
@@ -622,48 +667,69 @@
     reviewLeverTargetDate = "";
   }
 
-  function nodeById(id: string | null | undefined): AuthoredMetricNode | null {
+  function nodeById(
+    id: string | null | undefined,
+    sourceNodes: AuthoredMetricNode[] = nodes,
+  ): AuthoredMetricNode | null {
     if (!id) return null;
-    return nodes.find((n) => n.id === id) ?? null;
+    return sourceNodes.find((n) => n.id === id) ?? null;
   }
 
-  function descendantsOf(parentId: string): AuthoredMetricNode[] {
+  function descendantsOf(
+    parentId: string,
+    sourceNodes: AuthoredMetricNode[] = nodes,
+  ): AuthoredMetricNode[] {
     const out: AuthoredMetricNode[] = [];
-    const stack = childrenOf(nodes, parentId);
+    const stack = childrenOf(sourceNodes, parentId);
     while (stack.length) {
       const next = stack.shift();
       if (!next) continue;
       out.push(next);
-      stack.push(...childrenOf(nodes, next.id));
+      stack.push(...childrenOf(sourceNodes, next.id));
     }
     return out;
   }
 
-  function reviewLeverCandidate(): AuthoredMetricNode | null {
-    if (selectedNode?.type === "lever") return selectedNode;
-    if (reviewWalk?.stopReason === "lever") {
-      const stopped = reviewWalk.steps[reviewWalk.steps.length - 1];
-      const node = nodeById(stopped?.nodeId);
+  function reviewLeverCandidate(
+    nextSelectedNode: AuthoredMetricNode | null,
+    nextReviewWalk: ReviewWalk | null,
+    nextRankedLevers: LeverRootImpactRank[] | null | undefined,
+    sourceNodes: AuthoredMetricNode[],
+  ): AuthoredMetricNode | null {
+    if (nextSelectedNode?.type === "lever") return nextSelectedNode;
+    if (nextReviewWalk?.stopReason === "lever") {
+      const stopped = nextReviewWalk.steps?.[nextReviewWalk.steps.length - 1];
+      const node = nodeById(stopped?.nodeId, sourceNodes);
       if (node?.type === "lever") return node;
     }
-    const ranked = nodeById(rankedLevers[0]?.nodeId);
+    const ranked = nodeById(nextRankedLevers?.[0]?.nodeId, sourceNodes);
     return ranked?.type === "lever" ? ranked : null;
   }
 
-  function experimentsUnderLever(leverId: string): AuthoredMetricNode[] {
-    return descendantsOf(leverId).filter((n) => n.type === "experiment");
+  function experimentsUnderLever(
+    leverId: string,
+    sourceNodes: AuthoredMetricNode[] = nodes,
+  ): AuthoredMetricNode[] {
+    return descendantsOf(leverId, sourceNodes).filter((n) => n.type === "experiment");
   }
 
-  function evidenceWarningsForReview(): string[] {
+  function evidenceWarningsForReview(
+    nextSelectedNode: AuthoredMetricNode | null,
+    nextReviewWalk: ReviewWalk | null,
+    nextSuggestedReviewLever: AuthoredMetricNode | null,
+    nextEvidence: MetricTreeEvidence | null,
+    nextEvidenceLoading: boolean,
+    nextEvidenceError: string,
+  ): string[] {
     const warnings: string[] = [];
-    if (selectedNode?.type === "experiment") {
-      if (selectedNode.measurementBinding && evidenceLoading) warnings.push("Experiment evidence is still loading.");
-      if (selectedNode.measurementBinding && evidenceError) warnings.push(`Experiment evidence failed: ${evidenceError}`);
-      if (selectedNode.measurementBinding && (!evidence || evidence.status !== "ok")) warnings.push("Experiment has a measurement binding but no loaded evidence snapshot.");
-      if (!selectedNode.measurementBinding) warnings.push("Selected experiment has no measurement binding.");
+    if (nextSelectedNode?.type === "experiment") {
+      if (nextSelectedNode.measurementBinding && nextEvidenceLoading) warnings.push("Experiment evidence is still loading.");
+      if (nextSelectedNode.measurementBinding && nextEvidenceError) warnings.push(`Experiment evidence failed: ${nextEvidenceError}`);
+      if (nextSelectedNode.measurementBinding && (!nextEvidence || nextEvidence.status !== "ok")) warnings.push("Experiment has a measurement binding but no loaded evidence snapshot.");
+      if (!nextSelectedNode.measurementBinding) warnings.push("Selected experiment has no measurement binding.");
     }
-    if (!reviewWalk?.steps?.length) warnings.push("Review walk is empty because live movement is unavailable.");
-    if (!suggestedReviewLever) warnings.push("No accountable lever selected.");
+    if (!nextReviewWalk?.steps?.length) warnings.push("Review walk is empty because live movement is unavailable.");
+    if (!nextSuggestedReviewLever) warnings.push("No accountable lever selected.");
     return warnings;
   }
 
@@ -769,6 +835,28 @@
     reviewDecisionQueue = reviewDecisionQueue.filter((_, i) => i !== index);
   }
 
+
+  function nodeLabel(nodeId: string): string {
+    return nodeById(nodeId)?.label ?? nodeId;
+  }
+
+  function reviewSessionWorkspaceHref(session: MetricTreeReviewSession | null): string | null {
+    if (!session?.tree_id) return null;
+    const nodeId = session.selected_node_id || session.chosen_lever_node_id || session.experiment_node_id || session.root_node_id;
+    return `/metric-trees?tree_id=${encodeURIComponent(session.tree_id)}${nodeId ? `&node_id=${encodeURIComponent(nodeId)}` : ""}`;
+  }
+
+  function openReviewSession(session: MetricTreeReviewSession) {
+    selectedReviewSession = session;
+    setSelectedId(
+      session.selected_node_id ||
+        session.chosen_lever_node_id ||
+        session.experiment_node_id ||
+        session.root_node_id ||
+        selectedId,
+    );
+  }
+
   function queuedDecisionLabel(decision: MetricTreeReviewDecision): string {
     if (decision.actionType === "log_decision") return decision.note || "Decision";
     if (decision.actionType === "update_lever_plan") return `Update ${nodeById(decision.leverNodeId)?.label ?? "lever plan"}`;
@@ -782,7 +870,7 @@
     reviewSaving = true;
     error = "";
     try {
-      await createMetricTreeReviewSession(tree.tree_id, {
+      const savedSession = await createMetricTreeReviewSession(tree.tree_id, {
         actionType: "guided_review",
         status: "completed",
         selectedNodeId: selectedNode?.id ?? root.id,
@@ -798,8 +886,10 @@
         nextAction: reviewDecisionQueue[0]?.nextAction,
       });
       serverMessage = "Review session saved.";
+      selectedReviewSession = savedSession;
       resetReviewDraft();
       await loadTree(tree.tree_id, selectedNode?.id ?? suggestedReviewLever.id);
+      selectedReviewSession = savedSession;
     } catch (err) {
       error = err instanceof Error ? err.message : "Could not save review session.";
     } finally {
@@ -2104,18 +2194,19 @@
             {#each reviewSessions.slice(0, 8) as session}
               <button
                 type="button"
-                on:click={() =>
-                  setSelectedId(
-                    session.selected_node_id ||
-                      session.chosen_lever_node_id ||
-                      session.experiment_node_id,
-                  )}
+                class:active={selectedReviewSession?.session_id === session.session_id}
+                on:click={() => openReviewSession(session)}
               >
                 <span>{session.action_type.replaceAll("_", " ")}</span>
                 <small>{session.outcome || session.note || session.next_action || session.created_at}</small>
               </button>
             {/each}
           </div>
+          <MetricTreeReviewReadout
+            session={selectedReviewSession ?? reviewSessions[0]}
+            nodeLabel={nodeLabel}
+            workspaceHref={reviewSessionWorkspaceHref(selectedReviewSession ?? reviewSessions[0])}
+          />
         {/if}
       </section>
 
@@ -2679,6 +2770,11 @@
     gap: 3px;
     padding: 8px;
     text-align: left;
+  }
+
+  .event-log button.active {
+    border-color: #245bdb;
+    background: #eef4ff;
   }
 
   .event-log span {

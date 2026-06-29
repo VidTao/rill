@@ -1,4 +1,5 @@
 <script lang="ts">
+  import MetricTreeReviewReadout from "./MetricTreeReviewReadout.svelte";
   import { nodeTypeTheme } from "./node-types";
   import { statusLabel, statusTheme } from "./status";
   import type {
@@ -47,15 +48,50 @@
   type AuthoredReviewSession = {
     session_id: string;
     tree_id: string;
+    root_node_id?: string;
     selected_node_id: string;
     chosen_lever_node_id?: string;
     experiment_node_id?: string;
     action_type: string;
+    status?: string;
     note?: string;
     outcome?: string;
     next_action?: string;
     created_at: string;
+    updated_at?: string;
+    completed_at?: string;
     created_by: string;
+    timeRange?: Record<string, unknown> | null;
+    reviewWalk?: Array<{ nodeId?: string; label?: string; delta?: number | null; depth?: number | null }>;
+    topLevers?: Array<{ nodeId?: string; label?: string; rootImpact?: number | null }>;
+    evidenceSnapshot?: Record<string, unknown> | null;
+    decisions?: Array<{
+      actionType?: string;
+      nodeId?: string;
+      leverNodeId?: string;
+      experimentNodeId?: string;
+      note?: string;
+      outcome?: string;
+      nextAction?: string;
+      owner?: string;
+      target?: number | null;
+      targetDate?: string;
+      evidenceSnapshot?: Record<string, unknown> | null;
+      trafficSourceTest?: Record<string, unknown> | null;
+    }>;
+    summary?: {
+      rootNodeId?: string;
+      rootLabel?: string;
+      rootDelta?: number | null;
+      rootValue?: number | null;
+      chosenLeverId?: string;
+      chosenLeverLabel?: string;
+      chosenLeverOwner?: string;
+      chosenLeverTarget?: number | null;
+      timeLabel?: string;
+      stopReason?: string;
+      warnings?: string[];
+    } | null;
   };
 
   export let node: MetricTreeNodeData | null;
@@ -106,6 +142,7 @@
   let trafficCampaign = "";
   let trafficChannel = "";
   let trafficStartDate = new Date().toISOString().slice(0, 10);
+  let selectedReadoutSessionId: string | null = null;
 
   $: if (authoredNode && authoredNode.id !== draftNodeId) {
     draftNodeId = authoredNode.id;
@@ -123,6 +160,7 @@
     trafficCampaign = "";
     trafficChannel = "";
     trafficStartDate = new Date().toISOString().slice(0, 10);
+    selectedReadoutSessionId = null;
   }
 
   function fmtValue(
@@ -397,6 +435,28 @@
     { id: "logs" as const, label: "Logs", count: detailData.logs.length },
   ].filter((t) => t.id === "summary" || t.count > 0);
 
+  $: visibleReviewSessions = authoredNode
+    ? authoredReviewSessions
+        .filter(
+          (session) =>
+            session.selected_node_id === authoredNode.id ||
+            session.chosen_lever_node_id === authoredNode.id ||
+            session.experiment_node_id === authoredNode.id,
+        )
+        .slice(0, 5)
+    : [];
+  $: selectedReadoutSession =
+    visibleReviewSessions.find(
+      (session) => session.session_id === selectedReadoutSessionId,
+    ) ?? visibleReviewSessions[0] ?? null;
+  $: if (
+    selectedReadoutSessionId &&
+    !visibleReviewSessions.some(
+      (session) => session.session_id === selectedReadoutSessionId,
+    )
+  ) {
+    selectedReadoutSessionId = null;
+  }
   $: if (!tabs.some((t) => t.id === activeTab)) activeTab = "summary";
 </script>
 
@@ -574,15 +634,27 @@
         <div class="section-label">Recent reviews</div>
         {#if authoredReviewSessionsLoading}
           <div class="op-muted">Loading reviews...</div>
-        {:else if !authoredReviewSessions.length}
+        {:else if !visibleReviewSessions.length}
           <div class="op-muted">No saved reviews yet.</div>
         {:else}
-          {#each authoredReviewSessions.filter((session) => session.selected_node_id === authoredNode?.id || session.chosen_lever_node_id === authoredNode?.id || session.experiment_node_id === authoredNode?.id).slice(0, 5) as session}
-            <div class="event-row">
-              <strong>{new Date(session.created_at).toLocaleDateString()}</strong>
-              <span>{sessionText(session)}</span>
-            </div>
-          {/each}
+          <div class="review-pickers">
+            {#each visibleReviewSessions as session}
+              <button
+                type="button"
+                class:active={selectedReadoutSession?.session_id === session.session_id}
+                on:click={() => (selectedReadoutSessionId = session.session_id ?? null)}
+              >
+                <strong>{new Date(session.created_at ?? "").toLocaleDateString()}</strong>
+                <span>{sessionText(session)}</span>
+              </button>
+            {/each}
+          </div>
+          <MetricTreeReviewReadout
+            session={selectedReadoutSession}
+            nodeLabel={(nodeId) => nodeId === authoredNode?.id ? authoredNode.label : nodeId}
+            {workspaceHref}
+            compact
+          />
         {/if}
       </section>
 
@@ -831,6 +903,32 @@
   }
   textarea {
     resize: vertical;
+  }
+  .review-pickers {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .review-pickers button {
+    display: grid;
+    gap: 2px;
+    border: 1px solid #edf0f4;
+    border-radius: 6px;
+    padding: 7px;
+    text-align: left;
+    background: #fff;
+    font-size: 12px;
+  }
+  .review-pickers button.active {
+    border-color: #245bdb;
+    background: #f4f7ff;
+  }
+  .review-pickers span {
+    color: #64748b;
+  }
+  :global(.dark) .review-pickers button {
+    border-color: #2a2a2a;
+    background: #161616;
   }
   .event-row {
     display: grid;
