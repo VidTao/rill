@@ -87,6 +87,16 @@
     summary: string;
   };
 
+  type OwnershipPersona = {
+    owner: string;
+    leverCount: number;
+    experimentCount: number;
+    runningCount: number;
+    backlogCount: number;
+    unassigned: boolean;
+    nodes: Array<{ id: string; label: string; type: string; status?: string | null }>;
+  };
+
   $: ({ instanceId } = $runtime);
   $: ({
     specStore,
@@ -641,6 +651,45 @@
     return out;
   }
 
+  function ownershipRosterFor(tree: AuthoredMetricTree | null): OwnershipPersona[] {
+    if (!tree) return [];
+    const groups = new Map<string, OwnershipPersona>();
+    for (const node of tree.nodes) {
+      if (node.type !== "lever" && node.type !== "experiment") continue;
+      const owner = node.owner?.trim() || "Unassigned";
+      const existing = groups.get(owner) ?? {
+        owner,
+        leverCount: 0,
+        experimentCount: 0,
+        runningCount: 0,
+        backlogCount: 0,
+        unassigned: owner === "Unassigned",
+        nodes: [],
+      };
+      if (node.type === "lever") existing.leverCount += 1;
+      if (node.type === "experiment") {
+        existing.experimentCount += 1;
+        if (node.status === "running") existing.runningCount += 1;
+        if (!node.status || node.status === "backlog" || node.status === "do_now") {
+          existing.backlogCount += 1;
+        }
+      }
+      existing.nodes.push({
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        status: node.status,
+      });
+      groups.set(owner, existing);
+    }
+    return [...groups.values()].sort((a, b) => {
+      if (a.unassigned !== b.unassigned) return a.unassigned ? -1 : 1;
+      const aWeight = a.leverCount * 10 + a.runningCount * 4 + a.experimentCount;
+      const bWeight = b.leverCount * 10 + b.runningCount * 4 + b.experimentCount;
+      return bWeight - aWeight || a.owner.localeCompare(b.owner);
+    });
+  }
+
   // Detail panel selection. Drop it if the selected node leaves the full tree.
   let selectedNode: MetricTreeNodeData | null = null;
   $: if (
@@ -665,6 +714,7 @@
   $: authoredLeverExperiments = authoredReviewLeverId
     ? authoredDescendants(authoredTreeRaw, authoredReviewLeverId).filter((n) => n.type === "experiment")
     : [];
+  $: authoredOwnershipRoster = ownershipRosterFor(authoredTreeRaw);
   $: authoredEvidenceRequestKey =
     authoredTreeRaw && authoredSelectedNode?.type === "experiment"
       ? `${authoredTreeRaw.tree_id}:${authoredSelectedNode.id}:${authoredSelectedNode.updatedAt ?? ""}`
@@ -949,6 +999,7 @@
         {operatingStatus}
         authoredNodeLabels={authoredNodeLabels}
         authoredLeverExperiments={authoredLeverExperiments}
+        authoredOwnershipRoster={authoredOwnershipRoster}
         onUpdateAuthoredNode={updateAuthoredNode}
         onCreateAuthoredEvent={createAuthoredEvent}
         onCreateReviewSession={createReviewSession}

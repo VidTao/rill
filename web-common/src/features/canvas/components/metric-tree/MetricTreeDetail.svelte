@@ -113,6 +113,16 @@
     summary: string;
   };
 
+  type OwnershipPersona = {
+    owner: string;
+    leverCount: number;
+    experimentCount: number;
+    runningCount: number;
+    backlogCount: number;
+    unassigned: boolean;
+    nodes: Array<{ id: string; label: string; type: string; status?: string | null }>;
+  };
+
   export let node: MetricTreeNodeData | null;
   export let detailData: MetricTreeDetailData = {
     relationships: [],
@@ -135,6 +145,7 @@
   export let operatingStatus: OperatingStatus | null = null;
   export let authoredNodeLabels: Record<string, string> = {};
   export let authoredLeverExperiments: AuthoredOperatingNode[] = [];
+  export let authoredOwnershipRoster: OwnershipPersona[] = [];
   export let onUpdateAuthoredNode: (nodeId: string, patch: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateAuthoredEvent: (nodeId: string, payload: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateReviewSession: (payload: Record<string, unknown>) => Promise<void> = async () => {};
@@ -407,6 +418,20 @@
   function reviewPageHref(session: AuthoredReviewSession | null): string | null {
     if (!session?.tree_id || !session.session_id) return null;
     return `/metric-trees/reviews/${encodeURIComponent(session.tree_id)}/${encodeURIComponent(session.session_id)}`;
+  }
+
+  function ownerCoverageLabel(): string {
+    const unassigned = authoredOwnershipRoster.find((owner) => owner.unassigned);
+    if (!authoredOwnershipRoster.length) return "No owned levers or experiments";
+    if (unassigned) {
+      const count = unassigned.leverCount + unassigned.experimentCount;
+      return `${count} unassigned action item${count === 1 ? "" : "s"}`;
+    }
+    return `${authoredOwnershipRoster.length} owner${authoredOwnershipRoster.length === 1 ? "" : "s"} accountable`;
+  }
+
+  function ownerNodeText(item: OwnershipPersona["nodes"][number]): string {
+    return [item.type, item.status].filter(Boolean).join(" · ");
   }
 
   function eventText(event: AuthoredEvent): string {
@@ -689,6 +714,10 @@
               <span>Evidence</span>
               <strong>{evidenceStatusLabel}</strong>
             </div>
+            <div>
+              <span>Owners</span>
+              <strong>{ownerCoverageLabel()}</strong>
+            </div>
           </div>
           {#if operatingStatus?.timeLabel || operatingStatus?.filterLabel}
             <em>{[operatingStatus.timeLabel, operatingStatus.filterLabel].filter(Boolean).join(" · ")}</em>
@@ -843,6 +872,33 @@
               <textarea rows="2" bind:value={readoutNote} placeholder="Readout note" />
             {:else}
               <div class="op-muted">No experiments under this lever yet.</div>
+            {/if}
+          </section>
+
+          <section class="cockpit-card ownership-card">
+            <div class="section-label">Ownership map</div>
+            {#if authoredOwnershipRoster.length}
+              <div class="owner-list-compact">
+                {#each authoredOwnershipRoster.slice(0, 5) as owner}
+                  <div class:warn={owner.unassigned} class="owner-group">
+                    <div class="owner-head">
+                      <strong>{owner.owner}</strong>
+                      <span>{owner.leverCount} levers · {owner.experimentCount} experiments</span>
+                    </div>
+                    <div class="owner-subline">
+                      {owner.runningCount} running · {owner.backlogCount} queued
+                    </div>
+                    {#each owner.nodes.slice(0, 3) as item}
+                      <div class="owner-node">
+                        <span>{item.label}</span>
+                        <em>{ownerNodeText(item)}</em>
+                      </div>
+                    {/each}
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="op-muted">No owners assigned to levers or experiments yet.</div>
             {/if}
           </section>
 
@@ -1087,7 +1143,7 @@
   }
   .cockpit-kpis {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
   }
   .cockpit-kpis div {
@@ -1126,7 +1182,8 @@
   }
   .review-walk-compact,
   .impact-list-compact,
-  .experiment-list-compact {
+  .experiment-list-compact,
+  .owner-list-compact {
     display: grid;
     gap: 4px;
   }
@@ -1155,6 +1212,49 @@
   .experiment-list-compact strong {
     color: #475569;
     font-size: 11px;
+    white-space: nowrap;
+  }
+  .owner-group {
+    border: 1px solid #edf0f4;
+    border-radius: 7px;
+    display: grid;
+    gap: 4px;
+    padding: 7px;
+  }
+  .owner-group.warn {
+    border-color: #f0cc78;
+    background: #fff9e8;
+  }
+  .owner-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .owner-head strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .owner-head span,
+  .owner-subline,
+  .owner-node em {
+    color: #64748b;
+    font-size: 11px;
+    font-style: normal;
+    white-space: nowrap;
+  }
+  .owner-node {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .owner-node span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
   .inline-plan {
@@ -1411,12 +1511,19 @@
   :global(.dark) .review-walk-compact div,
   :global(.dark) .impact-list-compact div,
   :global(.dark) .experiment-list-compact div,
+  :global(.dark) .owner-group,
   :global(.dark) .event-row {
     border-color: #2a2a2a;
   }
+  :global(.dark) .owner-group.warn {
+    border-color: #7a5a1d;
+    background: rgba(55, 39, 12, 0.94);
+  }
   :global(.dark) .review-walk-compact span,
   :global(.dark) .impact-list-compact span,
-  :global(.dark) .experiment-list-compact span {
+  :global(.dark) .experiment-list-compact span,
+  :global(.dark) .owner-node span,
+  :global(.dark) .owner-head strong {
     color: #ece7dd;
   }
   :global(.dark) input,
