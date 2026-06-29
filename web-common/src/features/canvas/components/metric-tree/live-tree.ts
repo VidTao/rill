@@ -168,6 +168,35 @@ function deltaFor(value: number | null, previousValue: number | null): { delta: 
   return { delta, deltaPercent: previousValue !== 0 ? delta / previousValue : null };
 }
 
+function sanitizeMetricQueryError(status: number | null, body: string | null | undefined): string {
+  const statusText = status ? `Metric query failed (${status})` : "Metric query failed";
+  const raw = body?.trim() ?? "";
+  if (!raw) return statusText;
+  if (/<!doctype|<html|<body|<head|<center|nginx\//i.test(raw)) return statusText;
+  const text = raw
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return statusText;
+  return `${statusText}: ${text.slice(0, 220)}${text.length > 220 ? "..." : ""}`;
+}
+
+function metricRequestError(req: MetricTreeLiveRequest, detail: string): string {
+  return `${req.metricsView}.${req.measures.join(", ")}: ${detail}`;
+}
+
+function logMetricRequestFailure(req: MetricTreeLiveRequest, detail: string, requestTimeRange: unknown, inheritedWhere: unknown) {
+  if (!import.meta.env.DEV) return;
+  console.warn("[metric-tree-live-binding]", {
+    metricsView: req.metricsView,
+    measures: req.measures,
+    timeMode: req.timeMode,
+    hasTimeRange: !!requestTimeRange,
+    hasFilter: !!inheritedWhere,
+    error: detail,
+  });
+}
 
 export interface ResolveMetricTreeLiveOptions {
   tree: AuthoredMetricTree | null;
@@ -209,25 +238,36 @@ async function runAggregationRequest(
   if (req.timeMode === "dashboard" && hasTimeSeries && requestTimeRange) {
     body.timeRange = requestTimeRange;
   }
-  const res = await fetch(
-    `/v1/instances/${encodeURIComponent(instanceId)}/queries/metrics-views/${encodeURIComponent(req.metricsView)}/aggregation`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
-  if (!res.ok) {
-    const message = await res.text().catch(() => "Metric query failed");
-    const detail = message || `Metric query failed (${res.status})`;
-    return {
-      row: {},
-      error: `${req.metricsView}.${req.measures.join(", ")}: ${detail}`,
-    };
+  let res: Response;
+  try {
+    res = await fetch(
+      `/v1/instances/${encodeURIComponent(instanceId)}/queries/metrics-views/${encodeURIComponent(req.metricsView)}/aggregation`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+  } catch (err) {
+    const detail = err instanceof Error ? `Metric query failed: ${err.message}` : "Metric query failed";
+    logMetricRequestFailure(req, detail, requestTimeRange, inheritedWhere);
+    return { row: {}, error: metricRequestError(req, detail) };
   }
-  const json = await res.json();
-  return { row: json?.data?.[0] ?? {}, error: null };
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    const detail = sanitizeMetricQueryError(res.status, bodyText);
+    logMetricRequestFailure(req, detail, requestTimeRange, inheritedWhere);
+    return { row: {}, error: metricRequestError(req, detail) };
+  }
+  try {
+    const json = await res.json();
+    return { row: json?.data?.[0] ?? {}, error: null };
+  } catch {
+    const detail = "Metric query returned invalid JSON";
+    logMetricRequestFailure(req, detail, requestTimeRange, inheritedWhere);
+    return { row: {}, error: metricRequestError(req, detail) };
+  }
 }
 
 async function fetchLiveRequest(
@@ -301,7 +341,9 @@ export async function resolveMetricTreeLiveValues(
         const valueKey = metricRequestMeasureKey(req, binding.measure);
         if (!bindingKey || bindingKey !== valueKey) continue;
         const value = values[valueKey] ?? { value: null, error: `${req.metricsView}.${binding.measure}: Metric value missing` };
-        if (value.error) liveWarnings.push(value.error);
+        for (const error of [value.error, value.previousError]) {
+          if (error && !liveWarnings.includes(error)) liveWarnings.push(error);
+        }
         liveValues[bindingKey] = value;
       }
     }),

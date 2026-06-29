@@ -121,6 +121,11 @@ export async function listMetricTreeReviewSessions(treeId: string): Promise<Metr
   return res.data;
 }
 
+export async function getMetricTreeReviewSession(treeId: string, sessionId: string): Promise<MetricTreeReviewSession> {
+  const res = await apiFetch<{ data: MetricTreeReviewSession }>(`/bratrax/metric-trees/${encodeURIComponent(treeId)}/review-sessions/${encodeURIComponent(sessionId)}`);
+  return res.data;
+}
+
 export async function createMetricTreeReviewSession(treeId: string, payload: CreateMetricTreeReviewSessionPayload): Promise<MetricTreeReviewSession> {
   const res = await apiFetch<{ data: MetricTreeReviewSession }>(`/bratrax/metric-trees/${encodeURIComponent(treeId)}/review-sessions`, {
     method: "POST",

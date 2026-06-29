@@ -48,6 +48,11 @@
   };
 
   type ReviewSummary = {
+    rootNodeId?: string;
+    rootLabel?: string;
+    rootDelta?: number | null;
+    rootValue?: number | null;
+    timeLabel?: string | null;
     stopReason: string;
     steps: Array<{ nodeId: string; label: string; delta: number | null; depth: number }>;
     topLevers: Array<{ nodeId: string; label: string; rootImpact: number | null }>;
@@ -68,6 +73,18 @@
     reviewWalk?: ReviewSummary["steps"];
     topLevers?: ReviewSummary["topLevers"];
     evidenceSnapshot?: Record<string, unknown>;
+  };
+
+  type OperatingStatus = {
+    liveCount: number;
+    computedCount: number;
+    fallbackCount: number;
+    errorCount: number;
+    warningCount: number;
+    failedBindings: string[];
+    timeLabel: string | null;
+    filterLabel: string | null;
+    summary: string;
   };
 
   $: ({ instanceId } = $runtime);
@@ -483,6 +500,7 @@
     ? (fullTree.nodes.find((n) => n.id === focusId) ?? null)
     : null;
   $: tree = focusId ? subtreeFrom(fullTree, focusId) : fullTree;
+  $: operatingStatus = operatingStatusFor(fullTree);
 
   function subtreeFrom(t: typeof fullTree, rootId: string): typeof fullTree {
     const keep = new Set<string>([rootId]);
@@ -564,7 +582,63 @@
       .sort((a, b) => Math.abs(b.rootImpact ?? 0) - Math.abs(a.rootImpact ?? 0))
       .slice(0, 6);
     const last = steps[steps.length - 1];
-    return { stopReason: last ? (tree.nodes.find((n) => n.id === last.nodeId)?.type === "lever" ? "owned lever reached" : "no child movement or missing live deltas") : "not reviewed", steps, topLevers };
+    return {
+      rootNodeId: root.id,
+      rootLabel: root.label,
+      rootDelta: typeof root.delta === "number" ? root.delta : null,
+      rootValue: typeof root.value === "number" ? root.value : null,
+      timeLabel: timeLabel(timeRange),
+      stopReason: last ? (tree.nodes.find((n) => n.id === last.nodeId)?.type === "lever" ? "owned lever reached" : "no child movement or missing live deltas") : "not reviewed",
+      steps,
+      topLevers,
+    };
+  }
+
+  function shortBindingLabel(label: string | null): string | null {
+    if (!label) return null;
+    const parts = label.split(".");
+    return parts[parts.length - 1] ?? label;
+  }
+
+  function operatingStatusFor(t: typeof fullTree): OperatingStatus {
+    const failedBindings = [...new Set(
+      t.nodes
+        .filter((node) => node.sourceStatus === "error")
+        .map((node) => shortBindingLabel(node.sourceLabel) ?? node.label),
+    )];
+    const liveCount = t.nodes.filter((node) => node.sourceStatus === "live").length;
+    const computedCount = t.nodes.filter((node) => node.sourceStatus === "computed").length;
+    const fallbackCount = t.nodes.filter((node) => node.sourceStatus === "fallback").length;
+    const errorCount = t.nodes.filter((node) => node.sourceStatus === "error").length;
+    const summary = errorCount
+      ? `${errorCount} live binding${errorCount === 1 ? "" : "s"} failed; fallback values shown.`
+      : authoredLiveLoading
+        ? "Refreshing live metric bindings."
+        : `${liveCount} live metric${liveCount === 1 ? "" : "s"} resolved.`;
+    return {
+      liveCount,
+      computedCount,
+      fallbackCount,
+      errorCount,
+      warningCount: t.warnings.length,
+      failedBindings,
+      timeLabel: timeLabel(timeRange),
+      filterLabel: filterLabel(),
+      summary,
+    };
+  }
+
+  function authoredDescendants(tree: AuthoredMetricTree | null, parentId: string): AuthoredMetricNode[] {
+    if (!tree) return [];
+    const out: AuthoredMetricNode[] = [];
+    const stack = tree.nodes.filter((n) => n.parentId === parentId);
+    while (stack.length) {
+      const next = stack.shift();
+      if (!next) continue;
+      out.push(next);
+      stack.push(...tree.nodes.filter((n) => n.parentId === next.id));
+    }
+    return out;
   }
 
   // Detail panel selection. Drop it if the selected node leaves the full tree.
@@ -582,6 +656,15 @@
       ? (authoredTreeRaw.nodes.find((n) => n.id === selectedNode?.id) ?? null)
       : null;
   $: authoredReviewSummary = authoredMode ? reviewSummaryFor(authoredTreeData) : null;
+  $: authoredNodeLabels = authoredTreeRaw
+    ? Object.fromEntries(authoredTreeRaw.nodes.map((n) => [n.id, n.label]))
+    : {};
+  $: authoredReviewLeverId = authoredSelectedNode?.type === "lever"
+    ? authoredSelectedNode.id
+    : authoredReviewSummary?.topLevers?.[0]?.nodeId ?? null;
+  $: authoredLeverExperiments = authoredReviewLeverId
+    ? authoredDescendants(authoredTreeRaw, authoredReviewLeverId).filter((n) => n.type === "experiment")
+    : [];
   $: authoredEvidenceRequestKey =
     authoredTreeRaw && authoredSelectedNode?.type === "experiment"
       ? `${authoredTreeRaw.tree_id}:${authoredSelectedNode.id}:${authoredSelectedNode.updatedAt ?? ""}`
@@ -816,6 +899,15 @@
     </div>
   {:else}
     <div class="relative size-full grow">
+      {#if authoredMode}
+        <div class:error={operatingStatus.errorCount > 0} class:loading={authoredLiveLoading} class="mt-status">
+          <strong>{operatingStatus.errorCount > 0 ? "Live data degraded" : authoredLiveLoading ? "Refreshing live data" : "Live data connected"}</strong>
+          <span>{operatingStatus.summary}</span>
+          {#if operatingStatus.timeLabel || operatingStatus.filterLabel}
+            <em>{[operatingStatus.timeLabel, operatingStatus.filterLabel].filter(Boolean).join(" · ")}</em>
+          {/if}
+        </div>
+      {/if}
       {#if focusId || selectedHasChildren}
         <div class="mt-toolbar">
           {#if focusId}
@@ -854,6 +946,9 @@
         authoredOperatingError={authoredOperatingError}
         authoredOperatingSaving={authoredOperatingSaving}
         authoredReviewSummary={authoredReviewSummary}
+        {operatingStatus}
+        authoredNodeLabels={authoredNodeLabels}
+        authoredLeverExperiments={authoredLeverExperiments}
         onUpdateAuthoredNode={updateAuthoredNode}
         onCreateAuthoredEvent={createAuthoredEvent}
         onCreateReviewSession={createReviewSession}
@@ -879,5 +974,38 @@
   }
   .mt-crumb {
     @apply text-xs font-semibold text-fg-muted;
+  }
+  .mt-status {
+    @apply absolute right-2 top-2 z-10 grid max-w-[360px] gap-0.5 rounded border border-emerald-200 bg-emerald-50/95 px-3 py-2 text-xs shadow-sm;
+    color: #14532d;
+  }
+  .mt-status strong {
+    @apply font-bold;
+  }
+  .mt-status span {
+    @apply font-medium;
+  }
+  .mt-status em {
+    @apply not-italic opacity-75;
+  }
+  .mt-status.error {
+    border-color: #f1c66d;
+    background: rgba(255, 248, 223, 0.96);
+    color: #6f4b00;
+  }
+  .mt-status.loading {
+    border-color: #cbd5e1;
+    background: rgba(248, 250, 252, 0.96);
+    color: #475569;
+  }
+  :global(.dark) .mt-status {
+    border-color: #235b38;
+    background: rgba(15, 44, 27, 0.94);
+    color: #bdf0ca;
+  }
+  :global(.dark) .mt-status.error {
+    border-color: #7a5a1d;
+    background: rgba(55, 39, 12, 0.94);
+    color: #f8dda2;
   }
 </style>

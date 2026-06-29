@@ -846,6 +846,11 @@
     return `/metric-trees?tree_id=${encodeURIComponent(session.tree_id)}${nodeId ? `&node_id=${encodeURIComponent(nodeId)}` : ""}`;
   }
 
+  function reviewSessionPageHref(session: MetricTreeReviewSession | null): string | null {
+    if (!session?.tree_id || !session.session_id) return null;
+    return `/metric-trees/reviews/${encodeURIComponent(session.tree_id)}/${encodeURIComponent(session.session_id)}`;
+  }
+
   function openReviewSession(session: MetricTreeReviewSession) {
     selectedReviewSession = session;
     setSelectedId(
@@ -2206,6 +2211,7 @@
             session={selectedReviewSession ?? reviewSessions[0]}
             nodeLabel={nodeLabel}
             workspaceHref={reviewSessionWorkspaceHref(selectedReviewSession ?? reviewSessions[0])}
+            reviewHref={reviewSessionPageHref(selectedReviewSession ?? reviewSessions[0])}
           />
         {/if}
       </section>

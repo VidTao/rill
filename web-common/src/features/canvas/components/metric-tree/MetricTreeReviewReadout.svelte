@@ -63,6 +63,7 @@
   export let session: MetricTreeReviewReadoutSession | null = null;
   export let nodeLabel: (nodeId: string) => string = (nodeId) => nodeId;
   export let workspaceHref: string | null = null;
+  export let reviewHref: string | null = null;
   export let compact = false;
 
   function actionLabel(action: string | null | undefined): string {
@@ -248,11 +249,16 @@
       </div>
     {/if}
 
-    {#if workspaceHref}
-      <a class="workspace-link" href={workspaceHref}>Open selected node in workspace</a>
-    {:else if selectedId}
-      <div class="selected-node">Selected node: {nodeLabel(selectedId)}</div>
-    {/if}
+    <div class="readout-links">
+      {#if reviewHref}
+        <a class="workspace-link" href={reviewHref}>Open review page</a>
+      {/if}
+      {#if workspaceHref}
+        <a class="workspace-link" href={workspaceHref}>Open selected node in workspace</a>
+      {:else if selectedId}
+        <div class="selected-node">Selected node: {nodeLabel(selectedId)}</div>
+      {/if}
+    </div>
   </section>
 {/if}
 
@@ -372,6 +378,11 @@
     color: #7a5308;
     background: #fff7df;
     font-size: 12px;
+  }
+  .readout-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
   }
   .workspace-link {
     color: #245bdb;

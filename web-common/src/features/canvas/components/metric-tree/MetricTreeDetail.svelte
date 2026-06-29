@@ -20,6 +20,21 @@
     measurementBinding?: Record<string, unknown>;
   };
 
+  type ReviewDecision = {
+    actionType: "log_decision" | "result_readout" | "create_traffic_source_test" | "update_lever_plan";
+    nodeId?: string;
+    leverNodeId?: string;
+    experimentNodeId?: string;
+    note?: string;
+    outcome?: "won" | "lost" | "shipped";
+    nextAction?: string;
+    owner?: string | null;
+    target?: number | null;
+    targetDate?: string | null;
+    evidenceSnapshot?: Record<string, unknown> | null;
+    trafficSourceTest?: Record<string, unknown>;
+  };
+
   type AuthoredEvent = {
     event_id: string;
     node_id: string;
@@ -40,6 +55,11 @@
   };
 
   type ReviewSummary = {
+    rootNodeId?: string;
+    rootLabel?: string;
+    rootDelta?: number | null;
+    rootValue?: number | null;
+    timeLabel?: string | null;
     stopReason: string;
     steps: Array<{ nodeId: string; label: string; delta: number | null; depth: number }>;
     topLevers: Array<{ nodeId: string; label: string; rootImpact: number | null }>;
@@ -65,20 +85,7 @@
     reviewWalk?: Array<{ nodeId?: string; label?: string; delta?: number | null; depth?: number | null }>;
     topLevers?: Array<{ nodeId?: string; label?: string; rootImpact?: number | null }>;
     evidenceSnapshot?: Record<string, unknown> | null;
-    decisions?: Array<{
-      actionType?: string;
-      nodeId?: string;
-      leverNodeId?: string;
-      experimentNodeId?: string;
-      note?: string;
-      outcome?: string;
-      nextAction?: string;
-      owner?: string;
-      target?: number | null;
-      targetDate?: string;
-      evidenceSnapshot?: Record<string, unknown> | null;
-      trafficSourceTest?: Record<string, unknown> | null;
-    }>;
+    decisions?: ReviewDecision[];
     summary?: {
       rootNodeId?: string;
       rootLabel?: string;
@@ -92,6 +99,18 @@
       stopReason?: string;
       warnings?: string[];
     } | null;
+  };
+
+  type OperatingStatus = {
+    liveCount: number;
+    computedCount: number;
+    fallbackCount: number;
+    errorCount: number;
+    warningCount: number;
+    failedBindings: string[];
+    timeLabel: string | null;
+    filterLabel: string | null;
+    summary: string;
   };
 
   export let node: MetricTreeNodeData | null;
@@ -113,6 +132,9 @@
   export let authoredOperatingError: string | null = null;
   export let authoredOperatingSaving = false;
   export let authoredReviewSummary: ReviewSummary | null = null;
+  export let operatingStatus: OperatingStatus | null = null;
+  export let authoredNodeLabels: Record<string, string> = {};
+  export let authoredLeverExperiments: AuthoredOperatingNode[] = [];
   export let onUpdateAuthoredNode: (nodeId: string, patch: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateAuthoredEvent: (nodeId: string, payload: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateReviewSession: (payload: Record<string, unknown>) => Promise<void> = async () => {};
@@ -135,7 +157,9 @@
   let decisionNote = "";
   let reviewNote = "";
   let reviewNextAction = "";
-  let reviewAction = "log_decision";
+  let reviewAction: ReviewDecision["actionType"] = "log_decision";
+  let reviewOutcome: "won" | "lost" | "shipped" = "won";
+  let reviewDecisionQueue: ReviewDecision[] = [];
   let readoutNote = "";
   let trafficLabel = "New traffic-source test";
   let trafficSource = "";
@@ -154,6 +178,8 @@
     reviewNote = "";
     reviewNextAction = "";
     reviewAction = authoredNode.type === "experiment" ? "result_readout" : "log_decision";
+    reviewOutcome = "won";
+    reviewDecisionQueue = [];
     readoutNote = "";
     trafficLabel = "New traffic-source test";
     trafficSource = "";
@@ -303,6 +329,7 @@
   function evidenceSnapshot(): Record<string, unknown> | null {
     if (!authoredEvidence || authoredEvidence.status !== "ok") return null;
     return {
+      status: authoredEvidence.status,
       resultLabel: authoredEvidence.resultLabel,
       queryBasis: authoredEvidence.queryBasis,
       metrics: authoredEvidence.metrics ?? {},
@@ -316,6 +343,44 @@
     return authoredReviewSummary?.topLevers?.[0]?.nodeId ?? "";
   }
 
+  function labelFor(nodeId: string | null | undefined): string {
+    if (!nodeId) return "";
+    if (nodeId === authoredNode?.id) return authoredNode.label;
+    return authoredNodeLabels[nodeId] ?? nodeId;
+  }
+
+  function evidenceCompletenessLabel(): string {
+    if (authoredNode?.type === "experiment" && authoredNode.measurementBinding) {
+      if (authoredEvidence?.status === "ok") return "Evidence attached";
+      return "Evidence incomplete";
+    }
+    return "Movement-only snapshot";
+  }
+
+  function reviewWarnings(): string[] {
+    const warnings: string[] = [];
+    const evidenceLabel = evidenceCompletenessLabel();
+    if (evidenceLabel !== "Evidence attached") warnings.push(evidenceLabel);
+    if (!authoredReviewSummary?.steps?.length) warnings.push("Review walk is empty because live movement is unavailable.");
+    if (!reviewLeverId()) warnings.push("No accountable lever selected.");
+    if (authoredNode?.type === "experiment" && authoredNode.measurementBinding && authoredEvidenceLoading) warnings.push("Experiment evidence is still loading.");
+    return warnings;
+  }
+
+  function reviewSummaryPayload(): Record<string, unknown> {
+    return {
+      rootNodeId: authoredReviewSummary?.rootNodeId,
+      rootLabel: authoredReviewSummary?.rootLabel,
+      rootDelta: authoredReviewSummary?.rootDelta,
+      rootValue: authoredReviewSummary?.rootValue,
+      chosenLeverId: reviewLeverId() || undefined,
+      chosenLeverLabel: labelFor(reviewLeverId()) || undefined,
+      timeLabel: authoredReviewSummary?.timeLabel,
+      stopReason: authoredReviewSummary?.stopReason,
+      warnings: reviewWarnings(),
+    };
+  }
+
   function reviewPayload(extra: Record<string, unknown> = {}): Record<string, unknown> {
     return {
       selectedNodeId: authoredNode?.id,
@@ -325,6 +390,7 @@
       reviewWalk: authoredReviewSummary?.steps ?? [],
       topLevers: authoredReviewSummary?.topLevers ?? [],
       evidenceSnapshot: evidenceSnapshot() ?? undefined,
+      summary: reviewSummaryPayload(),
       note: reviewNote.trim(),
       nextAction: reviewNextAction.trim(),
       ...extra,
@@ -360,27 +426,86 @@
     await onUpdateAuthoredNode(authoredNode.id, { status });
   }
 
-  async function saveReview() {
-    if (!authoredNode) return;
-    if ((reviewAction === "log_decision" || reviewAction === "result_readout") && !reviewNote.trim()) return;
-    if (reviewAction === "create_traffic_source_test" && !trafficSource.trim() && !trafficCampaign.trim() && !trafficChannel.trim()) return;
-    const actionPayload = reviewAction === "create_traffic_source_test"
-      ? {
-          actionType: reviewAction,
-          trafficSourceTest: {
-            label: trafficLabel.trim() || "New traffic-source test",
-            source: trafficSource.trim() || undefined,
-            campaign: trafficCampaign.trim() || undefined,
-            channel_group: trafficChannel.trim() || undefined,
-            startDate: trafficStartDate,
-            attributionModel: "first_touch",
-            primaryMeasure: "metric_nc_cpa",
-          },
-        }
-      : { actionType: reviewAction, outcome: authoredNode.type === "experiment" ? authoredNode.status || undefined : undefined };
-    await onCreateReviewSession(reviewPayload(actionPayload));
+  function canQueueReviewDecision(): boolean {
+    if (!authoredNode) return false;
+    if ((reviewAction === "log_decision" || reviewAction === "result_readout") && !reviewNote.trim()) return false;
+    if (reviewAction === "result_readout" && authoredNode.measurementBinding && (authoredEvidenceLoading || authoredEvidence?.status !== "ok")) return false;
+    if (reviewAction === "create_traffic_source_test" && !trafficSource.trim() && !trafficCampaign.trim() && !trafficChannel.trim()) return false;
+    if (reviewAction === "update_lever_plan" && !reviewLeverId()) return false;
+    return true;
+  }
+
+  function queuedDecisionLabel(decision: ReviewDecision): string {
+    if (decision.actionType === "log_decision") return decision.note || "Decision";
+    if (decision.actionType === "result_readout") return `${labelFor(decision.experimentNodeId)}: ${decision.outcome}`;
+    if (decision.actionType === "update_lever_plan") return `Update ${labelFor(decision.leverNodeId)}`;
+    if (decision.actionType === "create_traffic_source_test") return String(decision.trafficSourceTest?.label ?? "Traffic-source test");
+    return decision.actionType;
+  }
+
+  function queueReviewDecision() {
+    if (!authoredNode || !canQueueReviewDecision()) return;
+    let decision: ReviewDecision | null = null;
+    const note = reviewNote.trim();
+    const nextAction = reviewNextAction.trim() || undefined;
+    if (reviewAction === "log_decision") {
+      decision = { actionType: "log_decision", nodeId: authoredNode.id, note, nextAction };
+    } else if (reviewAction === "result_readout") {
+      decision = {
+        actionType: "result_readout",
+        experimentNodeId: authoredNode.id,
+        note: note || `Marked ${reviewOutcome}`,
+        outcome: reviewOutcome,
+        nextAction,
+        evidenceSnapshot: evidenceSnapshot(),
+      };
+    } else if (reviewAction === "update_lever_plan") {
+      decision = {
+        actionType: "update_lever_plan",
+        leverNodeId: reviewLeverId(),
+        note: note || "Updated lever plan",
+        owner: ownerDraft.trim() || null,
+        target: numOrNull(targetDraft),
+        targetDate: targetDateDraft || null,
+        nextAction,
+      };
+    } else if (reviewAction === "create_traffic_source_test") {
+      decision = {
+        actionType: "create_traffic_source_test",
+        leverNodeId: reviewLeverId() || authoredNode.id,
+        note: note || "Create traffic-source test",
+        nextAction,
+        trafficSourceTest: {
+          label: trafficLabel.trim() || "New traffic-source test",
+          source: trafficSource.trim() || undefined,
+          campaign: trafficCampaign.trim() || undefined,
+          channel_group: trafficChannel.trim() || undefined,
+          startDate: trafficStartDate,
+          attributionModel: "first_touch",
+          primaryMeasure: "metric_nc_cpa",
+        },
+      };
+    }
+    if (!decision) return;
+    reviewDecisionQueue = [...reviewDecisionQueue, decision];
     reviewNote = "";
     reviewNextAction = "";
+  }
+
+  function removeQueuedReviewDecision(index: number) {
+    reviewDecisionQueue = reviewDecisionQueue.filter((_, i) => i !== index);
+  }
+
+  async function saveGuidedReview() {
+    if (!authoredNode || !reviewDecisionQueue.length) return;
+    await onCreateReviewSession(reviewPayload({
+      actionType: "guided_review",
+      status: "completed",
+      decisions: reviewDecisionQueue,
+      note: reviewDecisionQueue[0]?.note ?? "Guided review",
+      nextAction: reviewDecisionQueue[0]?.nextAction,
+    }));
+    reviewDecisionQueue = [];
   }
 
   async function logDecision() {
@@ -449,6 +574,16 @@
     visibleReviewSessions.find(
       (session) => session.session_id === selectedReadoutSessionId,
     ) ?? visibleReviewSessions[0] ?? null;
+  $: selectedNodeEvents = authoredNode
+    ? authoredEvents.filter((event) => event.node_id === authoredNode.id).slice(0, 6)
+    : [];
+  $: evidenceMetricEntries = Object.entries(authoredEvidence?.metrics ?? {}).slice(0, 6);
+  $: reviewStopStep = authoredReviewSummary?.steps?.length
+    ? authoredReviewSummary.steps[authoredReviewSummary.steps.length - 1]
+    : null;
+  $: primaryRootLever = authoredReviewSummary?.topLevers?.[0] ?? null;
+  $: reviewWarningsList = reviewWarnings();
+  $: evidenceStatusLabel = evidenceCompletenessLabel();
   $: if (
     selectedReadoutSessionId &&
     !visibleReviewSessions.some(
@@ -474,7 +609,7 @@
         <div class="type-pill">{typeTheme.label}</div>
         <div class="title" title={node.label}>{node.label}</div>
         {#if workspaceHref}
-          <a class="workspace-link" href={workspaceHref}>Open in workspace</a>
+          <a class="workspace-link" href={workspaceHref}>Edit tree structure</a>
         {/if}
       </div>
       <button class="close" aria-label="Close" on:click={onClose}>x</button>
@@ -525,152 +660,252 @@
         </section>
       {/each}
     {:else if activeTab === "operate" && authoredNode}
-      {#if authoredOperatingError}
-        <section class="op-alert">{authoredOperatingError}</section>
-      {/if}
-
-      <section>
-        <div class="section-label">Review</div>
-        <div class="op-muted">{authoredReviewSummary?.stopReason ?? "No review context"}</div>
-        {#each authoredReviewSummary?.steps ?? [] as step}
-          <button class="op-row" type="button" disabled>
-            <span style={`padding-left: ${step.depth * 12}px`}>{step.label}</span>
-            <strong>{fmtValue(step.delta ?? 0, node.unit)}</strong>
-          </button>
-        {/each}
-        {#if authoredReviewSummary?.topLevers?.length}
-          <div class="section-label nested">Root-impact levers</div>
-          {#each authoredReviewSummary.topLevers as lever}
-            <div class="kv compact">
-              <span>{lever.label}</span>
-              <strong>{lever.rootImpact == null ? "unsized" : fmtValue(lever.rootImpact, node.unit)}</strong>
-            </div>
-          {/each}
+      <div class="cockpit">
+        {#if authoredOperatingError}
+          <section class="op-alert">{authoredOperatingError}</section>
         {/if}
-      </section>
 
-      <section>
-        <div class="section-label">Save review</div>
-        <select bind:value={reviewAction}>
-          <option value="log_decision">Decision</option>
-          {#if authoredNode.type === "experiment"}
-            <option value="result_readout">Result readout</option>
+        <section class:error={operatingStatus && operatingStatus.errorCount > 0} class="cockpit-hero">
+          <div>
+            <div class="section-label">Operating status</div>
+            <strong>{operatingStatus?.errorCount ? "Live data degraded" : operatingStatus ? "Live data connected" : "Operating context"}</strong>
+            <p>{operatingStatus?.summary ?? authoredReviewSummary?.stopReason ?? "Select a node to review the operating context."}</p>
+          </div>
+          <div class="cockpit-kpis">
+            <div>
+              <span>Root movement</span>
+              <strong>{fmtValue(authoredReviewSummary?.rootDelta ?? node.delta ?? 0, node.unit)}</strong>
+            </div>
+            <div>
+              <span>Selected value</span>
+              <strong>{fmtValue(node.value, node.unit)}</strong>
+            </div>
+            <div>
+              <span>Evidence</span>
+              <strong>{evidenceStatusLabel}</strong>
+            </div>
+          </div>
+          {#if operatingStatus?.timeLabel || operatingStatus?.filterLabel}
+            <em>{[operatingStatus.timeLabel, operatingStatus.filterLabel].filter(Boolean).join(" · ")}</em>
           {/if}
-          {#if authoredNode.type === "lever" || authoredNode.type === "surface"}
-            <option value="create_traffic_source_test">Create follow-up test</option>
+          {#if operatingStatus}
+            <div class="status-metrics compact-status">
+              <span>Live {operatingStatus.liveCount}</span>
+              <span>Computed {operatingStatus.computedCount}</span>
+              <span>Fallback {operatingStatus.fallbackCount}</span>
+              <span>Errors {operatingStatus.errorCount}</span>
+            </div>
           {/if}
-        </select>
-        <textarea rows="3" bind:value={reviewNote} placeholder="What did we decide in this review?" />
-        <input bind:value={reviewNextAction} placeholder="Next action" />
-        <button class="op-primary" type="button" on:click={saveReview} disabled={authoredOperatingSaving || ((reviewAction === "log_decision" || reviewAction === "result_readout") && !reviewNote.trim())}>Save review</button>
-      </section>
-
-      {#if authoredNode.type === "lever"}
-        <section>
-          <div class="section-label">Owner and target</div>
-          <label>Owner<input bind:value={ownerDraft} /></label>
-          <div class="op-grid">
-            <label>Baseline<input type="number" step="any" bind:value={baselineDraft} /></label>
-            <label>Target<input type="number" step="any" bind:value={targetDraft} /></label>
-          </div>
-          <label>Target date<input type="date" bind:value={targetDateDraft} /></label>
-          <button class="op-primary" type="button" on:click={saveOwnerTarget} disabled={authoredOperatingSaving}>Save owner/target</button>
-        </section>
-      {/if}
-
-      {#if authoredNode.type === "lever" || authoredNode.type === "surface"}
-        <section>
-          <div class="section-label">New traffic-source test</div>
-          <label>Label<input bind:value={trafficLabel} /></label>
-          <div class="op-grid">
-            <label>Channel<input bind:value={trafficChannel} placeholder="Meta" /></label>
-            <label>Source<input bind:value={trafficSource} placeholder="Conversion" /></label>
-          </div>
-          <label>Campaign<input bind:value={trafficCampaign} placeholder="Campaign name" /></label>
-          <label>Start date<input type="date" bind:value={trafficStartDate} /></label>
-          <button class="op-primary" type="button" on:click={createTrafficTest} disabled={authoredOperatingSaving || (!trafficSource.trim() && !trafficCampaign.trim() && !trafficChannel.trim())}>Create test</button>
-        </section>
-      {/if}
-
-      {#if authoredNode.type === "experiment"}
-        <section>
-          <div class="section-label">Experiment status</div>
-          <div class="op-actions">
-            <button type="button" on:click={() => setExperimentStatus("running")} disabled={authoredOperatingSaving}>Launch</button>
-            <button type="button" on:click={() => saveReadout("won")} disabled={authoredOperatingSaving}>Won</button>
-            <button type="button" on:click={() => saveReadout("lost")} disabled={authoredOperatingSaving}>Lost</button>
-            <button type="button" on:click={() => saveReadout("shipped")} disabled={authoredOperatingSaving}>Shipped</button>
-          </div>
-          <textarea rows="3" bind:value={readoutNote} placeholder="Readout note" />
+          {#if operatingStatus?.failedBindings.length}
+            <div class="failed-bindings">Failed bindings: {operatingStatus.failedBindings.slice(0, 6).join(", ")}</div>
+          {/if}
         </section>
 
-        <section>
-          <div class="section-label">Evidence snapshot</div>
-          {#if authoredEvidenceLoading}
-            <div class="op-muted">Loading evidence...</div>
-          {:else if !authoredEvidence}
-            <div class="op-muted">No evidence loaded.</div>
-          {:else if authoredEvidence.status !== "ok"}
-            <div class="op-muted">{authoredEvidence.message ?? authoredEvidence.status}</div>
+        <div class="cockpit-grid">
+          <section class="cockpit-card review-card">
+            <div class="section-label">Weekly review path</div>
+            <div class="review-headline">
+              <strong>{reviewStopStep?.label ?? authoredNode.label}</strong>
+              <span>{authoredReviewSummary?.stopReason ?? "No review path yet"}</span>
+            </div>
+            {#if authoredReviewSummary?.steps?.length}
+              <div class="review-walk-compact">
+                {#each authoredReviewSummary.steps as step}
+                  <div style={`padding-left: ${step.depth * 12}px`}>
+                    <span>{step.label}</span>
+                    <strong>{fmtValue(step.delta ?? 0, node.unit)}</strong>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="op-muted">Live movement has not produced a review walk for this node.</div>
+            {/if}
+          </section>
+
+          <section class="cockpit-card lever-card">
+            <div class="section-label">Accountable lever</div>
+            <div class="lever-focus">
+              <strong>{primaryRootLever?.label ?? reviewStopStep?.label ?? authoredNode.label}</strong>
+              <span>{primaryRootLever?.rootImpact == null ? "Root impact unsized" : `Root impact ${fmtValue(primaryRootLever.rootImpact, node.unit)}`}</span>
+            </div>
+            {#if authoredReviewSummary?.topLevers?.length}
+              <div class="impact-list-compact">
+                {#each authoredReviewSummary.topLevers.slice(0, 4) as lever}
+                  <div>
+                    <span>{lever.label}</span>
+                    <strong>{lever.rootImpact == null ? "unsized" : fmtValue(lever.rootImpact, node.unit)}</strong>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+            {#if authoredNode.type === "lever"}
+              <div class="inline-plan">
+                <label>Owner<input bind:value={ownerDraft} /></label>
+                <label>Target<input type="number" step="any" bind:value={targetDraft} /></label>
+                <button type="button" on:click={saveOwnerTarget} disabled={authoredOperatingSaving}>Save plan</button>
+              </div>
+            {/if}
+          </section>
+        </div>
+
+        <section class="cockpit-card action-card">
+          <div class="section-label">Decision queue</div>
+          <div class:warn={evidenceStatusLabel !== "Evidence attached"} class="evidence-status">{evidenceStatusLabel}</div>
+          {#each reviewWarningsList as warning}
+            <div class="op-warning">{warning}</div>
+          {/each}
+          <div class="review-composer-compact">
+            <label>
+              Action
+              <select bind:value={reviewAction}>
+                <option value="log_decision">Decision</option>
+                <option value="update_lever_plan">Update lever plan</option>
+                {#if authoredNode.type === "experiment"}
+                  <option value="result_readout">Result readout</option>
+                {/if}
+                {#if authoredNode.type === "lever" || authoredNode.type === "surface"}
+                  <option value="create_traffic_source_test">Create traffic-source test</option>
+                {/if}
+              </select>
+            </label>
+            {#if reviewAction === "result_readout"}
+              <label>
+                Outcome
+                <select bind:value={reviewOutcome}>
+                  <option value="won">Won</option>
+                  <option value="lost">Lost</option>
+                  <option value="shipped">Shipped</option>
+                </select>
+              </label>
+            {:else if reviewAction === "create_traffic_source_test"}
+              <div class="field-grid-compact">
+                <label>Label<input bind:value={trafficLabel} /></label>
+                <label>Channel<input bind:value={trafficChannel} placeholder="Meta" /></label>
+                <label>Source<input bind:value={trafficSource} placeholder="Conversion" /></label>
+                <label>Campaign<input bind:value={trafficCampaign} placeholder="Campaign name" /></label>
+              </div>
+            {:else if reviewAction === "update_lever_plan"}
+              <div class="field-grid-compact three">
+                <label>Owner<input bind:value={ownerDraft} /></label>
+                <label>Target<input type="number" step="any" bind:value={targetDraft} /></label>
+                <label>Target date<input type="date" bind:value={targetDateDraft} /></label>
+              </div>
+            {/if}
+            <label class="wide-field">Review note<textarea rows="3" bind:value={reviewNote} placeholder="What did we decide in this review?" /></label>
+            <label class="wide-field">Next action<input bind:value={reviewNextAction} placeholder="Owner and next move" /></label>
+            <div class="action-buttons">
+              <button type="button" on:click={queueReviewDecision} disabled={authoredOperatingSaving || !canQueueReviewDecision()}>Add to queue</button>
+              <button class="op-primary" type="button" on:click={saveGuidedReview} disabled={authoredOperatingSaving || !reviewDecisionQueue.length}>Save review session</button>
+            </div>
+          </div>
+          {#if reviewDecisionQueue.length}
+            <div class="queued-decisions compact-queue">
+              {#each reviewDecisionQueue as decision, index}
+                <div>
+                  <span>{decision.actionType.replaceAll("_", " ")}</span>
+                  <strong>{queuedDecisionLabel(decision)}</strong>
+                  <button type="button" on:click={() => removeQueuedReviewDecision(index)}>Remove</button>
+                </div>
+              {/each}
+            </div>
           {:else}
-            <div class="op-muted">{authoredEvidence.resultLabel} · {authoredEvidence.queryBasis}</div>
-            {#each Object.entries(authoredEvidence.metrics ?? {}).slice(0, 8) as [key, value]}
-              <div class="kv compact"><span>{key.replaceAll("_", " ")}</span><strong>{fmtValue(value, key.includes("revenue") || key.includes("spend") || key.includes("cpa") ? "currency" : "count")}</strong></div>
-            {/each}
-            {#each authoredEvidence.warnings ?? [] as warning}
-              <div class="op-warning">{warning}</div>
-            {/each}
+            <div class="op-muted">Queue one or more decisions, then save the review session.</div>
           {/if}
         </section>
-      {/if}
 
-      <section>
-        <div class="section-label">Decision</div>
-        <textarea rows="3" bind:value={decisionNote} placeholder="What did we decide?" />
-        <button class="op-primary" type="button" on:click={logDecision} disabled={authoredOperatingSaving || !decisionNote.trim()}>Log decision</button>
-      </section>
+        <div class="cockpit-grid side-grid">
+          <section class="cockpit-card">
+            <div class="section-label">Experiments</div>
+            {#if authoredLeverExperiments.length}
+              <div class="experiment-list-compact">
+                {#each authoredLeverExperiments.slice(0, 6) as experiment}
+                  <div>
+                    <span>{experiment.label}</span>
+                    <strong>{experiment.status ?? "backlog"}</strong>
+                  </div>
+                {/each}
+              </div>
+            {:else if authoredNode.type === "experiment"}
+              <div class="experiment-list-compact">
+                <div><span>{authoredNode.label}</span><strong>{authoredNode.status ?? "backlog"}</strong></div>
+              </div>
+              <div class="op-actions tight">
+                <button type="button" on:click={() => setExperimentStatus("running")} disabled={authoredOperatingSaving}>Launch</button>
+                <button type="button" on:click={() => saveReadout("won")} disabled={authoredOperatingSaving}>Won</button>
+                <button type="button" on:click={() => saveReadout("lost")} disabled={authoredOperatingSaving}>Lost</button>
+                <button type="button" on:click={() => saveReadout("shipped")} disabled={authoredOperatingSaving}>Shipped</button>
+              </div>
+              <textarea rows="2" bind:value={readoutNote} placeholder="Readout note" />
+            {:else}
+              <div class="op-muted">No experiments under this lever yet.</div>
+            {/if}
+          </section>
 
-      <section>
-        <div class="section-label">Recent reviews</div>
-        {#if authoredReviewSessionsLoading}
-          <div class="op-muted">Loading reviews...</div>
-        {:else if !visibleReviewSessions.length}
-          <div class="op-muted">No saved reviews yet.</div>
-        {:else}
-          <div class="review-pickers">
-            {#each visibleReviewSessions as session}
-              <button
-                type="button"
-                class:active={selectedReadoutSession?.session_id === session.session_id}
-                on:click={() => (selectedReadoutSessionId = session.session_id ?? null)}
-              >
-                <strong>{new Date(session.created_at ?? "").toLocaleDateString()}</strong>
-                <span>{sessionText(session)}</span>
-              </button>
-            {/each}
-          </div>
-          <MetricTreeReviewReadout
-            session={selectedReadoutSession}
-            nodeLabel={(nodeId) => nodeId === authoredNode?.id ? authoredNode.label : nodeId}
-            {workspaceHref}
-            compact
-          />
-        {/if}
-      </section>
+          <section class="cockpit-card">
+            <div class="section-label">Evidence snapshot</div>
+            {#if authoredEvidenceLoading}
+              <div class="op-muted">Loading evidence...</div>
+            {:else if !authoredEvidence}
+              <div class="op-muted">No evidence loaded.</div>
+            {:else if authoredEvidence.status !== "ok"}
+              <div class="op-muted">{authoredEvidence.message ?? authoredEvidence.status}</div>
+            {:else}
+              <div class="op-muted">{authoredEvidence.resultLabel} · {authoredEvidence.queryBasis}</div>
+              {#each evidenceMetricEntries as [key, value]}
+                <div class="kv compact"><span>{key.replaceAll("_", " ")}</span><strong>{fmtValue(value, key.includes("revenue") || key.includes("spend") || key.includes("cpa") ? "currency" : "count")}</strong></div>
+              {/each}
+              {#each authoredEvidence.warnings ?? [] as warning}
+                <div class="op-warning">{warning}</div>
+              {/each}
+            {/if}
+          </section>
+        </div>
 
-      <section>
-        <div class="section-label">Decision log</div>
-        {#if authoredEventsLoading}
-          <div class="op-muted">Loading events...</div>
-        {:else}
-          {#each authoredEvents.filter((event) => event.node_id === authoredNode?.id).slice(0, 8) as event}
-            <div class="event-row">
-              <strong>{event.event_type.replaceAll("_", " ")}</strong>
-              <span>{eventText(event)}</span>
-            </div>
-          {/each}
-        {/if}
-      </section>
+        <div class="cockpit-grid history-grid">
+          <section class="cockpit-card">
+            <div class="section-label">Recent reviews</div>
+            {#if authoredReviewSessionsLoading}
+              <div class="op-muted">Loading reviews...</div>
+            {:else if !visibleReviewSessions.length}
+              <div class="op-muted">No saved reviews yet.</div>
+            {:else}
+              <div class="review-pickers compact-pickers">
+                {#each visibleReviewSessions as session}
+                  <button
+                    type="button"
+                    class:active={selectedReadoutSession?.session_id === session.session_id}
+                    on:click={() => (selectedReadoutSessionId = session.session_id ?? null)}
+                  >
+                    <strong>{new Date(session.created_at ?? "").toLocaleDateString()}</strong>
+                    <span>{sessionText(session)}</span>
+                  </button>
+                {/each}
+              </div>
+              <MetricTreeReviewReadout
+                session={selectedReadoutSession}
+                nodeLabel={labelFor}
+                compact
+              />
+            {/if}
+          </section>
+
+          <section class="cockpit-card">
+            <div class="section-label">Decision log</div>
+            {#if authoredEventsLoading}
+              <div class="op-muted">Loading events...</div>
+            {:else if !selectedNodeEvents.length}
+              <div class="op-muted">No decisions logged for this node.</div>
+            {:else}
+              {#each selectedNodeEvents as event}
+                <div class="event-row compact-event">
+                  <strong>{event.event_type.replaceAll("_", " ")}</strong>
+                  <span>{eventText(event)}</span>
+                </div>
+              {/each}
+            {/if}
+          </section>
+        </div>
+      </div>
     {:else}
       {#each detailRows(activeTab) as row, i (`${activeTab}-${i}`)}
         <section class="row-card">
@@ -693,7 +928,7 @@
   }
   .panel {
     @apply absolute inset-y-0 right-0 z-20 flex flex-col gap-3 overflow-y-auto p-4;
-    width: min(420px, 90%);
+    width: min(620px, 96%);
     background: var(--color-surface-card, #ffffff);
     border-left: 4px solid var(--type-color);
     box-shadow: -8px 0 24px rgba(15, 23, 42, 0.12);
@@ -804,6 +1039,187 @@
     overflow-wrap: anywhere;
   }
 
+  .cockpit {
+    display: grid;
+    gap: 10px;
+  }
+  .cockpit-hero,
+  .cockpit-card {
+    border: 1px solid #dfe6ee;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 10px;
+  }
+  .cockpit-hero {
+    display: grid;
+    gap: 9px;
+    border-color: #badfc9;
+    background: #f5fbf7;
+    color: #173b25;
+  }
+  .cockpit-hero.error {
+    border-color: #efc466;
+    background: #fff8df;
+    color: #684600;
+  }
+  .cockpit-hero strong,
+  .review-headline strong,
+  .lever-focus strong {
+    display: block;
+    font-size: 14px;
+    line-height: 1.25;
+  }
+  .cockpit-hero p {
+    margin: 2px 0 0;
+    font-size: 12px;
+  }
+  .cockpit-hero em {
+    color: currentColor;
+    font-size: 11px;
+    font-style: normal;
+    opacity: 0.72;
+  }
+  .cockpit-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .cockpit-kpis div {
+    border: 1px solid rgba(23, 59, 37, 0.18);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.68);
+    padding: 7px;
+  }
+  .cockpit-kpis span,
+  .review-headline span,
+  .lever-focus span {
+    display: block;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .cockpit-kpis strong {
+    display: block;
+    margin-top: 2px;
+    color: inherit;
+    font-size: 13px;
+  }
+  .cockpit-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 10px;
+  }
+  .review-card {
+    min-width: 0;
+  }
+  .review-headline,
+  .lever-focus {
+    margin-bottom: 8px;
+  }
+  .review-walk-compact,
+  .impact-list-compact,
+  .experiment-list-compact {
+    display: grid;
+    gap: 4px;
+  }
+  .review-walk-compact div,
+  .impact-list-compact div,
+  .experiment-list-compact div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid #edf0f4;
+    padding: 5px 0;
+    font-size: 12px;
+  }
+  .review-walk-compact span,
+  .impact-list-compact span,
+  .experiment-list-compact span {
+    min-width: 0;
+    overflow: hidden;
+    color: #17202a;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .review-walk-compact strong,
+  .impact-list-compact strong,
+  .experiment-list-compact strong {
+    color: #475569;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .inline-plan {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .inline-plan label,
+  .review-composer-compact label,
+  .field-grid-compact label {
+    margin: 0;
+  }
+  .action-card {
+    display: grid;
+    gap: 8px;
+  }
+  .review-composer-compact {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.35fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+  .wide-field,
+  .field-grid-compact,
+  .action-buttons,
+  .compact-queue {
+    grid-column: 1 / -1;
+  }
+  .field-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .field-grid-compact.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .side-grid,
+  .history-grid {
+    align-items: start;
+  }
+  .tight {
+    margin-top: 8px;
+  }
+  .compact-pickers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .compact-event {
+    padding: 6px 0;
+  }
+  @media (max-width: 720px) {
+    .panel {
+      width: min(100%, 100%);
+    }
+    .cockpit-grid,
+    .cockpit-kpis,
+    .review-composer-compact,
+    .field-grid-compact,
+    .field-grid-compact.three,
+    .inline-plan,
+    .compact-pickers {
+      grid-template-columns: 1fr;
+    }
+  }
+
   :global(.dark) .panel {
     background: #161616;
     border-left-color: var(--type-color);
@@ -863,6 +1279,52 @@
     font-size: 12px;
     margin-bottom: 8px;
   }
+  .operating-context {
+    border: 1px solid #bbf0cf;
+    border-radius: 8px;
+    background: #f0fdf4;
+    padding: 10px;
+    color: #14532d;
+  }
+  .operating-context.error {
+    border-color: #f3c969;
+    background: #fff8df;
+    color: #6f4b00;
+  }
+  .operating-context strong {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+  .operating-context p,
+  .operating-context em,
+  .failed-bindings {
+    display: block;
+    margin: 0 0 7px;
+    font-size: 12px;
+  }
+  .operating-context em {
+    opacity: 0.75;
+    font-style: normal;
+  }
+  .status-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin: 8px 0;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .status-metrics span {
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    opacity: 0.8;
+    padding: 3px 7px;
+  }
+  .failed-bindings {
+    overflow-wrap: anywhere;
+    opacity: 0.85;
+  }
   .op-alert,
   .op-warning {
     border: 1px solid #f3c969;
@@ -894,6 +1356,7 @@
     color: #475569;
   }
   input,
+  select,
   textarea {
     min-height: 30px;
     border: 1px solid #cbd5df;
@@ -903,6 +1366,43 @@
   }
   textarea {
     resize: vertical;
+  }
+  .evidence-status {
+    border: 1px solid #9ed7b5;
+    border-radius: 999px;
+    color: #17663a;
+    background: #eefaf2;
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 750;
+    margin-bottom: 8px;
+    padding: 3px 8px;
+  }
+  .evidence-status.warn {
+    border-color: #f0cc78;
+    color: #7a5308;
+    background: #fff7df;
+  }
+  .queued-decisions {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .queued-decisions > div {
+    border: 1px solid #edf0f4;
+    border-radius: 6px;
+    display: grid;
+    gap: 2px;
+    padding: 7px;
+  }
+  .queued-decisions span {
+    color: #64748b;
+    font-size: 11px;
+    text-transform: capitalize;
+  }
+  .queued-decisions button {
+    justify-self: start;
+    margin-top: 2px;
   }
   .review-pickers {
     display: grid;
@@ -930,6 +1430,42 @@
     border-color: #2a2a2a;
     background: #161616;
   }
+  :global(.dark) .cockpit-card {
+    border-color: #2a2a2a;
+    background: #181818;
+  }
+  :global(.dark) .cockpit-hero {
+    border-color: #235b38;
+    background: rgba(15, 44, 27, 0.94);
+    color: #bdf0ca;
+  }
+  :global(.dark) .cockpit-hero.error {
+    border-color: #7a5a1d;
+    background: rgba(55, 39, 12, 0.94);
+    color: #f8dda2;
+  }
+  :global(.dark) .cockpit-kpis div {
+    border-color: rgba(189, 240, 202, 0.18);
+    background: rgba(255, 255, 255, 0.04);
+  }
+  :global(.dark) .review-walk-compact div,
+  :global(.dark) .impact-list-compact div,
+  :global(.dark) .experiment-list-compact div,
+  :global(.dark) .event-row {
+    border-color: #2a2a2a;
+  }
+  :global(.dark) .review-walk-compact span,
+  :global(.dark) .impact-list-compact span,
+  :global(.dark) .experiment-list-compact span {
+    color: #ece7dd;
+  }
+  :global(.dark) input,
+  :global(.dark) select,
+  :global(.dark) textarea {
+    border-color: #343434;
+    background: #111;
+    color: #ece7dd;
+  }
   .event-row {
     display: grid;
     gap: 2px;
@@ -939,5 +1475,15 @@
   }
   .event-row span {
     color: #64748b;
+  }
+  :global(.dark) .operating-context {
+    border-color: #235b38;
+    background: rgba(15, 44, 27, 0.94);
+    color: #bdf0ca;
+  }
+  :global(.dark) .operating-context.error {
+    border-color: #7a5a1d;
+    background: rgba(55, 39, 12, 0.94);
+    color: #f8dda2;
   }
 </style>

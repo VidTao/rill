@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthoredMetricTree } from "./authored-tree";
 import {
   metricBindingKey,
   planLiveMetricRequests,
+  resolveMetricTreeLiveValues,
   resolveMetricTreeValues,
 } from "./live-tree";
 
@@ -16,6 +17,10 @@ function tree(nodes: AuthoredMetricTree["nodes"]): AuthoredMetricTree {
 }
 
 describe("metric tree live bindings", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
   it("groups Rill metrics-view bindings into live requests", () => {
     const t = tree([
       {
@@ -127,6 +132,63 @@ describe("metric tree live bindings", () => {
       driftPercent: 0.1,
       sourceStatus: "live",
     });
+  });
+
+
+
+  it("sanitizes HTML 502 responses from grouped live metric requests", async () => {
+    const t = tree([
+      { id: "traffic", parentId: null, label: "Traffic", type: "driver", unit: "count", value: 123, metricBinding: { source: "rill_metrics_view", metricsView: "d2c_metric_tree_drivers_metrics", measure: "metric_traffic_visitors" } },
+      { id: "conversion", parentId: null, label: "Conversion", type: "lever", unit: "percent", value: 0.04, metricBinding: { source: "rill_metrics_view", metricsView: "d2c_metric_tree_drivers_metrics", measure: "metric_conversion_rate" } },
+    ]);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(`<!doctype html><html><body><h1>502 Bad Gateway</h1><center>nginx/1.24.0</center></body></html>`, { status: 502 })));
+
+    const resolved = await resolveMetricTreeLiveValues({
+      tree: t,
+      instanceId: "paw_origins_llc",
+      hasTimeSeries: true,
+      timeRange: { isoDuration: "P30D" },
+    });
+
+    expect(resolved?.nodeResolutions.traffic).toMatchObject({
+      value: 123,
+      sourceStatus: "error",
+      sourceError: "d2c_metric_tree_drivers_metrics.metric_traffic_visitors, metric_conversion_rate: Metric query failed (502)",
+    });
+    expect(resolved?.nodeResolutions.conversion.value).toBe(0.04);
+    expect(resolved?.liveWarnings).toEqual([
+      "d2c_metric_tree_drivers_metrics.metric_traffic_visitors, metric_conversion_rate: Metric query failed (502)",
+    ]);
+    expect(JSON.stringify(resolved)).not.toMatch(/<html|nginx|Bad Gateway/i);
+  });
+
+  it("keeps current live values when only the comparison request fails", async () => {
+    const t = tree([
+      { id: "traffic", parentId: null, label: "Traffic", type: "driver", unit: "count", value: 123, metricBinding: { source: "rill_metrics_view", metricsView: "d2c_metric_tree_drivers_metrics", measure: "metric_traffic_visitors" } },
+    ]);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ metric_traffic_visitors: 500 }] }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response("<html><body><h1>502 Bad Gateway</h1></body></html>", { status: 502 })));
+
+    const resolved = await resolveMetricTreeLiveValues({
+      tree: t,
+      instanceId: "paw_origins_llc",
+      hasTimeSeries: true,
+      showTimeComparison: true,
+      timeRange: { isoDuration: "P30D" },
+      comparisonTimeRange: { isoOffset: "P30D" },
+    });
+
+    expect(resolved?.nodeResolutions.traffic).toMatchObject({
+      value: 500,
+      previousValue: null,
+      sourceStatus: "live",
+      sourceError: "d2c_metric_tree_drivers_metrics.metric_traffic_visitors: Metric query failed (502)",
+    });
+    expect(resolved?.liveWarnings).toEqual([
+      "d2c_metric_tree_drivers_metrics.metric_traffic_visitors: Metric query failed (502)",
+    ]);
+    expect(JSON.stringify(resolved)).not.toMatch(/<html|Bad Gateway/i);
   });
 
   it("marks unresolved live bindings as errors instead of silently using fallback", () => {
