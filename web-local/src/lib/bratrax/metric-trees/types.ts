@@ -148,7 +148,44 @@ export interface CreateMetricTreeEventPayload {
   nextAction?: string;
 }
 
-export type MetricTreeReviewActionType = "none" | "log_decision" | "result_readout" | "create_traffic_source_test";
+export type MetricTreeReviewActionType =
+  | "none"
+  | "guided_review"
+  | "log_decision"
+  | "result_readout"
+  | "create_traffic_source_test"
+  | "update_lever_plan";
+
+export interface MetricTreeReviewDecision {
+  actionType: Exclude<MetricTreeReviewActionType, "none" | "guided_review">;
+  nodeId?: string;
+  leverNodeId?: string;
+  experimentNodeId?: string;
+  note?: string;
+  outcome?: "won" | "lost" | "shipped";
+  nextAction?: string;
+  owner?: string | null;
+  target?: number | null;
+  targetDate?: string | null;
+  trafficSourceTest?: Record<string, unknown>;
+  evidenceSnapshot?: Record<string, unknown>;
+  eventId?: string;
+  followUpNodeId?: string;
+}
+
+export interface MetricTreeReviewSummary {
+  rootNodeId?: string;
+  rootLabel?: string;
+  rootDelta?: number | null;
+  rootValue?: number | null;
+  chosenLeverId?: string;
+  chosenLeverLabel?: string;
+  chosenLeverOwner?: string | null;
+  chosenLeverTarget?: number | null;
+  timeLabel?: string;
+  stopReason?: string;
+  warnings?: string[];
+}
 
 export interface MetricTreeReviewSession {
   session_id: string;
@@ -162,6 +199,10 @@ export interface MetricTreeReviewSession {
   topLevers?: Array<Record<string, unknown>>;
   evidenceSnapshot?: Record<string, unknown>;
   action_type: MetricTreeReviewActionType;
+  status?: "draft" | "completed";
+  completed_at?: string;
+  decisions?: MetricTreeReviewDecision[];
+  summary?: MetricTreeReviewSummary;
   decision_event_id?: string;
   follow_up_node_id?: string;
   note?: string;
@@ -181,6 +222,9 @@ export interface CreateMetricTreeReviewSessionPayload {
   topLevers?: Array<Record<string, unknown>>;
   evidenceSnapshot?: Record<string, unknown>;
   actionType: MetricTreeReviewActionType;
+  status?: "draft" | "completed";
+  summary?: MetricTreeReviewSummary;
+  decisions?: MetricTreeReviewDecision[];
   note?: string;
   outcome?: string;
   nextAction?: string;

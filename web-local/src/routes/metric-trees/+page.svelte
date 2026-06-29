@@ -11,6 +11,7 @@
   import {
     createMetricNode,
     createMetricTreeEvent,
+    createMetricTreeReviewSession,
     createStarterTree,
     deleteMetricNode,
     getMetricTree,
@@ -33,9 +34,12 @@
     GoodDirection,
     MetricBindingFilter,
     MetricNodeType,
+    CreateMetricTreeReviewSessionPayload,
     MetricTreeDecisionEventType,
     MetricTreeEvent,
     MetricTreeEvidence,
+    MetricTreeReviewActionType,
+    MetricTreeReviewDecision,
     MetricTreeReviewSession,
     MetricUnit,
   } from "$lib/bratrax/metric-trees/types";
@@ -153,6 +157,19 @@
   let eventsLoading = false;
   let reviewSessions: MetricTreeReviewSession[] = [];
   let reviewSessionsLoading = false;
+  let reviewDecisionQueue: MetricTreeReviewDecision[] = [];
+  let reviewSaving = false;
+  let reviewAction: Exclude<MetricTreeReviewActionType, "none" | "guided_review"> = "log_decision";
+  let reviewDecisionNote = "";
+  let reviewNextAction = "";
+  let reviewOutcome: "won" | "lost" | "shipped" = "won";
+  let reviewTrafficLabel = "New traffic-source test";
+  let reviewTrafficSource = "";
+  let reviewTrafficCampaign = "";
+  let reviewTrafficChannel = "";
+  let reviewLeverOwner = "";
+  let reviewLeverTarget: number | null = null;
+  let reviewLeverTargetDate = "";
   let decisionEventType: MetricTreeDecisionEventType = "decision";
   let decisionNote = "";
   let decisionSaving = false;
@@ -208,6 +225,9 @@
   $: selectedRankedLever = selectedDraft?.type === "lever"
     ? rankedLevers.find((r) => r.nodeId === selectedDraft?.id) ?? null
     : null;
+  $: suggestedReviewLever = reviewLeverCandidate();
+  $: reviewLeverExperiments = suggestedReviewLever ? experimentsUnderLever(suggestedReviewLever.id) : [];
+  $: reviewEvidenceWarnings = evidenceWarningsForReview();
   $: selectedMeasurementReadiness = selectedDraft?.type === "experiment"
     ? measurementReadiness(selectedDraft.measurementBinding)
     : null;
@@ -446,6 +466,7 @@
     setSelectedId(resolveSelectedId(tree, preferredNodeId));
     serverMessage = "";
     clearEvidence();
+    resetReviewDraft();
     await loadEvents(treeId);
     await loadReviewSessions(treeId);
   }
@@ -583,6 +604,206 @@
           : "Could not load experiment evidence.";
     } finally {
       evidenceLoading = false;
+    }
+  }
+
+  function resetReviewDraft() {
+    reviewDecisionQueue = [];
+    reviewAction = "log_decision";
+    reviewDecisionNote = "";
+    reviewNextAction = "";
+    reviewOutcome = "won";
+    reviewTrafficLabel = "New traffic-source test";
+    reviewTrafficSource = "";
+    reviewTrafficCampaign = "";
+    reviewTrafficChannel = "";
+    reviewLeverOwner = "";
+    reviewLeverTarget = null;
+    reviewLeverTargetDate = "";
+  }
+
+  function nodeById(id: string | null | undefined): AuthoredMetricNode | null {
+    if (!id) return null;
+    return nodes.find((n) => n.id === id) ?? null;
+  }
+
+  function descendantsOf(parentId: string): AuthoredMetricNode[] {
+    const out: AuthoredMetricNode[] = [];
+    const stack = childrenOf(nodes, parentId);
+    while (stack.length) {
+      const next = stack.shift();
+      if (!next) continue;
+      out.push(next);
+      stack.push(...childrenOf(nodes, next.id));
+    }
+    return out;
+  }
+
+  function reviewLeverCandidate(): AuthoredMetricNode | null {
+    if (selectedNode?.type === "lever") return selectedNode;
+    if (reviewWalk?.stopReason === "lever") {
+      const stopped = reviewWalk.steps[reviewWalk.steps.length - 1];
+      const node = nodeById(stopped?.nodeId);
+      if (node?.type === "lever") return node;
+    }
+    const ranked = nodeById(rankedLevers[0]?.nodeId);
+    return ranked?.type === "lever" ? ranked : null;
+  }
+
+  function experimentsUnderLever(leverId: string): AuthoredMetricNode[] {
+    return descendantsOf(leverId).filter((n) => n.type === "experiment");
+  }
+
+  function evidenceWarningsForReview(): string[] {
+    const warnings: string[] = [];
+    if (selectedNode?.type === "experiment") {
+      if (selectedNode.measurementBinding && evidenceLoading) warnings.push("Experiment evidence is still loading.");
+      if (selectedNode.measurementBinding && evidenceError) warnings.push(`Experiment evidence failed: ${evidenceError}`);
+      if (selectedNode.measurementBinding && (!evidence || evidence.status !== "ok")) warnings.push("Experiment has a measurement binding but no loaded evidence snapshot.");
+      if (!selectedNode.measurementBinding) warnings.push("Selected experiment has no measurement binding.");
+    }
+    if (!reviewWalk?.steps?.length) warnings.push("Review walk is empty because live movement is unavailable.");
+    if (!suggestedReviewLever) warnings.push("No accountable lever selected.");
+    return warnings;
+  }
+
+  function reviewEvidenceSnapshot(): Record<string, unknown> {
+    return {
+      selectedNodeId: selectedNode?.id ?? null,
+      selectedNodeLabel: selectedNode?.label ?? null,
+      evidence: evidence ?? null,
+      guardrailLive,
+      warnings: reviewEvidenceWarnings,
+      capturedAt: new Date().toISOString(),
+    };
+  }
+
+  function reviewSummaryPayload(): NonNullable<CreateMetricTreeReviewSessionPayload["summary"]> {
+    return {
+      rootNodeId: root?.id,
+      rootLabel: root?.label,
+      rootDelta: root?.delta ?? null,
+      rootValue: root ? rollup.values[root.id] ?? root.value ?? null : null,
+      chosenLeverId: suggestedReviewLever?.id,
+      chosenLeverLabel: suggestedReviewLever?.label,
+      chosenLeverOwner: suggestedReviewLever?.owner ?? null,
+      chosenLeverTarget: suggestedReviewLever?.target ?? null,
+      timeLabel: timeContext.label,
+      stopReason: reviewWalk?.stopReason,
+      warnings: reviewEvidenceWarnings,
+    };
+  }
+
+  function resetReviewComposer() {
+    reviewDecisionNote = "";
+    reviewNextAction = "";
+    reviewTrafficLabel = "New traffic-source test";
+    reviewTrafficSource = "";
+    reviewTrafficCampaign = "";
+    reviewTrafficChannel = "";
+    reviewLeverOwner = "";
+    reviewLeverTarget = null;
+    reviewLeverTargetDate = "";
+  }
+
+  function queueReviewDecision() {
+    if (!tree) return;
+    const lever = suggestedReviewLever;
+    const note = reviewDecisionNote.trim();
+    let decision: MetricTreeReviewDecision | null = null;
+    if (reviewAction === "log_decision") {
+      if (!note) return;
+      decision = {
+        actionType: "log_decision",
+        nodeId: selectedNode?.id ?? lever?.id ?? root?.id,
+        note,
+        nextAction: reviewNextAction.trim() || undefined,
+      };
+    } else if (reviewAction === "update_lever_plan") {
+      if (!lever) return;
+      decision = {
+        actionType: "update_lever_plan",
+        leverNodeId: lever.id,
+        note: note || "Updated lever plan",
+        owner: reviewLeverOwner.trim() || lever.owner || null,
+        target: reviewLeverTarget == null ? lever.target ?? null : Number(reviewLeverTarget),
+        targetDate: reviewLeverTargetDate || lever.targetDate || null,
+        nextAction: reviewNextAction.trim() || undefined,
+      };
+    } else if (reviewAction === "result_readout") {
+      if (selectedNode?.type !== "experiment") return;
+      if (selectedNode.measurementBinding && (!evidence || evidence.status !== "ok" || evidenceLoading || evidenceError)) return;
+      decision = {
+        actionType: "result_readout",
+        experimentNodeId: selectedNode.id,
+        note: note || `Marked ${reviewOutcome}`,
+        outcome: reviewOutcome,
+        nextAction: reviewNextAction.trim() || undefined,
+        evidenceSnapshot: reviewEvidenceSnapshot(),
+      };
+    } else if (reviewAction === "create_traffic_source_test") {
+      if (!lever) return;
+      if (!reviewTrafficSource.trim() && !reviewTrafficCampaign.trim() && !reviewTrafficChannel.trim()) return;
+      decision = {
+        actionType: "create_traffic_source_test",
+        leverNodeId: lever.id,
+        note: note || "Create traffic-source test",
+        nextAction: reviewNextAction.trim() || undefined,
+        trafficSourceTest: {
+          label: reviewTrafficLabel.trim() || "New traffic-source test",
+          source: reviewTrafficSource.trim() || undefined,
+          campaign: reviewTrafficCampaign.trim() || undefined,
+          channel_group: reviewTrafficChannel.trim() || undefined,
+          startDate: isoDate(new Date()),
+          attributionModel: "first_touch",
+          primaryMeasure: "metric_nc_cpa",
+        },
+      };
+    }
+    if (!decision) return;
+    reviewDecisionQueue = [...reviewDecisionQueue, decision];
+    resetReviewComposer();
+  }
+
+  function removeQueuedReviewDecision(index: number) {
+    reviewDecisionQueue = reviewDecisionQueue.filter((_, i) => i !== index);
+  }
+
+  function queuedDecisionLabel(decision: MetricTreeReviewDecision): string {
+    if (decision.actionType === "log_decision") return decision.note || "Decision";
+    if (decision.actionType === "update_lever_plan") return `Update ${nodeById(decision.leverNodeId)?.label ?? "lever plan"}`;
+    if (decision.actionType === "result_readout") return `${nodeById(decision.experimentNodeId)?.label ?? "Experiment"}: ${decision.outcome}`;
+    if (decision.actionType === "create_traffic_source_test") return String(decision.trafficSourceTest?.label ?? "Traffic-source test");
+    return decision.actionType;
+  }
+
+  async function saveGuidedReviewSession() {
+    if (!tree || !root || !suggestedReviewLever || !reviewDecisionQueue.length) return;
+    reviewSaving = true;
+    error = "";
+    try {
+      await createMetricTreeReviewSession(tree.tree_id, {
+        actionType: "guided_review",
+        status: "completed",
+        selectedNodeId: selectedNode?.id ?? root.id,
+        chosenLeverNodeId: suggestedReviewLever.id,
+        experimentNodeId: selectedNode?.type === "experiment" ? selectedNode.id : undefined,
+        timeRange: timeContext.timeRange,
+        reviewWalk: reviewWalk?.steps ?? [],
+        topLevers: rankedLevers.slice(0, 8),
+        evidenceSnapshot: reviewEvidenceSnapshot(),
+        summary: reviewSummaryPayload(),
+        decisions: reviewDecisionQueue,
+        note: reviewDecisionQueue[0]?.note ?? "Guided review",
+        nextAction: reviewDecisionQueue[0]?.nextAction,
+      });
+      serverMessage = "Review session saved.";
+      resetReviewDraft();
+      await loadTree(tree.tree_id, selectedNode?.id ?? suggestedReviewLever.id);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Could not save review session.";
+    } finally {
+      reviewSaving = false;
     }
   }
 
@@ -1160,28 +1381,148 @@
               </div>
             </section>
 
+            <div class="review-grid">
+              <section class="review-block">
+                <div class="section-title">Top-down review walk</div>
+                <div class="review-walk">
+                  {#each reviewWalk?.steps ?? [] as step}
+                    <button type="button" on:click={() => setSelectedId(step.nodeId)}>
+                      <span style={`padding-left: ${step.depth * 14}px`}>{step.label}</span>
+                      <strong>{formatValue(step.delta ?? 0, step.node.unit)}</strong>
+                    </button>
+                  {/each}
+                </div>
+              </section>
+
+              <section class="review-block">
+                <div class="section-title">Highest root-impact levers</div>
+                <div class="impact-list">
+                  {#each rankedLevers.slice(0, 8) as item}
+                    <button type="button" class:active={item.nodeId === suggestedReviewLever?.id} on:click={() => setSelectedId(item.nodeId)}>
+                      <span>{item.label}</span>
+                      <strong>{item.rootImpact == null ? "unsized" : formatValue(item.rootImpact, root?.unit)}</strong>
+                    </button>
+                  {/each}
+                </div>
+              </section>
+            </div>
+
             <section class="review-block">
-              <div class="section-title">Top-down review walk</div>
-              <div class="review-walk">
-                {#each reviewWalk?.steps ?? [] as step}
-                  <button type="button" on:click={() => setSelectedId(step.nodeId)}>
-                    <span style={`padding-left: ${step.depth * 14}px`}>{step.label}</span>
-                    <strong>{formatValue(step.delta ?? 0, step.node.unit)}</strong>
-                  </button>
-                {/each}
-              </div>
+              <div class="section-title">Accountable lever</div>
+              {#if suggestedReviewLever}
+                <div class="review-lever-card">
+                  <div>
+                    <span>Lever</span>
+                    <strong>{suggestedReviewLever.label}</strong>
+                  </div>
+                  <div>
+                    <span>Owner</span>
+                    <strong>{suggestedReviewLever.owner || "Unassigned"}</strong>
+                  </div>
+                  <div>
+                    <span>Target</span>
+                    <strong>{formatValue(suggestedReviewLever.target ?? null, suggestedReviewLever.unit)}</strong>
+                  </div>
+                  <div>
+                    <span>Target date</span>
+                    <strong>{suggestedReviewLever.targetDate || "No date"}</strong>
+                  </div>
+                </div>
+              {:else}
+                <div class="empty">Select a lever or resolve live movement so the review can stop at one.</div>
+              {/if}
             </section>
 
             <section class="review-block">
-              <div class="section-title">Highest root-impact levers</div>
-              <div class="impact-list">
-                {#each rankedLevers.slice(0, 8) as item}
-                  <button type="button" on:click={() => setSelectedId(item.nodeId)}>
-                    <span>{item.label}</span>
-                    <strong>{item.rootImpact == null ? "unsized" : formatValue(item.rootImpact, root?.unit)}</strong>
-                  </button>
-                {/each}
+              <div class="section-title">Experiments under lever</div>
+              {#if !reviewLeverExperiments.length}
+                <div class="empty">No experiments under the chosen lever.</div>
+              {:else}
+                <div class="review-experiments">
+                  {#each reviewLeverExperiments as experiment}
+                    {@const readiness = measurementReadiness(experiment.measurementBinding)}
+                    <button type="button" class:active={selectedNode?.id === experiment.id} on:click={() => setSelectedId(experiment.id)}>
+                      <span>{experiment.label}</span>
+                      <small>{experiment.status || "backlog"} · {readiness.ready ? "measured" : `missing ${readiness.missing.join(", ")}`}</small>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <section class="review-block">
+              <div class="section-title">Decision queue</div>
+              {#if reviewEvidenceWarnings.length}
+                <div class="readiness">
+                  {reviewEvidenceWarnings.join(" ")}
+                </div>
+              {/if}
+              <div class="review-composer">
+                <label>
+                  Action
+                  <select bind:value={reviewAction}>
+                    <option value="log_decision">Decision</option>
+                    <option value="update_lever_plan">Update lever plan</option>
+                    <option value="result_readout" disabled={selectedNode?.type !== "experiment"}>Result readout</option>
+                    <option value="create_traffic_source_test" disabled={!suggestedReviewLever}>Create traffic-source test</option>
+                  </select>
+                </label>
+
+                {#if reviewAction === "result_readout"}
+                  <label>
+                    Outcome
+                    <select bind:value={reviewOutcome}>
+                      <option value="won">Won</option>
+                      <option value="lost">Lost</option>
+                      <option value="shipped">Shipped</option>
+                    </select>
+                  </label>
+                {:else if reviewAction === "update_lever_plan"}
+                  <div class="field-grid three">
+                    <label>Owner<input bind:value={reviewLeverOwner} placeholder={suggestedReviewLever?.owner || "Owner"} /></label>
+                    <label>Target<input type="number" step="any" bind:value={reviewLeverTarget} placeholder={String(suggestedReviewLever?.target ?? "")} /></label>
+                    <label>Target date<input type="date" bind:value={reviewLeverTargetDate} /></label>
+                  </div>
+                {:else if reviewAction === "create_traffic_source_test"}
+                  <div class="field-grid">
+                    <label>Label<input bind:value={reviewTrafficLabel} /></label>
+                    <label>Source<input bind:value={reviewTrafficSource} placeholder="reddit" /></label>
+                    <label>Campaign<input bind:value={reviewTrafficCampaign} placeholder="prospecting test" /></label>
+                    <label>Channel<input bind:value={reviewTrafficChannel} placeholder="paid social" /></label>
+                  </div>
+                {/if}
+
+                <label>
+                  Review note
+                  <textarea rows="3" bind:value={reviewDecisionNote} placeholder="What did we decide in this review?" />
+                </label>
+                <label>
+                  Next action
+                  <input bind:value={reviewNextAction} placeholder="Owner and next move" />
+                </label>
+                <button type="button" on:click={queueReviewDecision} disabled={!canEditWorkspace || reviewSaving}>Add to queue</button>
               </div>
+
+              {#if reviewDecisionQueue.length}
+                <div class="queued-decisions">
+                  {#each reviewDecisionQueue as decision, index}
+                    <div>
+                      <span>{decision.actionType.replaceAll("_", " ")}</span>
+                      <strong>{queuedDecisionLabel(decision)}</strong>
+                      <button type="button" on:click={() => removeQueuedReviewDecision(index)}>Remove</button>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <div class="empty">Queue one or more decisions, then save the review session.</div>
+              {/if}
+
+              <button
+                type="button"
+                class="primary"
+                on:click={saveGuidedReviewSession}
+                disabled={!canEditWorkspace || reviewSaving || !suggestedReviewLever || !reviewDecisionQueue.length}
+              >Save review session</button>
             </section>
           </div>
         {:else}
@@ -2052,7 +2393,10 @@
   .backlog,
   .decision-lines,
   .impact-list,
-  .review-walk {
+  .review-walk,
+  .review-experiments,
+  .review-composer,
+  .queued-decisions {
     display: grid;
     gap: 6px;
   }
@@ -2061,7 +2405,8 @@
   .issues button,
   .backlog button,
   .impact-list button,
-  .review-walk button {
+  .review-walk button,
+  .review-experiments button {
     width: 100%;
     justify-content: space-between;
     text-align: left;
@@ -2073,7 +2418,9 @@
     gap: 3px;
   }
 
-  .tree-list button.active {
+  .tree-list button.active,
+  .impact-list button.active,
+  .review-experiments button.active {
     border-color: #245bdb;
     background: #eef4ff;
   }
@@ -2147,13 +2494,21 @@
     grid-template-columns: 1fr 120px 64px;
   }
 
+  .review-grid,
+  .review-lever-card {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
   .review-summary {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
   }
 
-  .review-summary div {
+  .review-summary div,
+  .review-lever-card div {
     border: 1px solid #edf0f4;
     border-radius: 6px;
     padding: 10px;
