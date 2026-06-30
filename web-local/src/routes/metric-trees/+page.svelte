@@ -241,8 +241,12 @@
       return (b.score ?? -1) - (a.score ?? -1);
     });
   $: ownershipRoster = ownershipRosterFor(storedNodes);
+  $: currentUserId = $bratraxUser?.id ?? null;
+  $: myOwnerKey = currentUserId != null ? `user:${currentUserId}` : null;
+  $: myOwnership = myOwnerKey ? ownershipRoster.find((owner) => owner.ownerKey === myOwnerKey) ?? null : null;
   $: activeOwnerFilter = ownerFilter && ownershipRoster.some((owner) => owner.ownerKey === ownerFilter) ? ownerFilter : null;
   $: activeOwnerLabel = ownershipRoster.find((owner) => owner.ownerKey === activeOwnerFilter)?.owner ?? null;
+  $: myActionItemCount = myOwnership ? ownershipItemCount(myOwnership) : 0;
   $: filteredRankedLevers = rankedLevers.filter((item) => ownerMatchesNode(activeOwnerFilter, nodeById(item.nodeId, nodes)));
   $: filteredExperiments = experiments.filter((item) => ownerMatchesNode(activeOwnerFilter, item.node));
   $: selectedRankedLever = selectedDraft?.type === "lever"
@@ -755,6 +759,10 @@
 
   function ownershipItemCount(owner: OwnershipPersona): number {
     return owner.leverCount + owner.experimentCount;
+  }
+
+  function selectMyOperatingView() {
+    if (myOwnerKey && myOwnership) ownerFilter = myOwnerKey;
   }
 
   function selectOwnerFilter(owner: string | null) {
@@ -1549,6 +1557,20 @@
       <section>
         <div class="section-title">Ownership</div>
         <div class="ownership-summary">{ownerCoverageLabel(ownershipRoster)}</div>
+        {#if myOwnership}
+          <button
+            type="button"
+            class="my-work-button"
+            class:active={activeOwnerFilter === myOwnerKey}
+            on:click={selectMyOperatingView}
+          >
+            <span>My work</span>
+            <strong>{myActionItemCount}</strong>
+            <small>{myOwnership.leverCount} levers · {myOwnership.experimentCount} experiments</small>
+          </button>
+        {:else if currentUserId != null}
+          <div class="my-work-empty">No levers or experiments assigned to you yet.</div>
+        {/if}
         <div class="ownership-list">
           <button
             type="button"

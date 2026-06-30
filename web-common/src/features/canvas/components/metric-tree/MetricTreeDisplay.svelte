@@ -77,6 +77,7 @@
   };
 
   type TeamMember = { id: number; email: string; name: string; role: string };
+  type CurrentUser = { id: number; email: string; name: string; role: string };
 
   type OperatingStatus = {
     liveCount: number;
@@ -130,6 +131,7 @@
   let authoredOperatingError: string | null = null;
   let authoredOperatingSaving = false;
   let authoredTeamMembers: TeamMember[] = [];
+  let authoredCurrentUser: CurrentUser | null = null;
   let authoredTeamKey: string | null = null;
 
   async function loadAuthoredTree(treeId: string) {
@@ -280,10 +282,15 @@
   async function loadAuthoredTeamMembers(treeId: string) {
     authoredTeamKey = treeId;
     try {
-      const res = await bratraxFetch<{ members?: TeamMember[] }>("/bratrax/settings/team");
-      authoredTeamMembers = res.members ?? [];
+      const [team, me] = await Promise.all([
+        bratraxFetch<{ members?: TeamMember[] }>("/bratrax/settings/team"),
+        bratraxFetch<{ user?: CurrentUser }>("/bratrax/auth/me"),
+      ]);
+      authoredTeamMembers = team.members ?? [];
+      authoredCurrentUser = me.user ?? null;
     } catch {
       authoredTeamMembers = [];
+      authoredCurrentUser = null;
     }
   }
 
@@ -976,7 +983,8 @@
         authoredNodeLabels={authoredNodeLabels}
         authoredLeverExperiments={authoredLeverExperiments}
         authoredOwnershipRoster={authoredOwnershipRoster}
-      authoredTeamMembers={authoredTeamMembers}
+        authoredTeamMembers={authoredTeamMembers}
+        authoredCurrentUserId={authoredCurrentUser?.id ?? null}
         onUpdateAuthoredNode={updateAuthoredNode}
         onCreateAuthoredEvent={createAuthoredEvent}
         onCreateReviewSession={createReviewSession}

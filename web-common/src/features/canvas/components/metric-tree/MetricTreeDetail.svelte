@@ -142,6 +142,7 @@
   export let authoredLeverExperiments: AuthoredOperatingNode[] = [];
   export let authoredOwnershipRoster: OwnershipPersona[] = [];
   export let authoredTeamMembers: Array<{ id: number; email: string; name: string; role: string }> = [];
+  export let authoredCurrentUserId: number | null = null;
   export let onUpdateAuthoredNode: (nodeId: string, patch: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateAuthoredEvent: (nodeId: string, payload: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateReviewSession: (payload: Record<string, unknown>) => Promise<void> = async () => {};
@@ -150,6 +151,10 @@
 
   type TabId = "summary" | "operate" | "relationships" | "evidence" | "personas" | "logs";
   let activeTab: TabId = "summary";
+
+  $: myOwnerKey = authoredCurrentUserId != null ? `user:${authoredCurrentUserId}` : null;
+  $: myOwnership = myOwnerKey ? authoredOwnershipRoster.find((owner) => owner.ownerKey === myOwnerKey) ?? null : null;
+  $: myOwnershipCount = myOwnership ? myOwnership.leverCount + myOwnership.experimentCount : 0;
 
   $: typeTheme = node ? nodeTypeTheme(node.nodeType) : nodeTypeTheme(null);
   $: healthTheme = node ? statusTheme(node.status) : statusTheme(null);
@@ -910,6 +915,13 @@
 
           <section class="cockpit-card ownership-card">
             <div class="section-label">Ownership map</div>
+            {#if myOwnership}
+              <div class="my-owner-summary">
+                <span>Your work</span>
+                <strong>{myOwnershipCount}</strong>
+                <em>{myOwnership.leverCount} levers · {myOwnership.experimentCount} experiments</em>
+              </div>
+            {/if}
             {#if authoredOwnershipRoster.length}
               <div class="owner-list-compact">
                 {#each authoredOwnershipRoster.slice(0, 5) as owner}
@@ -1247,6 +1259,28 @@
     font-size: 11px;
     white-space: nowrap;
   }
+  .my-owner-summary {
+    background: #f7fbff;
+    border: 1px solid #bfdbfe;
+    border-radius: 7px;
+    display: grid;
+    gap: 2px;
+    grid-template-columns: 1fr auto;
+    margin-bottom: 6px;
+    padding: 7px;
+  }
+  .my-owner-summary span,
+  .my-owner-summary strong {
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .my-owner-summary em {
+    color: #64748b;
+    font-size: 11px;
+    font-style: normal;
+    grid-column: 1 / -1;
+  }
   .owner-group {
     border: 1px solid #edf0f4;
     border-radius: 7px;
@@ -1544,6 +1578,7 @@
   :global(.dark) .review-walk-compact div,
   :global(.dark) .impact-list-compact div,
   :global(.dark) .experiment-list-compact div,
+  :global(.dark) .my-owner-summary,
   :global(.dark) .owner-group,
   :global(.dark) .event-row {
     border-color: #2a2a2a;
