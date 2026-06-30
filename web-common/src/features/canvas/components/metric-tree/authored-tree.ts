@@ -13,6 +13,8 @@ export interface AuthoredMetricNode {
   goodDirection?: "up" | "down";
   formula?: { op: string; operands: string[] } | null;
   owner?: string | null;
+  ownerUserId?: number | null;
+  ownerLabel?: string | null;
   baseline?: number | null;
   target?: number | null;
   targetDate?: string | null;
@@ -68,7 +70,7 @@ function statusFor(node: AuthoredMetricNode, delta: number | null | undefined = 
 function nodeObservation(node: AuthoredMetricNode): string | null {
   const parts: string[] = [];
   if (node.formula) parts.push(`Formula: ${node.formula.op}(${node.formula.operands.join(", ")})`);
-  if (node.owner) parts.push(`Owner: ${node.owner}`);
+  if (node.ownerLabel || node.owner) parts.push(`Owner: ${node.ownerLabel || node.owner}`);
   if (node.baseline != null || node.target != null) {
     parts.push(`Baseline ${node.baseline ?? "-"} -> target ${node.target ?? "-"}${node.targetDate ? ` by ${node.targetDate}` : ""}`);
   }

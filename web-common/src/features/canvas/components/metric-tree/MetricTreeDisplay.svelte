@@ -76,6 +76,8 @@
     evidenceSnapshot?: Record<string, unknown>;
   };
 
+  type TeamMember = { id: number; email: string; name: string; role: string };
+
   type OperatingStatus = {
     liveCount: number;
     computedCount: number;
@@ -127,6 +129,8 @@
   let authoredEvidenceLoading = false;
   let authoredOperatingError: string | null = null;
   let authoredOperatingSaving = false;
+  let authoredTeamMembers: TeamMember[] = [];
+  let authoredTeamKey: string | null = null;
 
   async function loadAuthoredTree(treeId: string) {
     const requestId = ++authoredRequest;
@@ -273,6 +277,16 @@
     }
   }
 
+  async function loadAuthoredTeamMembers(treeId: string) {
+    authoredTeamKey = treeId;
+    try {
+      const res = await bratraxFetch<{ members?: TeamMember[] }>("/bratrax/settings/team");
+      authoredTeamMembers = res.members ?? [];
+    } catch {
+      authoredTeamMembers = [];
+    }
+  }
+
   async function loadAuthoredReviewSessions(treeId: string) {
     authoredReviewSessionsKey = treeId;
     authoredReviewSessionsLoading = true;
@@ -312,6 +326,7 @@
     if (nextTree.tree_id) {
       await loadAuthoredEvents(nextTree.tree_id);
       await loadAuthoredReviewSessions(nextTree.tree_id);
+      if (authoredTeamKey !== nextTree.tree_id) await loadAuthoredTeamMembers(nextTree.tree_id);
     }
   }
 
@@ -862,9 +877,18 @@
     selectedNode = n;
   }
 
+  function metricTreeWorkspaceHref(treeId: string, nodeId: string | null): string {
+    const params = new URLSearchParams({
+      tree_id: treeId,
+      mode: "review",
+    });
+    if (nodeId) params.set("node_id", nodeId);
+    return `/metric-trees?${params.toString()}`;
+  }
+
   $: workspaceHref =
     authoredMode && spec.tree_id
-      ? `/metric-trees?tree_id=${encodeURIComponent(spec.tree_id)}${selectedNode ? `&node_id=${encodeURIComponent(selectedNode.id)}` : ""}`
+      ? metricTreeWorkspaceHref(spec.tree_id, selectedNode?.id ?? null)
       : null;
 
   $: ({ title, description, show_description_as_tooltip } = spec);
@@ -952,6 +976,7 @@
         authoredNodeLabels={authoredNodeLabels}
         authoredLeverExperiments={authoredLeverExperiments}
         authoredOwnershipRoster={authoredOwnershipRoster}
+      authoredTeamMembers={authoredTeamMembers}
         onUpdateAuthoredNode={updateAuthoredNode}
         onCreateAuthoredEvent={createAuthoredEvent}
         onCreateReviewSession={createReviewSession}

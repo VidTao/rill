@@ -25,9 +25,19 @@
     session?.experiment_node_id ||
     session?.root_node_id ||
     null;
-  $: workspaceHref = session
-    ? `/metric-trees?tree_id=${encodeURIComponent(session.tree_id)}${selectedNodeId ? `&node_id=${encodeURIComponent(selectedNodeId)}` : ""}`
-    : null;
+  function workspaceHrefForSession(nextSession: MetricTreeReviewSession, nodeId: string | null): string {
+    const params = new URLSearchParams({
+      tree_id: nextSession.tree_id,
+      mode: "review",
+      review_session_id: nextSession.session_id,
+    });
+    if (nodeId) params.set("node_id", nodeId);
+    const preset = (nextSession.timeRange as { preset?: string } | undefined)?.preset;
+    if (preset) params.set("time_preset", preset);
+    return `/metric-trees?${params.toString()}`;
+  }
+
+  $: workspaceHref = session ? workspaceHrefForSession(session, selectedNodeId) : null;
 
   function nodeLabel(nodeId: string): string {
     return tree?.nodes.find((node) => node.id === nodeId)?.label ?? nodeId;

@@ -14,6 +14,8 @@
     label: string;
     type: string;
     owner?: string | null;
+    ownerUserId?: number | null;
+    ownerLabel?: string | null;
     baseline?: number | null;
     target?: number | null;
     targetDate?: string | null;
@@ -30,6 +32,8 @@
     outcome?: "won" | "lost" | "shipped";
     nextAction?: string;
     owner?: string | null;
+    ownerUserId?: number | null;
+    ownerLabel?: string | null;
     target?: number | null;
     targetDate?: string | null;
     evidenceSnapshot?: Record<string, unknown> | null;
@@ -137,6 +141,7 @@
   export let authoredNodeLabels: Record<string, string> = {};
   export let authoredLeverExperiments: AuthoredOperatingNode[] = [];
   export let authoredOwnershipRoster: OwnershipPersona[] = [];
+  export let authoredTeamMembers: Array<{ id: number; email: string; name: string; role: string }> = [];
   export let onUpdateAuthoredNode: (nodeId: string, patch: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateAuthoredEvent: (nodeId: string, payload: Record<string, unknown>) => Promise<void> = async () => {};
   export let onCreateReviewSession: (payload: Record<string, unknown>) => Promise<void> = async () => {};
@@ -153,6 +158,8 @@
 
   let draftNodeId: string | null = null;
   let ownerDraft = "";
+  let ownerUserIdDraft: number | null = null;
+  let ownerLabelDraft = "";
   let baselineDraft: number | null = null;
   let targetDraft: number | null = null;
   let targetDateDraft = "";
@@ -173,6 +180,8 @@
   $: if (authoredNode && authoredNode.id !== draftNodeId) {
     draftNodeId = authoredNode.id;
     ownerDraft = authoredNode.owner ?? "";
+    ownerUserIdDraft = authoredNode.ownerUserId ?? null;
+    ownerLabelDraft = authoredNode.ownerLabel ?? authoredNode.owner ?? "";
     baselineDraft = authoredNode.baseline ?? null;
     targetDraft = authoredNode.target ?? null;
     targetDateDraft = authoredNode.targetDate ?? "";
@@ -418,10 +427,53 @@
     return event.node_id;
   }
 
+  function ownerOptionLabel(member: { email: string; name: string }): string {
+    return member.name || member.email;
+  }
+
+  function ownerSelectionValue(): string {
+    if (ownerUserIdDraft != null) return `user:${ownerUserIdDraft}`;
+    const label = (ownerLabelDraft || ownerDraft || "").trim();
+    return label ? `label:${label}` : "";
+  }
+
+  function applyOwnerSelection(value: string) {
+    if (!value) {
+      ownerUserIdDraft = null;
+      ownerLabelDraft = "";
+      ownerDraft = "";
+    } else if (value.startsWith("user:")) {
+      const userId = Number(value.slice(5));
+      const member = authoredTeamMembers.find((item) => item.id === userId);
+      ownerUserIdDraft = Number.isFinite(userId) ? userId : null;
+      ownerLabelDraft = member ? ownerOptionLabel(member) : ownerLabelDraft;
+      ownerDraft = ownerLabelDraft;
+    } else if (value.startsWith("label:")) {
+      const label = value.slice(6).trim();
+      ownerUserIdDraft = null;
+      ownerLabelDraft = label;
+      ownerDraft = label;
+    }
+  }
+
+  function setCustomOwnerLabel(label: string) {
+    ownerUserIdDraft = null;
+    ownerLabelDraft = label.trim();
+    ownerDraft = ownerLabelDraft;
+  }
+
+  function ownerPatch(): Record<string, unknown> {
+    return {
+      owner: ownerDraft.trim() || null,
+      ownerUserId: ownerUserIdDraft,
+      ownerLabel: ownerLabelDraft.trim() || ownerDraft.trim() || null,
+    };
+  }
+
   async function saveOwnerTarget() {
     if (!authoredNode) return;
     await onUpdateAuthoredNode(authoredNode.id, {
-      owner: ownerDraft.trim() || null,
+      ...ownerPatch(),
       baseline: numOrNull(baselineDraft),
       target: numOrNull(targetDraft),
       targetDate: targetDateDraft || null,
@@ -472,6 +524,8 @@
         leverNodeId: reviewLeverId(),
         note: note || "Updated lever plan",
         owner: ownerDraft.trim() || null,
+        ownerUserId: ownerUserIdDraft,
+        ownerLabel: ownerLabelDraft.trim() || ownerDraft.trim() || null,
         target: numOrNull(targetDraft),
         targetDate: targetDateDraft || null,
         nextAction,
@@ -751,7 +805,8 @@
             {/if}
             {#if authoredNode.type === "lever"}
               <div class="inline-plan">
-                <label>Owner<input bind:value={ownerDraft} /></label>
+                <label>Owner<select value={ownerSelectionValue()} on:change={(event) => applyOwnerSelection(event.currentTarget.value)}><option value="">Unassigned</option>{#each authoredTeamMembers as member}<option value={`user:${member.id}`}>{ownerOptionLabel(member)} · {member.role}</option>{/each}{#if ownerLabelDraft || ownerDraft}<option value={`label:${ownerLabelDraft || ownerDraft}`}>Custom: {ownerLabelDraft || ownerDraft}</option>{/if}</select></label>
+                <label>Custom owner / persona<input value={ownerLabelDraft || ownerDraft} on:input={(event) => setCustomOwnerLabel(event.currentTarget.value)} /></label>
                 <label>Target<input type="number" step="any" bind:value={targetDraft} /></label>
                 <button type="button" on:click={saveOwnerTarget} disabled={authoredOperatingSaving}>Save plan</button>
               </div>
@@ -797,7 +852,8 @@
               </div>
             {:else if reviewAction === "update_lever_plan"}
               <div class="field-grid-compact three">
-                <label>Owner<input bind:value={ownerDraft} /></label>
+                <label>Owner<select value={ownerSelectionValue()} on:change={(event) => applyOwnerSelection(event.currentTarget.value)}><option value="">Unassigned</option>{#each authoredTeamMembers as member}<option value={`user:${member.id}`}>{ownerOptionLabel(member)} · {member.role}</option>{/each}{#if ownerLabelDraft || ownerDraft}<option value={`label:${ownerLabelDraft || ownerDraft}`}>Custom: {ownerLabelDraft || ownerDraft}</option>{/if}</select></label>
+                <label>Custom owner / persona<input value={ownerLabelDraft || ownerDraft} on:input={(event) => setCustomOwnerLabel(event.currentTarget.value)} /></label>
                 <label>Target<input type="number" step="any" bind:value={targetDraft} /></label>
                 <label>Target date<input type="date" bind:value={targetDateDraft} /></label>
               </div>

@@ -78,6 +78,8 @@ export interface AuthoredMetricNode {
   metricBinding?: MetricBinding;
   measurementBinding?: ExperimentMeasurementBinding;
   owner?: string | null;
+  ownerUserId?: number | null;
+  ownerLabel?: string | null;
   baseline?: number | null;
   target?: number | null;
   targetDate?: string | null;
@@ -165,6 +167,8 @@ export interface MetricTreeReviewDecision {
   outcome?: "won" | "lost" | "shipped";
   nextAction?: string;
   owner?: string | null;
+  ownerUserId?: number | null;
+  ownerLabel?: string | null;
   target?: number | null;
   targetDate?: string | null;
   trafficSourceTest?: Record<string, unknown>;
@@ -181,6 +185,8 @@ export interface MetricTreeReviewSummary {
   chosenLeverId?: string;
   chosenLeverLabel?: string;
   chosenLeverOwner?: string | null;
+  chosenLeverOwnerUserId?: number | null;
+  chosenLeverOwnerLabel?: string | null;
   chosenLeverTarget?: number | null;
   timeLabel?: string;
   stopReason?: string;

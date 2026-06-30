@@ -16,6 +16,8 @@
   } from "@rilldata/web-common/features/canvas/components/metric-tree/ownership";
   import type { MetricTreeNodeResolution } from "@rilldata/web-common/features/canvas/components/metric-tree/live-tree";
   import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { getTeam } from "$lib/bratrax/settings/api";
+  import type { TeamMember } from "$lib/bratrax/settings/types";
   import {
     createMetricNode,
     createMetricTreeEvent,
@@ -146,6 +148,7 @@
   let summaries: TreeSummary[] = [];
   let templates: MetricTreeTemplateSummary[] = [];
   let selectedTemplateId = "d2c_hybrid";
+  let teamMembers: TeamMember[] = [];
   let tree: AuthoredMetricTree | null = null;
   let liveTree: AuthoredMetricTree | null = null;
   let liveLoading = false;
@@ -238,7 +241,8 @@
       return (b.score ?? -1) - (a.score ?? -1);
     });
   $: ownershipRoster = ownershipRosterFor(storedNodes);
-  $: activeOwnerFilter = ownerFilter && ownershipRoster.some((owner) => owner.owner === ownerFilter) ? ownerFilter : null;
+  $: activeOwnerFilter = ownerFilter && ownershipRoster.some((owner) => owner.ownerKey === ownerFilter) ? ownerFilter : null;
+  $: activeOwnerLabel = ownershipRoster.find((owner) => owner.ownerKey === activeOwnerFilter)?.owner ?? null;
   $: filteredRankedLevers = rankedLevers.filter((item) => ownerMatchesNode(activeOwnerFilter, nodeById(item.nodeId, nodes)));
   $: filteredExperiments = experiments.filter((item) => ownerMatchesNode(activeOwnerFilter, item.node));
   $: selectedRankedLever = selectedDraft?.type === "lever"
@@ -291,15 +295,30 @@
     void loadLiveTree(workspaceLiveKey);
 
   onMount(() => {
-    const { treeId, nodeId } = initialDeepLink();
-    void loadSummaries(treeId ?? undefined, treeId ? nodeId : null).finally(
+    const link = initialDeepLink();
+    if (link.timePreset) timePreset = link.timePreset;
+    if (link.mode) workspaceMode = link.mode;
+    ownerFilter = link.owner;
+    void loadTeamMembers();
+    void loadSummaries(link.treeId ?? undefined, link.treeId ? link.nodeId : null).finally(
       () => {
+        if (link.reviewSessionId) {
+          const session = reviewSessions.find((item) => item.session_id === link.reviewSessionId);
+          if (session) openReviewSession(session);
+        }
         urlSyncReady = true;
       },
     );
   });
 
-  $: if (urlSyncReady) syncUrl(tree?.tree_id ?? null, selectedId);
+  $: if (urlSyncReady) syncUrl(
+    tree?.tree_id ?? null,
+    selectedId,
+    workspaceMode,
+    timePreset,
+    activeOwnerFilter,
+    selectedReviewSession?.session_id ?? null,
+  );
 
   function cloneNode(node: AuthoredMetricNode): AuthoredMetricNode {
     return JSON.parse(JSON.stringify(node)) as AuthoredMetricNode;
@@ -432,13 +451,19 @@
     }
   }
 
-  function initialDeepLink(): { treeId: string | null; nodeId: string | null } {
-    if (!browser) return { treeId: null, nodeId: null };
+  function initialDeepLink(): { treeId: string | null; nodeId: string | null; mode: WorkspaceMode | null; owner: string | null; reviewSessionId: string | null; timePreset: TimePreset | null } {
+    if (!browser) return { treeId: null, nodeId: null, mode: null, owner: null, reviewSessionId: null, timePreset: null };
     const params = new URLSearchParams(window.location.search);
     const treeId = params.get("tree_id")?.trim() || null;
+    const mode = params.get("mode") === "review" ? "review" : params.get("mode") === "canvas" ? "canvas" : null;
+    const preset = params.get("time_preset") as TimePreset | null;
     return {
       treeId,
       nodeId: treeId ? params.get("node_id")?.trim() || null : null,
+      mode,
+      owner: params.get("owner")?.trim() || null,
+      reviewSessionId: params.get("review_session_id")?.trim() || null,
+      timePreset: TIME_PRESETS.some((item) => item.value === preset) ? preset : null,
     };
   }
 
@@ -463,17 +488,31 @@
     selectedId = nextId;
   }
 
-  function syncUrl(treeId: string | null, nodeId: string | null) {
+  function syncUrl(
+    treeId: string | null,
+    nodeId: string | null,
+    mode: WorkspaceMode,
+    preset: TimePreset,
+    ownerKey: string | null,
+    reviewSessionId: string | null,
+  ) {
     if (!browser) return;
     const url = new URL(window.location.href);
     if (!treeId) {
       url.searchParams.delete("tree_id");
       url.searchParams.delete("node_id");
+      url.searchParams.delete("review_session_id");
     } else {
       url.searchParams.set("tree_id", treeId);
       if (nodeId) url.searchParams.set("node_id", nodeId);
       else url.searchParams.delete("node_id");
     }
+    url.searchParams.set("mode", mode);
+    url.searchParams.set("time_preset", preset);
+    if (ownerKey) url.searchParams.set("owner", ownerKey);
+    else url.searchParams.delete("owner");
+    if (reviewSessionId) url.searchParams.set("review_session_id", reviewSessionId);
+    else url.searchParams.delete("review_session_id");
     const nextUrl = `${url.pathname}${url.search}`;
     if (
       nextUrl === lastSyncedUrl ||
@@ -663,6 +702,55 @@
     } finally {
       evidenceLoading = false;
     }
+  }
+
+  async function loadTeamMembers() {
+    try {
+      const team = await getTeam();
+      teamMembers = team.members ?? [];
+    } catch {
+      teamMembers = [];
+    }
+  }
+
+  function ownerOptionLabel(member: TeamMember): string {
+    return member.name || member.email;
+  }
+
+  function ownerSelectionValue(node: AuthoredMetricNode | null): string {
+    if (!node) return "";
+    if (node.ownerUserId != null) return `user:${node.ownerUserId}`;
+    const label = (node.ownerLabel || node.owner || "").trim();
+    return label ? `label:${label}` : "";
+  }
+
+  function applyOwnerSelection(value: string) {
+    if (!selectedDraft) return;
+    if (!value) {
+      selectedDraft.ownerUserId = null;
+      selectedDraft.ownerLabel = null;
+      selectedDraft.owner = null;
+    } else if (value.startsWith("user:")) {
+      const userId = Number(value.slice(5));
+      const member = teamMembers.find((item) => item.id === userId);
+      selectedDraft.ownerUserId = Number.isFinite(userId) ? userId : null;
+      selectedDraft.ownerLabel = member ? ownerOptionLabel(member) : selectedDraft.ownerLabel;
+      selectedDraft.owner = selectedDraft.ownerLabel ?? null;
+    } else if (value.startsWith("label:")) {
+      const label = value.slice(6).trim();
+      selectedDraft.ownerUserId = null;
+      selectedDraft.ownerLabel = label || null;
+      selectedDraft.owner = label || null;
+    }
+    selectedDraft = selectedDraft;
+  }
+
+  function setCustomOwnerLabel(label: string) {
+    if (!selectedDraft) return;
+    selectedDraft.ownerUserId = null;
+    selectedDraft.ownerLabel = label.trim() || null;
+    selectedDraft.owner = selectedDraft.ownerLabel;
+    selectedDraft = selectedDraft;
   }
 
   function ownershipItemCount(owner: OwnershipPersona): number {
@@ -864,7 +952,11 @@
   function reviewSessionWorkspaceHref(session: MetricTreeReviewSession | null): string | null {
     if (!session?.tree_id) return null;
     const nodeId = session.selected_node_id || session.chosen_lever_node_id || session.experiment_node_id || session.root_node_id;
-    return `/metric-trees?tree_id=${encodeURIComponent(session.tree_id)}${nodeId ? `&node_id=${encodeURIComponent(nodeId)}` : ""}`;
+    const params = new URLSearchParams({ tree_id: session.tree_id, mode: "review", review_session_id: session.session_id });
+    if (nodeId) params.set("node_id", nodeId);
+    const timePresetFromSession = (session.timeRange as { preset?: string } | undefined)?.preset;
+    if (timePresetFromSession) params.set("time_preset", timePresetFromSession);
+    return `/metric-trees?${params.toString()}`;
   }
 
   function reviewSessionPageHref(session: MetricTreeReviewSession | null): string | null {
@@ -874,6 +966,7 @@
 
   function openReviewSession(session: MetricTreeReviewSession) {
     selectedReviewSession = session;
+    workspaceMode = "review";
     setSelectedId(
       session.selected_node_id ||
         session.chosen_lever_node_id ||
@@ -1005,6 +1098,8 @@
     next.baseline = nullableNumber(next.baseline ?? null);
     next.target = nullableNumber(next.target ?? null);
     next.owner = emptyToNull(next.owner);
+    next.ownerLabel = emptyToNull(next.ownerLabel ?? next.owner);
+    next.ownerUserId = nullableNumber(next.ownerUserId);
     next.targetDate = emptyToNull(next.targetDate);
     next.hypothesis = emptyToNull(next.hypothesis);
     if (next.type === "experiment") {
@@ -1466,9 +1561,9 @@
           {#each ownershipRoster as owner}
             <button
               type="button"
-              class:active={activeOwnerFilter === owner.owner}
+              class:active={activeOwnerFilter === owner.ownerKey}
               class:warn={owner.unassigned}
-              on:click={() => selectOwnerFilter(owner.owner)}
+              on:click={() => selectOwnerFilter(owner.ownerKey)}
             >
               <span>{owner.owner}</span>
               <small>{owner.leverCount} levers · {owner.experimentCount} experiments</small>
@@ -1493,7 +1588,7 @@
           <div>
             <h2>{tree.name}</h2>
             <p>
-              {nodes.length} nodes · {timeContext.label}{activeOwnerFilter ? ` · owner: ${activeOwnerFilter}` : ""}{liveLoading
+              {nodes.length} nodes · {timeContext.label}{activeOwnerLabel ? ` · owner: ${activeOwnerLabel}` : ""}{liveLoading
                 ? " · resolving live values"
                 : ""}{liveError ? " · live fallback" : ""}
             </p>
@@ -1528,7 +1623,7 @@
               </div>
               <div>
                 <span>Ownership</span>
-                <strong>{activeOwnerFilter ?? ownerCoverageLabel(ownershipRoster)}</strong>
+                <strong>{activeOwnerLabel ?? ownerCoverageLabel(ownershipRoster)}</strong>
               </div>
             </section>
 
@@ -1748,7 +1843,19 @@
               <div class="section-title">Lever</div>
               <label>
                 Owner
-                <input bind:value={selectedDraft.owner} />
+                <select value={ownerSelectionValue(selectedDraft)} on:change={(event) => applyOwnerSelection(event.currentTarget.value)}>
+                  <option value="">Unassigned</option>
+                  {#each teamMembers as member}
+                    <option value={`user:${member.id}`}>{ownerOptionLabel(member)} · {member.role}</option>
+                  {/each}
+                  {#if selectedDraft.ownerLabel || selectedDraft.owner}
+                    <option value={`label:${selectedDraft.ownerLabel || selectedDraft.owner}`}>Custom: {selectedDraft.ownerLabel || selectedDraft.owner}</option>
+                  {/if}
+                </select>
+              </label>
+              <label>
+                Custom owner / persona
+                <input value={selectedDraft.ownerLabel || selectedDraft.owner || ""} on:input={(event) => setCustomOwnerLabel(event.currentTarget.value)} placeholder="Lifecycle / retention" />
               </label>
               <div class="field-grid">
                 <label>
