@@ -118,12 +118,10 @@
     <li class="flex items-start gap-2">
       <span class="font-mono text-bratrax-acid">3.</span>
       <span
-        >Go to <strong class="text-bratrax-text-headline"
-          >WooCommerce → Bratrax</strong
-        >
-        and click
-        <strong class="text-bratrax-text-headline">"Connect to Bratrax"</strong
-        >. Your workspace links automatically — no IDs to copy.</span
+        >That's it — the plugin links to your workspace automatically. No setup,
+        no IDs to copy. (Status shows under <strong
+          class="text-bratrax-text-headline">WooCommerce → Bratrax</strong
+        >.)</span
       >
     </li>
     <li class="flex items-start gap-2">

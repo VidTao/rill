@@ -115,14 +115,12 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	observability.MuxHandle(mux, "POST /bratrax/onboard/woocommerce/callback",
 		observability.Middleware("bratrax", logger, proxy))
 
-	// WooCommerce tracking-plugin handshake exchange. The store's WordPress
-	// server POSTs its opaque token here server-to-server (no login cookie) to
-	// receive its client_id + events endpoint, so it must bypass the auth mapper.
-	// Public by design — the signed token in the body is the auth. The companion
-	// /plugin-connect endpoint rides the authed /bratrax/ catch-all (the merchant
-	// is logged in when they click "Connect"). The plugin.zip download is public
-	// so it can be linked from docs / fetched without a session.
-	observability.MuxHandle(mux, "POST /bratrax/onboard/woocommerce/plugin-exchange",
+	// WooCommerce tracking-plugin auto-link. The installed plugin POSTs its own
+	// site_url here server-to-server (no login cookie) and gets linked to the
+	// client that already connected this store via wc-auth, so it must bypass the
+	// auth mapper. Public by design — same store->client posture as the Shopify
+	// shop_domain resolver. The plugin.zip download is public too.
+	observability.MuxHandle(mux, "POST /bratrax/onboard/woocommerce/plugin-autoconnect",
 		observability.Middleware("bratrax", logger, proxy))
 	observability.MuxHandle(mux, "GET /bratrax/onboard/woocommerce/plugin.zip",
 		observability.Middleware("bratrax", logger, proxy))
