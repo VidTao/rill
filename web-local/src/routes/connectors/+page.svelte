@@ -19,6 +19,7 @@
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
   import { getAuthConfig } from "$lib/bratrax/auth";
   import ConnectorPill from "$lib/bratrax/connectors/ConnectorPill.svelte";
+  import WooTrackingInstall from "$lib/bratrax/onboarding/WooTrackingInstall.svelte";
   import {
     fetchSyncStatus,
     aggregateBySource,
@@ -1156,6 +1157,12 @@
             </button>
           </div>
         </div>
+      </div>
+    {/if}
+
+    {#if clientId && isConnected("woocommerce")}
+      <div class="mb-5">
+        <WooTrackingInstall {clientId} />
       </div>
     {/if}
 

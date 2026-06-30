@@ -19,6 +19,7 @@
   import TaboolaCredentialModal from "../../connectors/TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "../../connectors/OutbrainLoginModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
+  import WooTrackingInstall from "$lib/bratrax/onboarding/WooTrackingInstall.svelte";
 
   // ---------------------------------------------------------------------------
   // Onboarding-time tracking-template flows (paused — pending team alignment)
@@ -50,7 +51,13 @@
     // "credential_modal" opens an in-page form (Taboola, Outbrain) whose
     // submit triggers a direct credential→token exchange on the backend,
     // bypassing the OAuth redirect dance entirely.
-    type: "oauth" | "oauth_direct" | "client_sdk" | "selection" | "coming_soon" | "credential_modal";
+    type:
+      | "oauth"
+      | "oauth_direct"
+      | "client_sdk"
+      | "selection"
+      | "coming_soon"
+      | "credential_modal";
     authUrlPath?: string;
     directAuthUrl?: string;
     color: string;
@@ -68,7 +75,12 @@
       subtitle: "",
       platforms: [
         { id: "shopify", name: "Shopify", type: "selection", color: "#95BF47" },
-        { id: "woocommerce", name: "WooCommerce", type: "selection", color: "#7F54B3" },
+        {
+          id: "woocommerce",
+          name: "WooCommerce",
+          type: "selection",
+          color: "#7F54B3",
+        },
       ],
     },
     {
@@ -145,10 +157,20 @@
       title: "SUBSCRIPTIONS",
       subtitle: "Optional",
       platforms: [
-        { id: "recharge", name: "Recharge", type: "coming_soon", color: "#5433FF" },
+        {
+          id: "recharge",
+          name: "Recharge",
+          type: "coming_soon",
+          color: "#5433FF",
+        },
         { id: "bold", name: "Bold", type: "coming_soon", color: "#FF6B35" },
         { id: "skio", name: "Skio", type: "coming_soon", color: "#6366F1" },
-        { id: "no_subscriptions", name: "None", type: "selection", color: "#9CA3AF" },
+        {
+          id: "no_subscriptions",
+          name: "None",
+          type: "selection",
+          color: "#9CA3AF",
+        },
       ],
     },
     {
@@ -198,14 +220,27 @@
     externalBuilderIds.has(p),
   );
 
-  const adPlatformIds = new Set(["facebook_ads", "google_ads", "tiktok_ads", "bing_ads", "taboola", "outbrain", "pinterest_ads", "amazon_ads"]);
+  const adPlatformIds = new Set([
+    "facebook_ads",
+    "google_ads",
+    "tiktok_ads",
+    "bing_ads",
+    "taboola",
+    "outbrain",
+    "pinterest_ads",
+    "amazon_ads",
+  ]);
 
   // Ids that behave as radio buttons (one-of-N selection) — distinct from
   // `type === "selection"`, which also includes the display-only Shopify card.
   // Keep in sync with the two Sets in handleSelectionToggle().
   const radioToggleIds = new Set([
-    "shopify_only", "external_pages",
-    "recharge", "bold", "skio", "no_subscriptions",
+    "shopify_only",
+    "external_pages",
+    "recharge",
+    "bold",
+    "skio",
+    "no_subscriptions",
   ]);
 
   $: hasAdPlatform = [...connectedPlatforms].some((p) => adPlatformIds.has(p));
@@ -237,7 +272,8 @@
       const res = await fetch(`${host}${platform.authUrlPath}`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error(`Failed to get auth URL for ${platform.name}`);
+      if (!res.ok)
+        throw new Error(`Failed to get auth URL for ${platform.name}`);
       const data = await res.json();
 
       // Store which platform we're connecting for the callback
@@ -258,7 +294,12 @@
 
   function handleSelectionToggle(platform: Platform) {
     // For radio-style groups (subscriptions, external pages)
-    const subscriptionIds = new Set(["recharge", "bold", "skio", "no_subscriptions"]);
+    const subscriptionIds = new Set([
+      "recharge",
+      "bold",
+      "skio",
+      "no_subscriptions",
+    ]);
     const pagesIds = new Set(["shopify_only", "external_pages"]);
 
     if (subscriptionIds.has(platform.id)) {
@@ -284,7 +325,9 @@
       `${window.location.origin}/onboard/stack`,
     );
     const state = encodeURIComponent(platform.id);
-    const url = platform.directAuthUrl.replace("{redirect}", redirect) + `&state=${state}`;
+    const url =
+      platform.directAuthUrl.replace("{redirect}", redirect) +
+      `&state=${state}`;
 
     sessionStorage.setItem("onboard_oauth_platform", platform.id);
     window.location.href = url;
@@ -354,9 +397,7 @@
   let fbUrlTagsAccounts: FbAccountPreview[] = [];
   let fbUrlTagsAdAccountIds: string[] = [];
   type FbUrlTagsChoice = "replace" | "empty_only" | "cancel";
-  let fbUrlTagsResolve:
-    | ((choice: FbUrlTagsChoice) => void)
-    | null = null;
+  let fbUrlTagsResolve: ((choice: FbUrlTagsChoice) => void) | null = null;
 
   // True when this page was hit purely as the OAuth-callback dispatcher for a
   // flow initiated elsewhere (e.g. /connectors). The "Build your stack" UI is
@@ -368,7 +409,11 @@
   // Single source of truth for "which platforms are connected": the server.
   // Rebuilds the connectedPlatforms Set as a new reference so Svelte
   // reactivity always fires (Set.add + self-assign is unreliable).
-  function explainOAuthError(code: string, desc: string | null, bingClientId: string): string {
+  function explainOAuthError(
+    code: string,
+    desc: string | null,
+    bingClientId: string,
+  ): string {
     // Microsoft AADSTS error codes have specific guidance — surface the
     // actionable fix rather than the wall-of-text Azure trace string.
     // For unknown codes, fall back to the provider's own description.
@@ -490,7 +535,11 @@
       } catch {
         // Non-fatal — fall through to the unavailable-URL message branch.
       }
-      const errorMsg = explainOAuthError(oauthError, oauthErrorDesc, bingClientIdForError);
+      const errorMsg = explainOAuthError(
+        oauthError,
+        oauthErrorDesc,
+        bingClientIdForError,
+      );
       const where = sessionStorage.getItem("onboard_oauth_return");
       // Strip the params so a refresh doesn't re-show the error and we
       // don't leak Microsoft trace/correlation IDs to address-bar history.
@@ -540,8 +589,14 @@
     //    same AccountSelectionModal used by Google/Facebook.
     const tiktokAuthCode = $page.url.searchParams.get("auth_code");
     const tiktokStateParam = $page.url.searchParams.get("state");
-    const expectedTiktokState = sessionStorage.getItem("tiktok_ads_oauth_state");
-    if (tiktokAuthCode && tiktokStateParam && expectedTiktokState === tiktokStateParam) {
+    const expectedTiktokState = sessionStorage.getItem(
+      "tiktok_ads_oauth_state",
+    );
+    if (
+      tiktokAuthCode &&
+      tiktokStateParam &&
+      expectedTiktokState === tiktokStateParam
+    ) {
       await handleTikTokReturn(tiktokAuthCode, tiktokStateParam);
     }
 
@@ -564,11 +619,7 @@
     const bingCode = $page.url.searchParams.get("code");
     const bingStateParam = $page.url.searchParams.get("state");
     const expectedBingState = sessionStorage.getItem("bing_ads_oauth_state");
-    if (
-      bingCode &&
-      bingStateParam &&
-      expectedBingState === bingStateParam
-    ) {
+    if (bingCode && bingStateParam && expectedBingState === bingStateParam) {
       await handleBingAdsReturn(bingCode, bingStateParam);
     }
 
@@ -576,7 +627,9 @@
     //     Klaviyo/Bing). Disambiguated by the sessionStorage state-key match.
     const pinterestCode = $page.url.searchParams.get("code");
     const pinterestStateParam = $page.url.searchParams.get("state");
-    const expectedPinterestState = sessionStorage.getItem("pinterest_ads_oauth_state");
+    const expectedPinterestState = sessionStorage.getItem(
+      "pinterest_ads_oauth_state",
+    );
     if (
       pinterestCode &&
       pinterestStateParam &&
@@ -618,7 +671,10 @@
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? "Failed to list TikTok advertisers");
+        throw new Error(
+          (body as { error?: string }).error ??
+            "Failed to list TikTok advertisers",
+        );
       }
       const body = (await res.json()) as {
         state: string;
@@ -656,7 +712,10 @@
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? "Failed to list Klaviyo accounts");
+        throw new Error(
+          (body as { error?: string }).error ??
+            "Failed to list Klaviyo accounts",
+        );
       }
       const body = (await res.json()) as {
         state: string;
@@ -694,7 +753,10 @@
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? "Failed to list Bing Ads accounts");
+        throw new Error(
+          (body as { error?: string }).error ??
+            "Failed to list Bing Ads accounts",
+        );
       }
       const body = (await res.json()) as {
         state: string;
@@ -757,7 +819,10 @@
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? "Failed to list Pinterest accounts");
+        throw new Error(
+          (body as { error?: string }).error ??
+            "Failed to list Pinterest accounts",
+        );
       }
       const body = (await res.json()) as {
         state: string;
@@ -903,10 +968,7 @@
     let nextPath: string | undefined = path;
     let nextParams: Record<string, unknown> | undefined = params;
     for (let i = 0; i < 50 && nextPath; i++) {
-      const resp: FbPagedResponse<T> = await fbApi(
-        nextPath,
-        nextParams ?? {},
-      );
+      const resp: FbPagedResponse<T> = await fbApi(nextPath, nextParams ?? {});
       if (resp?.error) {
         throw resp.error;
       }
@@ -1108,7 +1170,9 @@
   // each leaf customer needs the template set individually for Bratrax
   // attribution to work. Run after /onboard/google/connect succeeds and before
   // the user advances to /onboard/business → /onboard/activate.
-  async function runGoogleTrackingTemplateFlow(customerIds: string[]): Promise<void> {
+  async function runGoogleTrackingTemplateFlow(
+    customerIds: string[],
+  ): Promise<void> {
     if (!customerIds.length) return;
     const host = get(runtime).host;
 
@@ -1118,7 +1182,10 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ code: googleAuthCode, customer_ids: customerIds }),
+        body: JSON.stringify({
+          code: googleAuthCode,
+          customer_ids: customerIds,
+        }),
       },
     );
     if (!previewRes.ok) {
@@ -1264,7 +1331,11 @@
       account_name: string;
       total_campaigns: number;
       with_url_tags: number;
-      conflicting: Array<{ campaign_id: string; name: string; current: string }>;
+      conflicting: Array<{
+        campaign_id: string;
+        name: string;
+        current: string;
+      }>;
       conflicting_count: number;
       needs_confirm: boolean;
       error?: string;
@@ -1324,19 +1395,16 @@
   ): Promise<void> {
     if (!adAccountIds.length || !clientId) return;
     const host = get(runtime).host;
-    const res = await fetch(
-      `${host}/bratrax/onboard/facebook/apply-url-tags`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          client_id: clientId,
-          ad_account_ids: adAccountIds,
-          force_replace: forceReplace,
-        }),
-      },
-    );
+    const res = await fetch(`${host}/bratrax/onboard/facebook/apply-url-tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        client_id: clientId,
+        ad_account_ids: adAccountIds,
+        force_replace: forceReplace,
+      }),
+    });
     if (res.status === 409) {
       const body = await res.json().catch(() => ({}));
       console.warn("FB url_tags apply returned 409", body);
@@ -1504,7 +1572,8 @@
       // Honor the return-to set by the originating page. When the OAuth was
       // initiated from /connectors (or any other page), bounce back there
       // after the modal completes. Default "/onboard/stack" is a no-op.
-      const returnTo = sessionStorage.getItem("onboard_oauth_return") || "/onboard/stack";
+      const returnTo =
+        sessionStorage.getItem("onboard_oauth_return") || "/onboard/stack";
       sessionStorage.removeItem("onboard_oauth_return");
       if (returnTo && returnTo !== "/onboard/stack") {
         await goto(returnTo);
@@ -1522,7 +1591,10 @@
   // accounts + a state token, then open AccountSelectionModal — which
   // routes selection through handleAccountSelection above.
   // ---------------------------------------------------------------------------
-  async function handleTaboolaCredentials(creds: { clientId: string; clientSecret: string }) {
+  async function handleTaboolaCredentials(creds: {
+    clientId: string;
+    clientSecret: string;
+  }) {
     taboolaModalError = "";
     taboolaModalLoading = true;
     try {
@@ -1538,7 +1610,9 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error((data as any).error || "Failed to list Taboola accounts");
+        throw new Error(
+          (data as any).error || "Failed to list Taboola accounts",
+        );
       }
       taboolaState = (data as any).state;
       accountModalAccounts = ((data as any).accounts || []).map((a: any) => ({
@@ -1568,7 +1642,9 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error((data as any).error || "Failed to list Outbrain marketers");
+        throw new Error(
+          (data as any).error || "Failed to list Outbrain marketers",
+        );
       }
       outbrainState = (data as any).state;
       accountModalAccounts = ((data as any).accounts || []).map((a: any) => ({
@@ -1650,7 +1726,10 @@
           ["shopify_only", "external_pages"].includes(p),
         ),
       };
-      sessionStorage.setItem("onboard_stack_selections", JSON.stringify(stackSelections));
+      sessionStorage.setItem(
+        "onboard_stack_selections",
+        JSON.stringify(stackSelections),
+      );
 
       // Proceed to business profile questionnaire.
       // Activation (compile+deploy) is triggered from there after the user
@@ -1661,60 +1740,84 @@
       activating = false;
     }
   }
-
 </script>
 
 {#if isOAuthBounce}
   <div class="flex h-screen w-screen items-center justify-center bg-bratrax-bg">
     <div class="text-center">
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+      >
         ONBOARDING
       </div>
-      <div class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted">
+      <div
+        class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted"
+      >
         Completing connection…
       </div>
     </div>
   </div>
 {:else}
-<div class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12">
-  <div class="relative w-full max-w-2xl border border-bratrax-border bg-bratrax-surface p-8">
-    <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+  <div
+    class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12"
+  >
+    <div
+      class="relative w-full max-w-2xl border border-bratrax-border bg-bratrax-surface p-8"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
-    <div class="mb-6">
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
-        ONBOARDING
+      <div class="mb-6">
+        <div
+          class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+        >
+          ONBOARDING
+        </div>
+        <h1 class="text-2xl font-black text-bratrax-text-headline">
+          Build your stack
+        </h1>
+        <p class="mt-2 text-sm font-light text-bratrax-text-body">
+          Connect the tools you use. We'll set up your analytics automatically.
+        </p>
       </div>
-      <h1 class="text-2xl font-black text-bratrax-text-headline">
-        Build your stack
-      </h1>
-      <p class="mt-2 text-sm font-light text-bratrax-text-body">
-        Connect the tools you use. We'll set up your analytics automatically.
-      </p>
-    </div>
 
-    {#if error}
-      <div class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
-        {error}
-      </div>
-    {/if}
+      {#if error}
+        <div
+          class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+        >
+          {error}
+        </div>
+      {/if}
 
-    <div class="flex flex-col gap-6">
-      {#each categories as category}
-        <div>
-          <div class="mb-2 flex items-baseline gap-2">
-            <span class="font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
-              {category.title}
-            </span>
-            {#if category.subtitle}
-              <span class="font-mono text-[10px] text-bratrax-text-muted">({category.subtitle})</span>
-            {/if}
-          </div>
-          <div class="flex flex-wrap gap-2">
-            {#each category.platforms as platform}
-              <button
-                on:click={() => handleCardClick(platform)}
-                disabled={loading === platform.id || platform.id === "shopify" || platform.id === "woocommerce" || platform.type === "coming_soon"}
-                class="flex items-center gap-2 border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-all
+      {#if clientId && isConnected("woocommerce")}
+        <div class="mb-6">
+          <WooTrackingInstall {clientId} />
+        </div>
+      {/if}
+
+      <div class="flex flex-col gap-6">
+        {#each categories as category}
+          <div>
+            <div class="mb-2 flex items-baseline gap-2">
+              <span
+                class="font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+              >
+                {category.title}
+              </span>
+              {#if category.subtitle}
+                <span class="font-mono text-[10px] text-bratrax-text-muted"
+                  >({category.subtitle})</span
+                >
+              {/if}
+            </div>
+            <div class="flex flex-wrap gap-2">
+              {#each category.platforms as platform}
+                <button
+                  on:click={() => handleCardClick(platform)}
+                  disabled={loading === platform.id ||
+                    platform.id === "shopify" ||
+                    platform.id === "woocommerce" ||
+                    platform.type === "coming_soon"}
+                  class="flex items-center gap-2 border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-all
                   {radioToggleIds.has(platform.id)
                     ? isSelected(platform.id)
                       ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
@@ -1727,48 +1830,68 @@
                           ? 'border-bratrax-border bg-bratrax-bg text-bratrax-text-muted cursor-not-allowed'
                           : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}
                   {loading === platform.id ? 'opacity-50' : ''}
-                  {platform.id === 'shopify' || platform.id === 'woocommerce' ? 'cursor-default' : ''}"
-              >
-                <span
-                  class="h-3 w-3"
-                  style="background-color: {platform.color}"
-                ></span>
-                {#if radioToggleIds.has(platform.id) ? isSelected(platform.id) : isConnected(platform.id)}
-                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                {/if}
-                {platform.name}
-                {#if platform.type === "coming_soon"}
-                  <span class="text-bratrax-text-muted normal-case tracking-normal">coming soon</span>
-                {:else if loading === platform.id}
-                  <span class="text-bratrax-text-muted normal-case tracking-normal">connecting...</span>
-                {/if}
-              </button>
-            {/each}
+                  {platform.id === 'shopify' || platform.id === 'woocommerce'
+                    ? 'cursor-default'
+                    : ''}"
+                >
+                  <span
+                    class="h-3 w-3"
+                    style="background-color: {platform.color}"
+                  ></span>
+                  {#if radioToggleIds.has(platform.id) ? isSelected(platform.id) : isConnected(platform.id)}
+                    <svg
+                      class="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  {/if}
+                  {platform.name}
+                  {#if platform.type === "coming_soon"}
+                    <span
+                      class="text-bratrax-text-muted normal-case tracking-normal"
+                      >coming soon</span
+                    >
+                  {:else if loading === platform.id}
+                    <span
+                      class="text-bratrax-text-muted normal-case tracking-normal"
+                      >connecting...</span
+                    >
+                  {/if}
+                </button>
+              {/each}
+            </div>
           </div>
-        </div>
-      {/each}
-    </div>
+        {/each}
+      </div>
 
-    <div class="mt-8 flex items-center justify-between border-t border-bratrax-border pt-6">
-      <p class="font-mono text-[10px] text-bratrax-text-muted">
-        {#if !hasAdPlatform}
-          Connect at least 1 ad platform to continue
-        {:else}
-          Ready to set up your analytics
-        {/if}
-      </p>
-      <button
-        on:click={handleActivate}
-        disabled={!hasAdPlatform || activating}
-        class="bg-bratrax-acid px-6 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
+      <div
+        class="mt-8 flex items-center justify-between border-t border-bratrax-border pt-6"
       >
-        {activating ? "SETTING UP..." : "SET UP MY ANALYTICS →"}
-      </button>
+        <p class="font-mono text-[10px] text-bratrax-text-muted">
+          {#if !hasAdPlatform}
+            Connect at least 1 ad platform to continue
+          {:else}
+            Ready to set up your analytics
+          {/if}
+        </p>
+        <button
+          on:click={handleActivate}
+          disabled={!hasAdPlatform || activating}
+          class="bg-bratrax-acid px-6 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
+        >
+          {activating ? "SETTING UP..." : "SET UP MY ANALYTICS →"}
+        </button>
+      </div>
     </div>
   </div>
-</div>
 {/if}
 
 <AccountSelectionModal
@@ -1777,7 +1900,9 @@
   platformName={accountModalPlatform}
   accounts={accountModalAccounts}
   onSubmit={handleAccountSelection}
-  onClose={() => { showAccountModal = false; }}
+  onClose={() => {
+    showAccountModal = false;
+  }}
 />
 
 <TrackingTemplateConfirmModal
@@ -1823,7 +1948,10 @@
   loading={taboolaModalLoading}
   error={taboolaModalError}
   onSubmit={handleTaboolaCredentials}
-  onClose={() => { showTaboolaModal = false; taboolaModalError = ""; }}
+  onClose={() => {
+    showTaboolaModal = false;
+    taboolaModalError = "";
+  }}
 />
 
 <OutbrainLoginModal
@@ -1831,6 +1959,8 @@
   loading={outbrainModalLoading}
   error={outbrainModalError}
   onSubmit={handleOutbrainCredentials}
-  onClose={() => { showOutbrainModal = false; outbrainModalError = ""; }}
+  onClose={() => {
+    showOutbrainModal = false;
+    outbrainModalError = "";
+  }}
 />
-

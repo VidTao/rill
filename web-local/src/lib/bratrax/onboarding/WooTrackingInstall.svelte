@@ -81,63 +81,73 @@
   onDestroy(stopPolling);
 </script>
 
-<div class="flex flex-col gap-4 rounded-lg border border-gray-200 p-5">
-  <div>
-    <h3 class="text-base font-semibold">
-      Install the WooCommerce tracking plugin
-    </h3>
-    <p class="mt-1 text-sm text-gray-600">
-      Download the plugin, install it on your WordPress store, and connect it to
-      Bratrax. We'll confirm it's working when the first events arrive.
-    </p>
-  </div>
+<div class="border border-bratrax-border bg-bratrax-surface px-5 py-4">
+  <p
+    class="mb-1 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-acid"
+  >
+    WooCommerce tracking
+  </p>
+  <h3 class="text-base font-black text-bratrax-text-headline">
+    Install the tracking plugin
+  </h3>
+  <p class="mt-1 text-sm font-light text-bratrax-text-body">
+    Connecting your store lets us read orders. The plugin adds on-site tracking
+    (page views, add-to-cart, checkout) so we can attribute those orders to the
+    right channels. Orders stay the source of truth — events are evidence only.
+  </p>
 
-  <ol class="flex flex-col gap-2 text-sm text-gray-700">
+  <ol class="mt-4 flex flex-col gap-2 text-sm text-bratrax-text-body">
     <li class="flex items-start gap-2">
-      <span class="font-semibold">1.</span>
-      <span>
-        <a
-          href={downloadUrl}
-          class="font-semibold text-blue-600 underline"
-          download
-        >
-          Download the plugin (.zip)
-        </a>
-      </span>
+      <span class="font-mono text-bratrax-acid">1.</span>
+      <a
+        href={downloadUrl}
+        class="font-semibold text-bratrax-acid underline underline-offset-2"
+        download
+      >
+        Download the plugin (.zip)
+      </a>
     </li>
     <li class="flex items-start gap-2">
-      <span class="font-semibold">2.</span>
+      <span class="font-mono text-bratrax-acid">2.</span>
       <span
-        >In WordPress admin, go to <strong
-          >Plugins &rarr; Add New &rarr; Upload Plugin</strong
+        >In WordPress admin: <strong class="text-bratrax-text-headline"
+          >Plugins → Add New → Upload Plugin</strong
         >, choose the zip, install and activate.</span
       >
     </li>
     <li class="flex items-start gap-2">
-      <span class="font-semibold">3.</span>
+      <span class="font-mono text-bratrax-acid">3.</span>
       <span
-        >Go to <strong>WooCommerce &rarr; Bratrax</strong> and click
-        <strong>"Connect to Bratrax"</strong>. Your workspace links
-        automatically &mdash; no IDs to copy.</span
+        >Go to <strong class="text-bratrax-text-headline"
+          >WooCommerce → Bratrax</strong
+        >
+        and click
+        <strong class="text-bratrax-text-headline">"Connect to Bratrax"</strong
+        >. Your workspace links automatically — no IDs to copy.</span
       >
     </li>
     <li class="flex items-start gap-2">
-      <span class="font-semibold">4.</span>
-      <span
-        >Visit a product page and add it to the cart, then verify below.</span
-      >
+      <span class="font-mono text-bratrax-acid">4.</span>
+      <span>Visit a product and add it to the cart, then verify below.</span>
     </li>
   </ol>
 
-  <div class="flex items-center gap-3">
+  <div class="mt-4 flex flex-wrap items-center gap-3">
+    <a
+      href={downloadUrl}
+      download
+      class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-bg transition-opacity hover:opacity-90"
+    >
+      Download plugin →
+    </a>
     <button
       type="button"
-      class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+      class="border border-bratrax-border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted transition-colors hover:border-bratrax-acid hover:text-bratrax-acid disabled:opacity-40"
       on:click={startVerifying}
       disabled={status === "waiting" || status === "connected"}
     >
       {#if status === "waiting"}
-        Watching for events&hellip;
+        Watching for events…
       {:else if status === "connected"}
         Connected
       {:else}
@@ -146,36 +156,46 @@
     </button>
 
     {#if status === "connected"}
-      <span class="text-sm font-semibold text-green-600">
-        &#10003; Receiving events ({result?.events_seen})
+      <span
+        class="font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-acid"
+      >
+        ✓ Receiving events ({result?.events_seen})
       </span>
     {:else if status === "waiting"}
-      <span class="text-sm text-gray-500">
-        Browse your store in another tab &mdash; events appear within a minute.
+      <span class="text-sm text-bratrax-text-muted">
+        Browse your store in another tab — events appear within a minute.
       </span>
     {/if}
   </div>
 
   {#if error}
-    <p class="text-sm text-red-600">{error}</p>
+    <p class="mt-3 font-mono text-xs text-bratrax-tomato">{error}</p>
   {/if}
 
   {#if result}
-    <div class="rounded-md bg-gray-50 p-3 text-sm">
-      <p class="mb-1 font-semibold text-gray-700">
+    <div
+      class="mt-4 border border-bratrax-border bg-bratrax-bg px-3 py-3 text-sm"
+    >
+      <p
+        class="mb-1 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted"
+      >
         Events seen (last {result.lookback_minutes} min): {result.events_seen}
       </p>
       <ul class="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
         {#each EXPECTED as ev}
           <li class="flex items-center gap-2">
             <span
-              class={result.by_type[ev] ? "text-green-600" : "text-gray-400"}
+              class={result.by_type[ev]
+                ? "text-bratrax-acid"
+                : "text-bratrax-text-muted"}
             >
               {result.by_type[ev] ? "✓" : "—"}
             </span>
-            <span class="font-mono text-xs">{ev}</span>
+            <span class="font-mono text-xs text-bratrax-text-body">{ev}</span>
             {#if result.by_type[ev]}
-              <span class="text-xs text-gray-500">({result.by_type[ev]})</span>
+              <span class="text-xs text-bratrax-text-muted"
+                >({result.by_type[ev]})</span
+              >
             {/if}
           </li>
         {/each}
