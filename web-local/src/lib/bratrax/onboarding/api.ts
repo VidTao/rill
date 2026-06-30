@@ -5,7 +5,10 @@ function getBaseUrl(): string {
   return get(runtime).host;
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
   const res = await fetch(`${getBaseUrl()}${path}`, {
     credentials: "include",
     ...init,
@@ -268,9 +271,7 @@ export async function onboardActivate(
   });
 }
 
-export async function onboardStatus(
-  clientId: string,
-): Promise<OnboardStatus> {
+export async function onboardStatus(clientId: string): Promise<OnboardStatus> {
   return apiFetch<OnboardStatus>(
     `/bratrax/onboard/status?client_id=${encodeURIComponent(clientId)}`,
   );
@@ -281,18 +282,15 @@ export async function onboardBusinessProfile(
   businessProfile: Record<string, string>,
   stackSelections?: Record<string, unknown>,
 ): Promise<OnboardActivateResult> {
-  return apiFetch<OnboardActivateResult>(
-    "/bratrax/onboard/business-profile",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: clientId,
-        business_profile: businessProfile,
-        stack_selections: stackSelections ?? {},
-      }),
-    },
-  );
+  return apiFetch<OnboardActivateResult>("/bratrax/onboard/business-profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_id: clientId,
+      business_profile: businessProfile,
+      stack_selections: stackSelections ?? {},
+    }),
+  });
 }
 
 export async function onboardDisconnect(
@@ -335,6 +333,38 @@ export async function verifyEmbedStatus(
 ): Promise<EmbedStatusResult> {
   return apiFetch<EmbedStatusResult>(
     `/bratrax/onboard/embed-status?client_id=${encodeURIComponent(clientId)}`,
+  );
+}
+
+// -----------------------------------------------------------------------------
+// WooCommerce tracking plugin: download + install verification
+//
+// The generic WordPress plugin (extensions/bratrax-woocommerce) is downloaded
+// from the backend, installed on the merchant's store, and connected via the
+// signed "Connect to Bratrax" handshake (which runs inside WP admin, not here).
+// Onboarding confirms the plugin is live by polling verify-install, which counts
+// recent source='browser' activity_stream events for the client.
+// -----------------------------------------------------------------------------
+
+export interface WooVerifyInstallResult {
+  client_id: string;
+  events_seen: number;
+  by_type: Record<string, number>;
+  connected: boolean;
+  lookback_minutes: number;
+}
+
+/** Absolute URL for the generic plugin zip (public download). */
+export function wooPluginDownloadUrl(): string {
+  return `${getBaseUrl()}/bratrax/onboard/woocommerce/plugin.zip`;
+}
+
+/** Poll for recent browser events to confirm the tracking plugin is sending data. */
+export async function verifyWooInstall(
+  clientId: string,
+): Promise<WooVerifyInstallResult> {
+  return apiFetch<WooVerifyInstallResult>(
+    `/bratrax/onboard/woocommerce/verify-install?client_id=${encodeURIComponent(clientId)}`,
   );
 }
 
