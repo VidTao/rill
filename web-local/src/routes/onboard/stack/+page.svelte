@@ -18,6 +18,7 @@
   import FunnelishInstallModal from "../../connectors/FunnelishInstallModal.svelte";
   import TaboolaCredentialModal from "../../connectors/TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "../../connectors/OutbrainLoginModal.svelte";
+  import BloomreachCredentialModal from "../../connectors/BloomreachCredentialModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
   import WooTrackingInstall from "$lib/bratrax/onboarding/WooTrackingInstall.svelte";
 
@@ -150,6 +151,12 @@
           type: "oauth",
           authUrlPath: "/bratrax/onboard/klaviyo/auth-url",
           color: "#2D2D2D",
+        },
+        {
+          id: "bloomreach",
+          name: "Bloomreach",
+          type: "credential_modal",
+          color: "#502EA8",
         },
       ],
     },
@@ -351,6 +358,7 @@
   let pinterestAdsState = "";
   let taboolaState = "";
   let outbrainState = "";
+  let bloomreachState = "";
 
   // Credential-modal state (Taboola / Outbrain). Mirrors the pattern on
   // /connectors — modal stays open on error so the user can retry without
@@ -362,6 +370,10 @@
   let showOutbrainModal = false;
   let outbrainModalLoading = false;
   let outbrainModalError = "";
+
+  let showBloomreachModal = false;
+  let bloomreachModalLoading = false;
+  let bloomreachModalError = "";
 
   // Google Ads tracking_url_template confirmation modal — wedged between
   // /onboard/google/connect and /onboard/activate so each leaf customer gets
@@ -1440,6 +1452,7 @@
       const isTaboola = accountModalPlatform === "Taboola";
       const isOutbrain = accountModalPlatform === "Outbrain";
       const isPinterest = accountModalPlatform === "Pinterest";
+      const isBloomreach = accountModalPlatform === "Bloomreach";
 
       let endpoint: string;
       let body: Record<string, unknown>;
@@ -1461,6 +1474,14 @@
           selectedAccounts: selected,
         };
         connectedKey = "outbrain";
+      } else if (isBloomreach) {
+        endpoint = `${host}/bratrax/onboard/bloomreach/connect`;
+        body = {
+          state: bloomreachState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "bloomreach";
       } else if (isBingAds) {
         endpoint = `${host}/bratrax/onboard/bing-ads/connect`;
         body = {
@@ -1570,6 +1591,7 @@
       }
       if (isTaboola) taboolaState = "";
       if (isOutbrain) outbrainState = "";
+      if (isBloomreach) bloomreachState = "";
 
       // Re-pull from the server so the card renders from the source of
       // truth. Also guarantees a fresh Set reference for Svelte reactivity.
@@ -1667,6 +1689,48 @@
     }
   }
 
+  async function handleBloomreachCredentials(creds: {
+    projectToken: string;
+    apiKey: string;
+    apiSecret: string;
+    baseUrl: string;
+  }) {
+    bloomreachModalError = "";
+    bloomreachModalLoading = true;
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(`${host}/bratrax/onboard/bloomreach/accounts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          project_token: creds.projectToken,
+          api_key: creds.apiKey,
+          api_secret: creds.apiSecret,
+          base_url: creds.baseUrl,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (data as any).error || "Failed to validate Bloomreach credentials",
+        );
+      }
+      bloomreachState = (data as any).state;
+      accountModalAccounts = ((data as any).accounts || []).map((a: any) => ({
+        id: String(a.id),
+        name: a.name || a.id,
+      }));
+      accountModalPlatform = "Bloomreach";
+      showBloomreachModal = false;
+      showAccountModal = true;
+    } catch (e) {
+      bloomreachModalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      bloomreachModalLoading = false;
+    }
+  }
+
   function handleCardClick(platform: Platform) {
     if (platform.type === "oauth") {
       handleOAuthConnect(platform);
@@ -1684,6 +1748,9 @@
       } else if (platform.id === "outbrain") {
         outbrainModalError = "";
         showOutbrainModal = true;
+      } else if (platform.id === "bloomreach") {
+        bloomreachModalError = "";
+        showBloomreachModal = true;
       }
     } else if (platform.type === "coming_soon") {
       // Do nothing
@@ -1968,5 +2035,16 @@
   onClose={() => {
     showOutbrainModal = false;
     outbrainModalError = "";
+  }}
+/>
+
+<BloomreachCredentialModal
+  open={showBloomreachModal}
+  loading={bloomreachModalLoading}
+  error={bloomreachModalError}
+  onSubmit={handleBloomreachCredentials}
+  onClose={() => {
+    showBloomreachModal = false;
+    bloomreachModalError = "";
   }}
 />

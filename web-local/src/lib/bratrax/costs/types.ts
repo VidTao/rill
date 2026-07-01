@@ -60,6 +60,57 @@ export interface ExpenseRule {
   updated_at: string;
 }
 
+export type MediaSpendScopeChannel =
+  | ""
+  | "meta"
+  | "google"
+  | "tiktok"
+  | "bing"
+  | "taboola"
+  | "outbrain"
+  | "pinterest";
+
+export type MediaSpendScopeMatchField =
+  | "campaign_name"
+  | "campaign_id"
+  | "ad_set_id"
+  | "ad_id"
+  | "account_id";
+
+export type MediaSpendScopeOperator = "equals" | "prefix" | "contains" | "regex";
+export type MediaSpendScopeAction = "include" | "exclude";
+
+export interface MediaSpendScopeRuleData {
+  name: string;
+  channel: MediaSpendScopeChannel;
+  account_id: string;
+  match_field: MediaSpendScopeMatchField;
+  operator: MediaSpendScopeOperator;
+  match_value: string;
+  action: MediaSpendScopeAction;
+  priority: number;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+}
+
+export interface MediaSpendScopeRule {
+  entity_id: string;
+  data: MediaSpendScopeRuleData;
+  updated_at: string;
+}
+
+export interface MediaSpendScopeGuidance {
+  title: string;
+  body: string;
+  examples?: Array<{
+    rule: string;
+    matches: string;
+    does_not_match: string;
+  }>;
+  unmatched_policy?: string;
+}
+
 export type StoreSettings = Record<string, unknown>;
 
-export type CostTab = "cogs" | "shipping" | "gateway" | "expenses";
+export type CostTab = "cogs" | "shipping" | "gateway" | "expenses" | "media_scope";

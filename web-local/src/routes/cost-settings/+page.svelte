@@ -5,6 +5,13 @@
     ProductCogs,
     GatewayFee,
     ExpenseRule,
+    MediaSpendScopeGuidance,
+    MediaSpendScopeRule,
+    MediaSpendScopeRuleData,
+    MediaSpendScopeAction,
+    MediaSpendScopeChannel,
+    MediaSpendScopeMatchField,
+    MediaSpendScopeOperator,
     StoreSettings,
   } from "$lib/bratrax/costs/types";
   import {
@@ -18,6 +25,10 @@
     createExpenseRule,
     updateExpenseRule,
     deleteExpenseRule,
+    getMediaSpendScopeRules,
+    createMediaSpendScopeRule,
+    updateMediaSpendScopeRule,
+    deleteMediaSpendScopeRule,
     createOneTimeExpense,
   } from "$lib/bratrax/costs/api";
 
@@ -26,18 +37,22 @@
     { id: "shipping", label: "Shipping", icon: "🚚" },
     { id: "gateway", label: "Gateway Costs", icon: "💳" },
     { id: "expenses", label: "Custom Expenses", icon: "📋" },
+    { id: "media_scope", label: "Media Scope", icon: "🎯" },
   ];
 
   let activeTab: CostTab = "gateway";
   let loading = true;
   let saving = false;
   let errorMessage = "";
+  let savedMessage = "";
 
   // Data
   let storeSettings: StoreSettings = {};
   let products: ProductCogs[] = [];
   let gateways: GatewayFee[] = [];
   let expenseRules: ExpenseRule[] = [];
+  let mediaScopeRules: MediaSpendScopeRule[] = [];
+  let mediaScopeGuidance: MediaSpendScopeGuidance | null = null;
 
   // COGS state
   let cogsMode: "per_product" | "global_percent" = "per_product";
@@ -66,6 +81,23 @@
     is_active: true,
   };
 
+  // Media scope modal state
+  let showMediaScopeModal = false;
+  let editingMediaScopeRuleId: string | null = null;
+  let mediaScopeForm: MediaSpendScopeRuleData = {
+    name: "",
+    channel: "",
+    account_id: "",
+    match_field: "campaign_name",
+    operator: "regex",
+    match_value: "",
+    action: "include",
+    priority: 100,
+    start_date: "",
+    end_date: "",
+    is_active: true,
+  };
+
   function showError(msg: string) {
     errorMessage = msg;
     setTimeout(() => {
@@ -73,19 +105,29 @@
     }, 8000);
   }
 
+  function showSaved(msg: string) {
+    savedMessage = msg;
+    setTimeout(() => {
+      savedMessage = "";
+    }, 8000);
+  }
+
   async function loadAll() {
     loading = true;
     try {
-      const [settings, prods, gws, rules] = await Promise.all([
+      const [settings, prods, gws, rules, mediaRules] = await Promise.all([
         getStoreSettings().catch((e) => { console.error("Settings:", e); return {}; }),
         getProductsCogs().catch((e) => { console.error("COGS:", e); return []; }),
         getGatewayFees().catch((e) => { console.error("Gateways:", e); return []; }),
         getExpenseRules().catch((e) => { console.error("Expenses:", e); return []; }),
+        getMediaSpendScopeRules().catch((e) => { console.error("Media scope:", e); return { rules: [], guidance: null }; }),
       ]);
       storeSettings = settings;
       products = prods;
       gateways = gws;
       expenseRules = rules;
+      mediaScopeRules = mediaRules.rules;
+      mediaScopeGuidance = mediaRules.guidance;
 
       // Hydrate COGS settings
       const mode = storeSettings?.cogs_mode as Record<string, string> | undefined;
@@ -238,6 +280,148 @@
     }
   }
 
+  // --- Media scope handlers ---
+
+  const mediaScopeChannels: Array<{ value: MediaSpendScopeChannel; label: string }> = [
+    { value: "", label: "All channels" },
+    { value: "meta", label: "Meta" },
+    { value: "google", label: "Google" },
+    { value: "tiktok", label: "TikTok" },
+    { value: "bing", label: "Bing" },
+    { value: "taboola", label: "Taboola" },
+    { value: "outbrain", label: "Outbrain" },
+    { value: "pinterest", label: "Pinterest" },
+  ];
+
+  const mediaScopeActions: Array<{ value: MediaSpendScopeAction; label: string }> = [
+    { value: "include", label: "Include matching spend" },
+    { value: "exclude", label: "Exclude matching spend" },
+  ];
+
+  const mediaScopeMatchFields: Array<{ value: MediaSpendScopeMatchField; label: string }> = [
+    { value: "campaign_name", label: "Campaign name" },
+    { value: "campaign_id", label: "Campaign ID" },
+    { value: "ad_set_id", label: "Ad set ID" },
+    { value: "ad_id", label: "Ad ID" },
+    { value: "account_id", label: "Account ID" },
+  ];
+
+  const mediaScopeOperators: Array<{ value: MediaSpendScopeOperator; label: string; advanced?: boolean }> = [
+    { value: "equals", label: "Equals" },
+    { value: "prefix", label: "Starts with" },
+    { value: "contains", label: "Contains" },
+    { value: "regex", label: "Regex", advanced: true },
+  ];
+
+  function mediaScopeLabel<T extends string>(items: Array<{ value: T; label: string }>, value: T) {
+    return items.find((item) => item.value === value)?.label ?? value;
+  }
+
+  function resetMediaScopeForm() {
+    editingMediaScopeRuleId = null;
+    mediaScopeForm = {
+      name: "",
+      channel: "",
+      account_id: "",
+      match_field: "campaign_name",
+      operator: "regex",
+      match_value: "",
+      action: "include",
+      priority: 100,
+      start_date: "",
+      end_date: "",
+      is_active: true,
+    };
+  }
+
+  function openMediaScopeCreate() {
+    resetMediaScopeForm();
+    showMediaScopeModal = true;
+  }
+
+  function openMediaScopeEdit(rule: MediaSpendScopeRule) {
+    editingMediaScopeRuleId = rule.entity_id;
+    mediaScopeForm = {
+      name: rule.data.name || "",
+      channel: rule.data.channel || "",
+      account_id: rule.data.account_id || "",
+      match_field: rule.data.match_field || "campaign_name",
+      operator: rule.data.operator || "regex",
+      match_value: rule.data.match_value || "",
+      action: rule.data.action || "include",
+      priority: rule.data.priority ?? 100,
+      start_date: rule.data.start_date || "",
+      end_date: rule.data.end_date || "",
+      is_active: rule.data.is_active ?? true,
+    };
+    showMediaScopeModal = true;
+  }
+
+  function normalizedMediaScopeForm(): MediaSpendScopeRuleData {
+    return {
+      ...mediaScopeForm,
+      name: mediaScopeForm.name.trim(),
+      account_id: mediaScopeForm.account_id.trim(),
+      match_value: mediaScopeForm.match_value.trim(),
+      priority: Number(mediaScopeForm.priority) || 100,
+    };
+  }
+
+  async function reloadMediaScopeRules() {
+    const result = await getMediaSpendScopeRules();
+    mediaScopeRules = result.rules;
+    mediaScopeGuidance = result.guidance;
+  }
+
+  async function handleSaveMediaScopeRule() {
+    saving = true;
+    try {
+      const payload = normalizedMediaScopeForm();
+      if (editingMediaScopeRuleId) {
+        await updateMediaSpendScopeRule(editingMediaScopeRuleId, payload);
+      } else {
+        await createMediaSpendScopeRule(payload);
+      }
+      showMediaScopeModal = false;
+      resetMediaScopeForm();
+      await reloadMediaScopeRules();
+      showSaved("Media scope rule saved. Dashboard metrics update after the next data refresh.");
+    } catch (e) {
+      showError(e instanceof Error ? e.message : "Failed to save media scope rule");
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function handleToggleMediaScopeRule(rule: MediaSpendScopeRule) {
+    saving = true;
+    try {
+      await updateMediaSpendScopeRule(rule.entity_id, {
+        ...rule.data,
+        is_active: !rule.data.is_active,
+      });
+      await reloadMediaScopeRules();
+      showSaved("Media scope rule updated. Dashboard metrics update after the next data refresh.");
+    } catch (e) {
+      showError(e instanceof Error ? e.message : "Failed to update media scope rule");
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function handleDeleteMediaScopeRule(ruleId: string) {
+    saving = true;
+    try {
+      await deleteMediaSpendScopeRule(ruleId);
+      mediaScopeRules = mediaScopeRules.filter((rule) => rule.entity_id !== ruleId);
+      showSaved("Media scope rule deleted. Dashboard metrics update after the next data refresh.");
+    } catch (e) {
+      showError(e instanceof Error ? e.message : "Failed to delete media scope rule");
+    } finally {
+      saving = false;
+    }
+  }
+
   const categories = [
     "agency",
     "software",
@@ -260,6 +444,21 @@
       Configure costs to calculate true profit, MER, and blended ROAS.
     </p>
   </div>
+
+  <!-- Saved banner -->
+  {#if savedMessage}
+    <div
+      class="mb-4 border border-bratrax-acid/40 bg-bratrax-acid/10 px-4 py-3 font-mono text-xs text-bratrax-acid-text"
+    >
+      {savedMessage}
+      <button
+        class="ml-2 text-bratrax-text-muted hover:text-bratrax-text-headline"
+        on:click={() => {
+          savedMessage = "";
+        }}>&times;</button
+      >
+    </div>
+  {/if}
 
   <!-- Error banner -->
   {#if errorMessage}
@@ -797,6 +996,259 @@
           </div>
         </div>
       {/if}
+      <!-- ================================================================ -->
+      <!-- TAB: MEDIA SCOPE -->
+      <!-- ================================================================ -->
+    {:else if activeTab === "media_scope"}
+      <div class="space-y-5">
+        <div class="media-scope-guidance">
+          <div>
+            <div class="font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              Shared ad account controls
+            </div>
+            <h2 class="mt-1 text-lg font-bold text-bratrax-text-headline">
+              {mediaScopeGuidance?.title || "Media spend scope rules are exact, not fuzzy."}
+            </h2>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-bratrax-text-body">
+              {mediaScopeGuidance?.body || "Use these rules when one ad account sends traffic to multiple stores. Matching spend is kept for this store; unmatched spend is excluded when include rules exist."}
+            </p>
+            {#if mediaScopeGuidance?.unmatched_policy}
+              <p class="mt-2 font-mono text-[11px] uppercase tracking-wide text-bratrax-text-muted">
+                {mediaScopeGuidance.unmatched_policy}
+              </p>
+            {/if}
+          </div>
+          <button class="btn-bratrax btn-primary btn-compact" on:click={openMediaScopeCreate}>
+            + Add rule
+          </button>
+        </div>
+
+        {#if mediaScopeGuidance?.examples?.length}
+          <div class="grid gap-3 md:grid-cols-2">
+            {#each mediaScopeGuidance.examples as example}
+              <div class="border border-bratrax-border bg-bratrax-surface p-3">
+                <div class="font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Example</div>
+                <div class="mt-1 font-mono text-xs text-bratrax-text-headline">{example.rule}</div>
+                <div class="mt-2 text-xs text-bratrax-text-body">Matches: {example.matches}</div>
+                <div class="text-xs text-bratrax-text-muted">Does not match: {example.does_not_match}</div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        {#if mediaScopeRules.length === 0}
+          <div class="cost-empty-state">
+            <div class="cost-empty-icon" aria-hidden="true"></div>
+            <div class="cost-empty-headline">No media scope rules yet</div>
+            <p class="cost-empty-text">
+              Add rules only when this store shares ad accounts with another store. With no rules, all ad spend stays included.
+            </p>
+            <div class="cost-empty-actions">
+              <button class="btn-bratrax btn-primary" on:click={openMediaScopeCreate}>
+                + Add media scope rule
+              </button>
+            </div>
+          </div>
+        {:else}
+          <div class="space-y-3">
+            {#each mediaScopeRules as rule (rule.entity_id)}
+              <div class="media-scope-rule" class:opacity-50={!rule.data.is_active}>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-medium text-bratrax-text-headline">
+                      {rule.data.name || "Untitled rule"}
+                    </span>
+                    <span class="media-scope-badge" class:exclude={rule.data.action === "exclude"}>
+                      {rule.data.action === "include" ? "Include" : "Exclude"}
+                    </span>
+                    {#if !rule.data.is_active}
+                      <span class="media-scope-badge muted">Paused</span>
+                    {/if}
+                  </div>
+                  <div class="mt-2 text-xs leading-5 text-bratrax-text-muted">
+                    {mediaScopeLabel(mediaScopeChannels, rule.data.channel || "")} · {mediaScopeLabel(mediaScopeMatchFields, rule.data.match_field)} {mediaScopeLabel(mediaScopeOperators, rule.data.operator).toLowerCase()} <span class="font-mono text-bratrax-text-body">{rule.data.match_value}</span>
+                    {#if rule.data.account_id}
+                      · account <span class="font-mono text-bratrax-text-body">{rule.data.account_id}</span>
+                    {/if}
+                    · priority {rule.data.priority}
+                    {#if rule.data.start_date || rule.data.end_date}
+                      · {rule.data.start_date || "any"} to {rule.data.end_date || "any"}
+                    {/if}
+                  </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <button
+                    class="font-mono text-[10px] uppercase text-bratrax-text-muted hover:text-bratrax-acid"
+                    on:click={() => handleToggleMediaScopeRule(rule)}
+                  >
+                    {rule.data.is_active ? "Pause" : "Resume"}
+                  </button>
+                  <button
+                    class="font-mono text-[10px] uppercase text-bratrax-text-muted hover:text-bratrax-acid"
+                    on:click={() => openMediaScopeEdit(rule)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    class="font-mono text-[10px] uppercase text-bratrax-text-muted hover:text-bratrax-tomato"
+                    on:click={() => handleDeleteMediaScopeRule(rule.entity_id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Media scope modal -->
+      {#if showMediaScopeModal}
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          on:click|self={() => {
+            showMediaScopeModal = false;
+          }}
+          on:keydown={(e) => {
+            if (e.key === "Escape") showMediaScopeModal = false;
+          }}
+          role="dialog"
+          tabindex="-1"
+        >
+          <div class="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-bratrax-border bg-bratrax-surface p-6">
+            <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+            <h3 class="mb-1 text-lg font-bold text-bratrax-text-headline">
+              {editingMediaScopeRuleId ? "Edit media scope rule" : "Add media scope rule"}
+            </h3>
+            <p class="mb-5 text-xs leading-5 text-bratrax-text-muted">
+              Rules are exact. Use another explicit rule or fix the campaign name if buyers use malformed campaign prefixes.
+            </p>
+
+            <div class="space-y-4">
+              <div>
+                <label for="media-scope-name" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Rule name</label>
+                <input
+                  id="media-scope-name"
+                  type="text"
+                  class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
+                  placeholder="e.g., Vibit AU campaigns"
+                  bind:value={mediaScopeForm.name}
+                />
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label for="media-scope-action" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Action</label>
+                  <select id="media-scope-action" class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm" bind:value={mediaScopeForm.action}>
+                    {#each mediaScopeActions as item}
+                      <option value={item.value}>{item.label}</option>
+                    {/each}
+                  </select>
+                </div>
+                <div>
+                  <label for="media-scope-channel" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Channel</label>
+                  <select id="media-scope-channel" class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm" bind:value={mediaScopeForm.channel}>
+                    {#each mediaScopeChannels as item}
+                      <option value={item.value}>{item.label}</option>
+                    {/each}
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-3">
+                <div>
+                  <label for="media-scope-match-field" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Match field</label>
+                  <select id="media-scope-match-field" class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm" bind:value={mediaScopeForm.match_field}>
+                    {#each mediaScopeMatchFields as item}
+                      <option value={item.value}>{item.label}</option>
+                    {/each}
+                  </select>
+                </div>
+                <div>
+                  <label for="media-scope-operator" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Operator</label>
+                  <select id="media-scope-operator" class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm" bind:value={mediaScopeForm.operator}>
+                    {#each mediaScopeOperators as item}
+                      <option value={item.value}>{item.label}{item.advanced ? " - advanced" : ""}</option>
+                    {/each}
+                  </select>
+                </div>
+                <div>
+                  <label for="media-scope-priority" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Priority</label>
+                  <input
+                    id="media-scope-priority"
+                    type="number"
+                    step="1"
+                    min="0"
+                    class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
+                    bind:value={mediaScopeForm.priority}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label for="media-scope-match-value" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Match value</label>
+                <input
+                  id="media-scope-match-value"
+                  type="text"
+                  class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 font-mono text-sm"
+                  placeholder={mediaScopeForm.operator === "regex" ? "^\\s*(\\[(AUS|AU)\\]|(AUS|AU))(\\s|[-|])" : "[AU]"}
+                  bind:value={mediaScopeForm.match_value}
+                />
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-3">
+                <div>
+                  <label for="media-scope-account-id" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Account ID</label>
+                  <input
+                    id="media-scope-account-id"
+                    type="text"
+                    class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
+                    placeholder="Optional"
+                    bind:value={mediaScopeForm.account_id}
+                  />
+                </div>
+                <div>
+                  <label for="media-scope-start-date" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">Start date</label>
+                  <input
+                    id="media-scope-start-date"
+                    type="date"
+                    class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
+                    bind:value={mediaScopeForm.start_date}
+                  />
+                </div>
+                <div>
+                  <label for="media-scope-end-date" class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted">End date</label>
+                  <input
+                    id="media-scope-end-date"
+                    type="date"
+                    class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
+                    bind:value={mediaScopeForm.end_date}
+                  />
+                </div>
+              </div>
+
+              <label class="flex items-center gap-2 text-sm text-bratrax-text-body">
+                <input type="checkbox" bind:checked={mediaScopeForm.is_active} />
+                Rule is active
+              </label>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-2">
+              <button
+                class="btn-bratrax btn-neutral btn-compact"
+                on:click={() => {
+                  showMediaScopeModal = false;
+                }}>Cancel</button
+              >
+              <button
+                class="btn-bratrax btn-primary btn-compact"
+                disabled={saving || !mediaScopeForm.match_value || !mediaScopeForm.name}
+                on:click={handleSaveMediaScopeRule}>Save rule</button
+              >
+            </div>
+          </div>
+        </div>
+      {/if}
     {/if}
     </div>
   {/if}
@@ -916,5 +1368,47 @@
     gap: 10px;
     justify-content: center;
     flex-wrap: wrap;
+  }
+  .media-scope-guidance {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    border: 0.5px solid var(--color-border);
+    background: rgba(0, 0, 0, 0.015);
+    padding: 18px;
+  }
+  .media-scope-rule {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    border: 0.5px solid var(--color-border);
+    padding: 16px;
+  }
+  .media-scope-badge {
+    font-family: "Space Mono", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 6px;
+    background: var(--color-acid);
+    color: #0A0A0A;
+  }
+  .media-scope-badge.exclude {
+    background: rgba(214, 80, 63, 0.14);
+    color: var(--color-tomato);
+  }
+  .media-scope-badge.muted {
+    background: transparent;
+    border: 0.5px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+  @media (max-width: 720px) {
+    .media-scope-guidance,
+    .media-scope-rule {
+      flex-direction: column;
+    }
   }
 </style>

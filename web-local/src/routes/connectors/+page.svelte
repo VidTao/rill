@@ -16,6 +16,7 @@
   import FunnelishInstallModal from "./FunnelishInstallModal.svelte";
   import TaboolaCredentialModal from "./TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "./OutbrainLoginModal.svelte";
+  import BloomreachCredentialModal from "./BloomreachCredentialModal.svelte";
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
   import { getAuthConfig } from "$lib/bratrax/auth";
   import ConnectorPill from "$lib/bratrax/connectors/ConnectorPill.svelte";
@@ -110,6 +111,12 @@
       type: "oauth",
       authUrlPath: "/bratrax/onboard/klaviyo/auth-url",
       color: "#2D2D2D",
+    },
+    {
+      id: "bloomreach",
+      name: "Bloomreach",
+      type: "credential_modal",
+      color: "#502EA8",
     },
     {
       id: "taboola",
@@ -237,6 +244,11 @@
   let outbrainModalLoading = false;
   let outbrainModalError = "";
   let outbrainState = "";
+
+  let showBloomreachModal = false;
+  let bloomreachModalLoading = false;
+  let bloomreachModalError = "";
+  let bloomreachState = "";
 
   // Builder ids that map to the "external_pages" umbrella. Keep in sync with
   // ExternalPagesBuilderPickerModal's `available` list.
@@ -717,6 +729,7 @@
       const isFacebook = accountModalPlatform === "Facebook Ads";
       const isTaboola = accountModalPlatform === "Taboola";
       const isOutbrain = accountModalPlatform === "Outbrain";
+      const isBloomreach = accountModalPlatform === "Bloomreach";
 
       let endpoint: string;
       let body: Record<string, unknown>;
@@ -732,6 +745,13 @@
         endpoint = `${host}/bratrax/onboard/outbrain/connect`;
         body = {
           state: outbrainState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+      } else if (isBloomreach) {
+        endpoint = `${host}/bratrax/onboard/bloomreach/connect`;
+        body = {
+          state: bloomreachState,
           client_id: clientId,
           selectedAccounts: selected,
         };
@@ -769,6 +789,7 @@
 
       if (isTaboola) taboolaState = "";
       if (isOutbrain) outbrainState = "";
+      if (isBloomreach) bloomreachState = "";
 
       showAccountModal = false;
       await refreshFromServer();
@@ -852,6 +873,48 @@
       outbrainModalError = e instanceof Error ? e.message : String(e);
     } finally {
       outbrainModalLoading = false;
+    }
+  }
+
+  async function handleBloomreachCredentials(creds: {
+    projectToken: string;
+    apiKey: string;
+    apiSecret: string;
+    baseUrl: string;
+  }) {
+    bloomreachModalError = "";
+    bloomreachModalLoading = true;
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(`${host}/bratrax/onboard/bloomreach/accounts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          project_token: creds.projectToken,
+          api_key: creds.apiKey,
+          api_secret: creds.apiSecret,
+          base_url: creds.baseUrl,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (data as any).error || "Failed to validate Bloomreach credentials",
+        );
+      }
+      bloomreachState = (data as any).state;
+      accountModalAccounts = ((data as any).accounts || []).map((a: any) => ({
+        id: String(a.id),
+        name: a.name || a.id,
+      }));
+      accountModalPlatform = "Bloomreach";
+      showBloomreachModal = false;
+      showAccountModal = true;
+    } catch (e) {
+      bloomreachModalError = e instanceof Error ? e.message : String(e);
+    } finally {
+      bloomreachModalLoading = false;
     }
   }
 
@@ -993,6 +1056,9 @@
       } else if (platform.id === "outbrain") {
         outbrainModalError = "";
         showOutbrainModal = true;
+      } else if (platform.id === "bloomreach") {
+        bloomreachModalError = "";
+        showBloomreachModal = true;
       }
     } else {
       handleOAuthConnect(platform);
@@ -1494,6 +1560,17 @@
   onClose={() => {
     showOutbrainModal = false;
     outbrainModalError = "";
+  }}
+/>
+
+<BloomreachCredentialModal
+  open={showBloomreachModal}
+  loading={bloomreachModalLoading}
+  error={bloomreachModalError}
+  onSubmit={handleBloomreachCredentials}
+  onClose={() => {
+    showBloomreachModal = false;
+    bloomreachModalError = "";
   }}
 />
 

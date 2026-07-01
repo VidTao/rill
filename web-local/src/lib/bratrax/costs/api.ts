@@ -7,6 +7,9 @@ import type {
   GatewayFee,
   ShippingProfile,
   ExpenseRule,
+  MediaSpendScopeGuidance,
+  MediaSpendScopeRule,
+  MediaSpendScopeRuleData,
   StoreSettings,
 } from "./types";
 
@@ -177,6 +180,50 @@ export async function updateExpenseRule(
 
 export async function deleteExpenseRule(ruleId: string): Promise<void> {
   await apiFetch(`/bratrax/cost-settings/expense-rules/${ruleId}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Media Spend Scope Rules ---
+
+export async function getMediaSpendScopeRules(): Promise<{
+  rules: MediaSpendScopeRule[];
+  guidance: MediaSpendScopeGuidance | null;
+}> {
+  const res = await apiFetch<{
+    data: MediaSpendScopeRule[];
+    meta?: { ui_guidance?: MediaSpendScopeGuidance };
+  }>("/bratrax/cost-settings/media-spend-scope-rules");
+  return { rules: res.data, guidance: res.meta?.ui_guidance ?? null };
+}
+
+export async function createMediaSpendScopeRule(
+  rule: MediaSpendScopeRuleData,
+): Promise<string> {
+  const res = await apiFetch<{ rule_id: string }>(
+    "/bratrax/cost-settings/media-spend-scope-rules",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rule),
+    },
+  );
+  return res.rule_id;
+}
+
+export async function updateMediaSpendScopeRule(
+  ruleId: string,
+  rule: MediaSpendScopeRuleData,
+): Promise<void> {
+  await apiFetch(`/bratrax/cost-settings/media-spend-scope-rules/${ruleId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rule),
+  });
+}
+
+export async function deleteMediaSpendScopeRule(ruleId: string): Promise<void> {
+  await apiFetch(`/bratrax/cost-settings/media-spend-scope-rules/${ruleId}`, {
     method: "DELETE",
   });
 }

@@ -240,6 +240,18 @@ export const PLATFORMS: PlatformConfig[] = [
     connectionKey: "Klaviyo",
     detailType: "crm",
   },
+  {
+    id: "bloomreach",
+    name: "Bloomreach",
+    logo: "bloomreach-logo.png",
+    description: "Connect your Bloomreach email/SMS engagement account",
+    category: "crm",
+    flowType: "credential-modal",
+    apiSlug: "bloomreach",
+    callbackParams: [],
+    connectionKey: "Bloomreach",
+    detailType: "crm",
+  },
 
   // ── Analytics ──
   {
