@@ -84,6 +84,17 @@ export class CanvasEntity {
   public specStore: CanvasSpecResponseStore;
   // Tracks whether the canvas been loaded (and rows processed) for the first time
   firstLoad = writable(true);
+  // True when the dashboard body can render without showing incorrect, unfiltered
+  // data. Derived (in the constructor) from the LIVE url so it re-evaluates on
+  // every navigation — a persistent latch would (and did) stay true across SPA
+  // navigations on a reused canvas entity, showing stale/unfiltered data on
+  // re-visits while the correct preset was still being applied. Ready iff the url
+  // already carries params (the default/explicit preset has landed) OR the spec
+  // has resolved with no default preset to wait for.
+  paramsReady: Readable<boolean>;
+  // Latches true once processSpec has resolved the spec, so defaultUrlParamsStore
+  // reflects the real preset — distinguishing "no defaults" from "not loaded yet".
+  defaultsResolved = writable(false);
   themeName = writable<string | undefined>(undefined);
   theme: Readable<Theme | undefined>;
   unsubscriber: Unsubscriber;
@@ -109,6 +120,18 @@ export class CanvasEntity {
     private spec: CanvasResponse,
   ) {
     this.specStore = useCanvas(instanceId, name, {}, queryClient);
+
+    this.paramsReady = derived(
+      [this.searchParams, this.defaultsResolved, this.defaultUrlParamsStore],
+      ([searchParams, defaultsResolved, defaultParams]) => {
+        // The url already carries the (default or explicit) preset params.
+        if (searchParams.size > 0) return true;
+        // Spec not resolved yet — we don't know whether a preset is coming.
+        if (!defaultsResolved) return false;
+        // Spec resolved and there is genuinely no preset to wait for.
+        return defaultParams.size === 0;
+      },
+    );
 
     // This will be deprecated soon - bgh
     const searchParamsStore: SearchParamsStore = (() => {
@@ -296,6 +319,9 @@ export class CanvasEntity {
     this.checkAndSetFilterEnabled(validSpec);
     this.checkAndSetFileArtifact(filePath);
     this.checkAndSetDefaultParams(validSpec.defaultPreset ?? {});
+    // The spec is resolved, so defaultUrlParamsStore now reflects the real
+    // default preset (or its absence) — let the paramsReady gate proceed.
+    this.defaultsResolved.set(true);
     this.checkAndSetEmbeddedTheme(validSpec);
     this.checkAndSetHasBanner(validSpec);
     this.checkAndSetMaxWidth(validSpec);
@@ -477,6 +503,11 @@ export class CanvasEntity {
     url: URL;
     projectId?: string;
   }) => {
+    // Keep searchParams reflecting the live URL on EVERY pass (including redirect
+    // passes and re-navigations into a reused entity) so the derived paramsReady
+    // gate tracks the real URL state and resets on a bare-URL navigation.
+    this.searchParams.set(searchParams);
+
     const redirected = await this.handleCanvasRedirect({
       canvasName: this.name,
       searchParams,
@@ -488,7 +519,6 @@ export class CanvasEntity {
     if (redirected) return;
 
     this.filterManager.onUrlChange(searchParams);
-    this.searchParams.set(searchParams);
     this.saveSnapshot(searchParams.toString());
     this.timeManager.state.onUrlChange(searchParams);
   };

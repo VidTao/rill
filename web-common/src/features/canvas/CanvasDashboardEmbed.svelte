@@ -21,6 +21,7 @@
       componentsStore,
       _rows,
       firstLoad,
+      paramsReady,
       _maxWidth,
       filtersEnabledStore,
       themeName,
@@ -50,22 +51,31 @@
     <svelte:fragment slot="filter-right">
       <slot name="filter-right" />
     </svelte:fragment>
-    {#each rows as row, rowIndex (rowIndex)}
-      <StaticCanvasRow
-        {row}
-        {rowIndex}
-        {components}
-        {maxWidth}
-        {navigationEnabled}
-      />
-    {:else}
+    {#if !$paramsReady}
+      <!-- Wait for the default filter/time preset to be applied to the URL
+           before rendering any widgets, so the dashboard never shows
+           briefly-incorrect unfiltered data. -->
       <div class="size-full flex items-center justify-center">
-        {#if $firstLoad}
-          <Spinner status={EntityStatus.Running} size="32px" />
-        {:else}
-          <p class="text-lg text-fg-secondary">No components added</p>
-        {/if}
+        <Spinner status={EntityStatus.Running} size="32px" />
       </div>
-    {/each}
+    {:else}
+      {#each rows as row, rowIndex (rowIndex)}
+        <StaticCanvasRow
+          {row}
+          {rowIndex}
+          {components}
+          {maxWidth}
+          {navigationEnabled}
+        />
+      {:else}
+        <div class="size-full flex items-center justify-center">
+          {#if $firstLoad}
+            <Spinner status={EntityStatus.Running} size="32px" />
+          {:else}
+            <p class="text-lg text-fg-secondary">No components added</p>
+          {/if}
+        </div>
+      {/each}
+    {/if}
   </CanvasDashboardWrapper>
 {/if}
