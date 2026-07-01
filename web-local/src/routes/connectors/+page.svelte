@@ -618,6 +618,7 @@
     name?: string;
     descriptive_name?: string;
     manager_account_id?: string;
+    is_manager_account?: boolean;
     children?: GoogleAdAccountNode[];
   }
 
@@ -629,7 +630,13 @@
     function walk(list: GoogleAdAccountNode[]) {
       for (const acc of list) {
         const id = String(acc.customer_id);
-        flat.push({ id, name: acc.name || acc.descriptive_name || id });
+        const isManager =
+          !!acc.is_manager_account ||
+          !!(acc.children && acc.children.length > 0);
+        // Manager (MCC) accounts can't serve metrics — never selectable.
+        if (!isManager) {
+          flat.push({ id, name: acc.name || acc.descriptive_name || id });
+        }
         if (acc.manager_account_id) {
           googleManagerMap[id] = String(acc.manager_account_id);
         }

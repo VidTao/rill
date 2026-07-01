@@ -1075,6 +1075,7 @@
     name?: string;
     descriptive_name?: string;
     manager_account_id?: string;
+    is_manager_account?: boolean;
     children?: GoogleAdAccountNode[];
   }
 
@@ -1091,9 +1092,14 @@
       for (const acc of list) {
         const id = String(acc.customer_id);
         const name = acc.name || acc.descriptive_name || id;
-        const isManager = !!(acc.children && acc.children.length > 0);
+        const isManager =
+          !!acc.is_manager_account ||
+          !!(acc.children && acc.children.length > 0);
         const group = isManager ? name : parentName;
-        flat.push({ id, name, group });
+        // Manager (MCC) accounts can't serve metrics (REQUESTED_METRICS_FOR_MANAGER),
+        // so they're group headers only — never selectable extraction targets.
+        // Selecting an MCC leaves the client Google-dark (no leaf account stored).
+        if (!isManager) flat.push({ id, name, group });
         if (acc.manager_account_id) {
           googleManagerMap[id] = String(acc.manager_account_id);
         }

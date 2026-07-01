@@ -99,6 +99,7 @@
   };
 
   type WorkspaceMode = "canvas" | "review";
+  type WorkspaceView = "all" | "my_work";
 
   const UNITS: MetricUnit[] = [
     "currency",
@@ -156,6 +157,7 @@
   let liveKey = "";
   let timePreset: TimePreset = "last_30_days";
   let workspaceMode: WorkspaceMode = "canvas";
+  let workspaceView: WorkspaceView = "all";
   let selectedId: string | null = null;
   let selectedDraft: AuthoredMetricNode | null = null;
   let loading = true;
@@ -246,7 +248,10 @@
   $: myOwnership = myOwnerKey ? ownershipRoster.find((owner) => owner.ownerKey === myOwnerKey) ?? null : null;
   $: activeOwnerFilter = ownerFilter && ownershipRoster.some((owner) => owner.ownerKey === ownerFilter) ? ownerFilter : null;
   $: activeOwnerLabel = ownershipRoster.find((owner) => owner.ownerKey === activeOwnerFilter)?.owner ?? null;
+  $: if (workspaceView === "my_work" && myOwnerKey && myOwnership && ownerFilter !== myOwnerKey) ownerFilter = myOwnerKey;
+  $: if (workspaceView === "my_work" && storedTree && (!myOwnerKey || !myOwnership)) workspaceView = "all";
   $: myActionItemCount = myOwnership ? ownershipItemCount(myOwnership) : 0;
+  $: isMyOperatingView = workspaceView === "my_work" && !!myOwnership;
   $: filteredRankedLevers = rankedLevers.filter((item) => ownerMatchesNode(activeOwnerFilter, nodeById(item.nodeId, nodes)));
   $: filteredExperiments = experiments.filter((item) => ownerMatchesNode(activeOwnerFilter, item.node));
   $: selectedRankedLever = selectedDraft?.type === "lever"
@@ -302,7 +307,9 @@
     const link = initialDeepLink();
     if (link.timePreset) timePreset = link.timePreset;
     if (link.mode) workspaceMode = link.mode;
+    workspaceView = link.view;
     ownerFilter = link.owner;
+    if (link.view === "my_work" && !link.mode) workspaceMode = "review";
     void loadTeamMembers();
     void loadSummaries(link.treeId ?? undefined, link.treeId ? link.nodeId : null).finally(
       () => {
@@ -322,6 +329,7 @@
     timePreset,
     activeOwnerFilter,
     selectedReviewSession?.session_id ?? null,
+    workspaceView,
   );
 
   function cloneNode(node: AuthoredMetricNode): AuthoredMetricNode {
@@ -455,12 +463,13 @@
     }
   }
 
-  function initialDeepLink(): { treeId: string | null; nodeId: string | null; mode: WorkspaceMode | null; owner: string | null; reviewSessionId: string | null; timePreset: TimePreset | null } {
-    if (!browser) return { treeId: null, nodeId: null, mode: null, owner: null, reviewSessionId: null, timePreset: null };
+  function initialDeepLink(): { treeId: string | null; nodeId: string | null; mode: WorkspaceMode | null; owner: string | null; reviewSessionId: string | null; timePreset: TimePreset | null; view: WorkspaceView } {
+    if (!browser) return { treeId: null, nodeId: null, mode: null, owner: null, reviewSessionId: null, timePreset: null, view: "all" };
     const params = new URLSearchParams(window.location.search);
     const treeId = params.get("tree_id")?.trim() || null;
     const mode = params.get("mode") === "review" ? "review" : params.get("mode") === "canvas" ? "canvas" : null;
     const preset = params.get("time_preset") as TimePreset | null;
+    const view = params.get("view") === "my_work" ? "my_work" : "all";
     return {
       treeId,
       nodeId: treeId ? params.get("node_id")?.trim() || null : null,
@@ -468,6 +477,7 @@
       owner: params.get("owner")?.trim() || null,
       reviewSessionId: params.get("review_session_id")?.trim() || null,
       timePreset: TIME_PRESETS.some((item) => item.value === preset) ? preset : null,
+      view,
     };
   }
 
@@ -499,6 +509,7 @@
     preset: TimePreset,
     ownerKey: string | null,
     reviewSessionId: string | null,
+    view: WorkspaceView,
   ) {
     if (!browser) return;
     const url = new URL(window.location.href);
@@ -517,6 +528,8 @@
     else url.searchParams.delete("owner");
     if (reviewSessionId) url.searchParams.set("review_session_id", reviewSessionId);
     else url.searchParams.delete("review_session_id");
+    if (view === "my_work") url.searchParams.set("view", view);
+    else url.searchParams.delete("view");
     const nextUrl = `${url.pathname}${url.search}`;
     if (
       nextUrl === lastSyncedUrl ||
@@ -762,10 +775,14 @@
   }
 
   function selectMyOperatingView() {
-    if (myOwnerKey && myOwnership) ownerFilter = myOwnerKey;
+    if (!myOwnerKey || !myOwnership) return;
+    workspaceView = "my_work";
+    workspaceMode = "review";
+    ownerFilter = myOwnerKey;
   }
 
   function selectOwnerFilter(owner: string | null) {
+    workspaceView = "all";
     ownerFilter = owner;
   }
 
@@ -1561,7 +1578,7 @@
           <button
             type="button"
             class="my-work-button"
-            class:active={activeOwnerFilter === myOwnerKey}
+            class:active={isMyOperatingView}
             on:click={selectMyOperatingView}
           >
             <span>My work</span>
@@ -1612,7 +1629,7 @@
             <p>
               {nodes.length} nodes · {timeContext.label}{activeOwnerLabel ? ` · owner: ${activeOwnerLabel}` : ""}{liveLoading
                 ? " · resolving live values"
-                : ""}{liveError ? " · live fallback" : ""}
+                : ""}{liveError ? " · live fallback" : ""}{isMyOperatingView ? " · my operating view" : ""}
             </p>
           </div>
           {#if root}
@@ -1648,6 +1665,27 @@
                 <strong>{activeOwnerLabel ?? ownerCoverageLabel(ownershipRoster)}</strong>
               </div>
             </section>
+
+            {#if isMyOperatingView && myOwnership}
+              <section class="my-operating-band">
+                <div>
+                  <span>My operating view</span>
+                  <strong>{myOwnership.owner}</strong>
+                </div>
+                <div>
+                  <span>Action items</span>
+                  <strong>{myActionItemCount}</strong>
+                </div>
+                <div>
+                  <span>Levers</span>
+                  <strong>{myOwnership.leverCount}</strong>
+                </div>
+                <div>
+                  <span>Experiments</span>
+                  <strong>{myOwnership.experimentCount}</strong>
+                </div>
+              </section>
+            {/if}
 
             <div class="review-grid">
               <section class="review-block">
@@ -2465,7 +2503,8 @@
   .decision-lines div,
   .backlog button,
   .impact-list button,
-  .review-walk button {
+  .review-walk button,
+  .my-operating-band {
     display: flex;
   }
 
@@ -2541,6 +2580,41 @@
     background: #fff8df;
     font-size: 12px;
     font-weight: 650;
+  }
+
+  .my-operating-band {
+    align-items: stretch;
+    gap: 8px;
+    border-bottom: 1px solid #dbeafe;
+    background: #f8fbff;
+  }
+
+  .my-operating-band div {
+    min-width: 0;
+    flex: 1;
+    border: 1px solid #dbeafe;
+    border-radius: 7px;
+    padding: 9px 10px;
+    background: #fff;
+  }
+
+  .my-operating-band span {
+    display: block;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .my-operating-band strong {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .graph-shell,
