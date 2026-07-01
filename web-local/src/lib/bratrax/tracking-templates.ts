@@ -51,3 +51,67 @@ export const organicContentWarnings = [
   "Use utm_campaign for the broader content initiative.",
   "Use utm_content for the individual post or link slug.",
 ];
+
+// A single tracking-template card in the connectors guide. Add a new platform by
+// appending one object here — the view iterates this array. For the API to
+// override `defaultTemplate`, the backend must also return `apiKey` from
+// GET /bratrax/onboard/tracking-templates (utm_templates.yaml + onboarding.py);
+// until then the card renders its `defaultTemplate`.
+export interface TrackingTemplateCard {
+  id: string;
+  apiKey: keyof TrackingTemplatePayload;
+  kicker: string;
+  subtitle: string;
+  note: string;
+  copyLabel: string;
+  markColor: string;
+  defaultTemplate: string;
+  warnings: string[];
+}
+
+export const TRACKING_TEMPLATE_CARDS: TrackingTemplateCard[] = [
+  {
+    id: "google-combined",
+    apiKey: "google_ads",
+    kicker: "Google Ads",
+    subtitle: "Account global tracking template",
+    note: "Paste this combined value into Google Ads account Global settings, under Tracking template. It includes the landing page token and the full final URL suffix parameters.",
+    copyLabel: "Tracking template",
+    markColor: "#4285f4",
+    defaultTemplate: GOOGLE_ACCOUNT_TRACKING_TEMPLATE,
+    warnings: googleTrackingWarnings,
+  },
+  {
+    id: "meta-params",
+    apiKey: "facebook_ads",
+    kicker: "Meta Ads",
+    subtitle: "Campaign-level URL Parameters",
+    note: "Paste this into URL Parameters on each campaign in Meta Ads Manager. Meta does not provide a reliable account-level URL parameter setting for this setup.",
+    copyLabel: "URL Parameters",
+    markColor: "#1877f2",
+    defaultTemplate: META_URL_PARAMETERS,
+    warnings: metaTrackingWarnings,
+  },
+  {
+    id: "taboola-params",
+    apiKey: "taboola_ads",
+    kicker: "Taboola",
+    subtitle: "Campaign Tracking Code parameters",
+    note: "Paste this into Taboola Tracking Code / URL parameters for each campaign. It keeps native traffic separate and passes campaign, item, site, and click ID context into Bratrax.",
+    copyLabel: "URL Parameters",
+    markColor: "#1376dc",
+    defaultTemplate: TABOOLA_URL_PARAMETERS,
+    warnings: taboolaTrackingWarnings,
+  },
+  {
+    id: "organic-params",
+    apiKey: "organic_content",
+    kicker: "Organic Content",
+    subtitle: "Social profile and content links",
+    note: "Add this parameter string to outbound links from organic social posts, bio links, stories, captions, and creator content. Replace each brace placeholder before publishing the link.",
+    copyLabel: "URL Parameters",
+    markColor: "#14b86a",
+    defaultTemplate: ORGANIC_CONTENT_URL_PARAMETERS,
+    warnings: organicContentWarnings,
+  },
+];

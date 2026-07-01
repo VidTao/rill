@@ -3,48 +3,37 @@
   import { onMount } from "svelte";
   import { apiFetch } from "$lib/bratrax/onboarding/api";
   import {
-    GOOGLE_ACCOUNT_TRACKING_TEMPLATE,
-    META_URL_PARAMETERS,
-    ORGANIC_CONTENT_URL_PARAMETERS,
-    TABOOLA_URL_PARAMETERS,
-    googleTrackingWarnings,
-    metaTrackingWarnings,
-    taboolaTrackingWarnings,
-    organicContentWarnings,
+    TRACKING_TEMPLATE_CARDS,
     trackingVerificationChecklist,
   } from "$lib/bratrax/tracking-templates";
-  import type { TrackingTemplatePayload } from "$lib/bratrax/tracking-templates";
+  import type {
+    TrackingTemplateCard,
+    TrackingTemplatePayload,
+  } from "$lib/bratrax/tracking-templates";
 
-  type CopyKey =
-    | "google-combined"
-    | "meta-params"
-    | "taboola-params"
-    | "organic-params";
-
-  let copied: CopyKey | "" = "";
-  let googleTemplate = GOOGLE_ACCOUNT_TRACKING_TEMPLATE;
-  let metaTemplate = META_URL_PARAMETERS;
-  let taboolaTemplate = TABOOLA_URL_PARAMETERS;
-  let organicTemplate = ORGANIC_CONTENT_URL_PARAMETERS;
+  let copied = "";
+  let overrides: TrackingTemplatePayload = {};
 
   onMount(async () => {
     try {
-      const templates = await apiFetch<TrackingTemplatePayload>(
+      overrides = await apiFetch<TrackingTemplatePayload>(
         "/bratrax/onboard/tracking-templates",
       );
-      googleTemplate =
-        templates.google_ads?.template || GOOGLE_ACCOUNT_TRACKING_TEMPLATE;
-      metaTemplate = templates.facebook_ads?.template || META_URL_PARAMETERS;
-      taboolaTemplate =
-        templates.taboola_ads?.template || TABOOLA_URL_PARAMETERS;
-      organicTemplate =
-        templates.organic_content?.template || ORGANIC_CONTENT_URL_PARAMETERS;
     } catch (e) {
       console.warn("Failed to load tracking templates", e);
     }
   });
 
-  async function copyValue(key: CopyKey, value: string) {
+  // Resolve each card's template: API override (when present) else the bundled
+  // default. Reactive on `overrides` so cards update once the fetch lands.
+  $: templateById = Object.fromEntries(
+    TRACKING_TEMPLATE_CARDS.map((card: TrackingTemplateCard) => [
+      card.id,
+      overrides[card.apiKey]?.template || card.defaultTemplate,
+    ]),
+  ) as Record<string, string>;
+
+  async function copyValue(key: string, value: string) {
     try {
       await navigator.clipboard.writeText(value);
       copied = key;
@@ -61,14 +50,6 @@
     "URL parameters",
     "Bratrax attribution",
     "Campaign reporting",
-  ];
-
-  $: metaFields = [
-    {
-      key: "meta-params" as const,
-      label: "URL Parameters",
-      value: metaTemplate,
-    },
   ];
 </script>
 
@@ -94,186 +75,6 @@
     {/each}
   </div>
 
-  <div class="platform-grid">
-    <article class="platform-panel google-panel">
-      <div class="platform-header">
-        <span class="platform-mark google-mark"></span>
-        <div>
-          <div class="platform-kicker">Google Ads</div>
-          <h3>Account global tracking template</h3>
-        </div>
-      </div>
-
-      <p class="platform-note">
-        Paste this combined value into Google Ads account Global settings, under
-        Tracking template. It includes the landing page token and the full final
-        URL suffix parameters.
-      </p>
-
-      <div class="copy-block">
-        <div class="copy-block-top">
-          <span>Tracking template</span>
-          <button
-            type="button"
-            class="copy-button"
-            on:click={() => copyValue("google-combined", googleTemplate)}
-            title="Copy Google Ads tracking template"
-            aria-label="Copy Google Ads tracking template"
-          >
-            {#if copied === "google-combined"}
-              <Check size={14} />
-              Copied
-            {:else}
-              <Copy size={14} />
-              Copy
-            {/if}
-          </button>
-        </div>
-        <pre>{googleTemplate}</pre>
-      </div>
-
-      <ul class="warning-list">
-        {#each googleTrackingWarnings as warning}
-          <li>{warning}</li>
-        {/each}
-      </ul>
-    </article>
-
-    <article class="platform-panel meta-panel">
-      <div class="platform-header">
-        <span class="platform-mark meta-mark"></span>
-        <div>
-          <div class="platform-kicker">Meta Ads</div>
-          <h3>Campaign-level URL Parameters</h3>
-        </div>
-      </div>
-
-      <p class="platform-note">
-        Paste this into URL Parameters on each campaign in Meta Ads Manager.
-        Meta does not provide a reliable account-level URL parameter setting for
-        this setup.
-      </p>
-
-      {#each metaFields as field}
-        <div class="copy-block">
-          <div class="copy-block-top">
-            <span>{field.label}</span>
-            <button
-              type="button"
-              class="copy-button"
-              on:click={() => copyValue(field.key, field.value)}
-              title={`Copy ${field.label}`}
-              aria-label={`Copy Meta Ads ${field.label}`}
-            >
-              {#if copied === field.key}
-                <Check size={14} />
-                Copied
-              {:else}
-                <Copy size={14} />
-                Copy
-              {/if}
-            </button>
-          </div>
-          <pre>{field.value}</pre>
-        </div>
-      {/each}
-
-      <ul class="warning-list">
-        {#each metaTrackingWarnings as warning}
-          <li>{warning}</li>
-        {/each}
-      </ul>
-    </article>
-
-    <article class="platform-panel taboola-panel">
-      <div class="platform-header">
-        <span class="platform-mark taboola-mark"></span>
-        <div>
-          <div class="platform-kicker">Taboola</div>
-          <h3>Campaign Tracking Code parameters</h3>
-        </div>
-      </div>
-
-      <p class="platform-note">
-        Paste this into Taboola Tracking Code / URL parameters for each
-        campaign. It keeps native traffic separate and passes campaign, item,
-        site, and click ID context into Bratrax.
-      </p>
-
-      <div class="copy-block">
-        <div class="copy-block-top">
-          <span>URL Parameters</span>
-          <button
-            type="button"
-            class="copy-button"
-            on:click={() => copyValue("taboola-params", taboolaTemplate)}
-            title="Copy Taboola URL Parameters"
-            aria-label="Copy Taboola URL Parameters"
-          >
-            {#if copied === "taboola-params"}
-              <Check size={14} />
-              Copied
-            {:else}
-              <Copy size={14} />
-              Copy
-            {/if}
-          </button>
-        </div>
-        <pre>{taboolaTemplate}</pre>
-      </div>
-
-      <ul class="warning-list">
-        {#each taboolaTrackingWarnings as warning}
-          <li>{warning}</li>
-        {/each}
-      </ul>
-    </article>
-
-    <article class="platform-panel organic-panel">
-      <div class="platform-header">
-        <span class="platform-mark organic-mark"></span>
-        <div>
-          <div class="platform-kicker">Organic Content</div>
-          <h3>Social profile and content links</h3>
-        </div>
-      </div>
-
-      <p class="platform-note">
-        Add this parameter string to outbound links from organic social posts,
-        bio links, stories, captions, and creator content. Replace each brace
-        placeholder before publishing the link.
-      </p>
-
-      <div class="copy-block">
-        <div class="copy-block-top">
-          <span>URL Parameters</span>
-          <button
-            type="button"
-            class="copy-button"
-            on:click={() => copyValue("organic-params", organicTemplate)}
-            title="Copy Organic Content URL Parameters"
-            aria-label="Copy Organic Content URL Parameters"
-          >
-            {#if copied === "organic-params"}
-              <Check size={14} />
-              Copied
-            {:else}
-              <Copy size={14} />
-              Copy
-            {/if}
-          </button>
-        </div>
-        <pre>{organicTemplate}</pre>
-      </div>
-
-      <ul class="warning-list">
-        {#each organicContentWarnings as warning}
-          <li>{warning}</li>
-        {/each}
-      </ul>
-    </article>
-  </div>
-
   <div class="verification-panel">
     <div>
       <div class="tracking-eyebrow">Verify after setup</div>
@@ -284,6 +85,53 @@
         <li>{item}</li>
       {/each}
     </ol>
+  </div>
+
+  <div class="platform-grid">
+    {#each TRACKING_TEMPLATE_CARDS as card (card.id)}
+      <article class="platform-panel">
+        <div class="platform-header">
+          <span
+            class="platform-mark"
+            style="background: {card.markColor}"
+          ></span>
+          <div>
+            <div class="platform-kicker">{card.kicker}</div>
+            <h3>{card.subtitle}</h3>
+          </div>
+        </div>
+
+        <p class="platform-note">{card.note}</p>
+
+        <div class="copy-block">
+          <div class="copy-block-top">
+            <span>{card.copyLabel}</span>
+            <button
+              type="button"
+              class="copy-button"
+              on:click={() => copyValue(card.id, templateById[card.id])}
+              title={`Copy ${card.kicker} ${card.copyLabel}`}
+              aria-label={`Copy ${card.kicker} ${card.copyLabel}`}
+            >
+              {#if copied === card.id}
+                <Check size={14} />
+                Copied
+              {:else}
+                <Copy size={14} />
+                Copy
+              {/if}
+            </button>
+          </div>
+          <pre>{templateById[card.id]}</pre>
+        </div>
+
+        <ul class="warning-list">
+          {#each card.warnings as warning}
+            <li>{warning}</li>
+          {/each}
+        </ul>
+      </article>
+    {/each}
   </div>
 </section>
 
@@ -367,7 +215,7 @@
 
   .platform-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
 
@@ -377,6 +225,14 @@
     border: 0.5px solid var(--color-border);
     background: var(--color-elevated);
     padding: 20px;
+  }
+
+  /* Flex column so the warning list can pin to the bottom of the card,
+     keeping the acid-bordered notes aligned across a 2-up row regardless of
+     how much note/template content sits above them. */
+  .platform-panel {
+    display: flex;
+    flex-direction: column;
   }
 
   .platform-panel::before,
@@ -401,22 +257,6 @@
     width: 24px;
     height: 24px;
     flex: 0 0 auto;
-  }
-
-  .google-mark {
-    background: #4285f4;
-  }
-
-  .meta-mark {
-    background: #1877f2;
-  }
-
-  .taboola-mark {
-    background: #1376dc;
-  }
-
-  .organic-mark {
-    background: #14b86a;
   }
 
   .copy-block {
@@ -482,7 +322,9 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-top: 14px;
+    /* Push to the bottom of the flex-column card (min 14px from the block above). */
+    margin-top: auto;
+    padding-top: 14px;
     color: var(--color-text-secondary);
     font-size: 13px;
     line-height: 1.45;
@@ -497,7 +339,7 @@
     display: grid;
     grid-template-columns: 180px minmax(0, 1fr);
     gap: 20px;
-    margin-top: 16px;
+    margin-bottom: 16px;
   }
 
   .verification-panel ol {
@@ -529,12 +371,6 @@
     font-family: "Space Mono", monospace;
     font-size: 10px;
     font-weight: 700;
-  }
-
-  @media (max-width: 1180px) {
-    .platform-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
   }
 
   @media (max-width: 860px) {
