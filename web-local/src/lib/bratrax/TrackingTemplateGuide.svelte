@@ -6,18 +6,25 @@
     GOOGLE_ACCOUNT_TRACKING_TEMPLATE,
     META_URL_PARAMETERS,
     ORGANIC_CONTENT_URL_PARAMETERS,
+    TABOOLA_URL_PARAMETERS,
     googleTrackingWarnings,
     metaTrackingWarnings,
+    taboolaTrackingWarnings,
     organicContentWarnings,
     trackingVerificationChecklist,
   } from "$lib/bratrax/tracking-templates";
   import type { TrackingTemplatePayload } from "$lib/bratrax/tracking-templates";
 
-  type CopyKey = "google-combined" | "meta-params" | "organic-params";
+  type CopyKey =
+    | "google-combined"
+    | "meta-params"
+    | "taboola-params"
+    | "organic-params";
 
   let copied: CopyKey | "" = "";
   let googleTemplate = GOOGLE_ACCOUNT_TRACKING_TEMPLATE;
   let metaTemplate = META_URL_PARAMETERS;
+  let taboolaTemplate = TABOOLA_URL_PARAMETERS;
   let organicTemplate = ORGANIC_CONTENT_URL_PARAMETERS;
 
   onMount(async () => {
@@ -28,6 +35,8 @@
       googleTemplate =
         templates.google_ads?.template || GOOGLE_ACCOUNT_TRACKING_TEMPLATE;
       metaTemplate = templates.facebook_ads?.template || META_URL_PARAMETERS;
+      taboolaTemplate =
+        templates.taboola_ads?.template || TABOOLA_URL_PARAMETERS;
       organicTemplate =
         templates.organic_content?.template || ORGANIC_CONTENT_URL_PARAMETERS;
     } catch (e) {
@@ -176,6 +185,50 @@
       </ul>
     </article>
 
+    <article class="platform-panel taboola-panel">
+      <div class="platform-header">
+        <span class="platform-mark taboola-mark"></span>
+        <div>
+          <div class="platform-kicker">Taboola</div>
+          <h3>Campaign Tracking Code parameters</h3>
+        </div>
+      </div>
+
+      <p class="platform-note">
+        Paste this into Taboola Tracking Code / URL parameters for each
+        campaign. It keeps native traffic separate and passes campaign, item,
+        site, and click ID context into Bratrax.
+      </p>
+
+      <div class="copy-block">
+        <div class="copy-block-top">
+          <span>URL Parameters</span>
+          <button
+            type="button"
+            class="copy-button"
+            on:click={() => copyValue("taboola-params", taboolaTemplate)}
+            title="Copy Taboola URL Parameters"
+            aria-label="Copy Taboola URL Parameters"
+          >
+            {#if copied === "taboola-params"}
+              <Check size={14} />
+              Copied
+            {:else}
+              <Copy size={14} />
+              Copy
+            {/if}
+          </button>
+        </div>
+        <pre>{taboolaTemplate}</pre>
+      </div>
+
+      <ul class="warning-list">
+        {#each taboolaTrackingWarnings as warning}
+          <li>{warning}</li>
+        {/each}
+      </ul>
+    </article>
+
     <article class="platform-panel organic-panel">
       <div class="platform-header">
         <span class="platform-mark organic-mark"></span>
@@ -314,7 +367,7 @@
 
   .platform-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
   }
 
@@ -356,6 +409,10 @@
 
   .meta-mark {
     background: #1877f2;
+  }
+
+  .taboola-mark {
+    background: #1376dc;
   }
 
   .organic-mark {
@@ -472,6 +529,12 @@
     font-family: "Space Mono", monospace;
     font-size: 10px;
     font-weight: 700;
+  }
+
+  @media (max-width: 1180px) {
+    .platform-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   @media (max-width: 860px) {

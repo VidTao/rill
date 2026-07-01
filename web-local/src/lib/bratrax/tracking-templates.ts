@@ -11,9 +11,13 @@ export const META_URL_PARAMETERS =
 export const ORGANIC_CONTENT_URL_PARAMETERS =
   "utm_source={platform}&utm_medium=organic_social&utm_campaign={initiative_slug}&utm_term={placement_slug}&utm_content={post_slug}";
 
+export const TABOOLA_URL_PARAMETERS =
+  "utm_source=taboola&utm_medium=native&utm_campaign={campaign_id}&utm_term={site}&utm_content={item_id}&bt_campaign_id={campaign_id}&bt_ad_id={item_id}&campaign_id={campaign_id}&campaign_name={campaign_name}&ad_id={item_id}&ad_name={item_name}&site={site}&platform={platform}&tblci={click_id}";
+
 export interface TrackingTemplatePayload {
   google_ads?: { template?: string };
   facebook_ads?: { template?: string };
+  taboola_ads?: { template?: string };
   organic_content?: { template?: string };
 }
 
@@ -34,6 +38,12 @@ export const metaTrackingWarnings = [
   "Do not include a leading ?.",
   "Paste this into URL Parameters, not Website URL.",
   "Apply this at campaign level in Meta Ads Manager; Meta does not reliably support this as an account-level URL setting.",
+];
+
+export const taboolaTrackingWarnings = [
+  "Do not include a leading ?.",
+  "Paste this into Taboola Tracking Code / URL parameters for each campaign.",
+  "Campaign ID and item ID are the primary Bratrax join keys; site is kept as placement context.",
 ];
 
 export const organicContentWarnings = [
