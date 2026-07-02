@@ -17,6 +17,8 @@ type mockClientStore struct {
 	defaultClient *Client
 	projectMap    map[string]*Client
 	userMap       map[int]*Client
+	mcpClient     *Client // returned by GetByMCPToken when set (nil → not recognized)
+	anthropicKey  string  // returned by GetAnthropicKey when set
 }
 
 func newMockClientStore() *mockClientStore {
@@ -64,11 +66,11 @@ func (m *mockClientStore) GetByUserID(_ context.Context, userID int) (*Client, e
 }
 
 func (m *mockClientStore) GetAnthropicKey(_ context.Context, _ string) (string, error) {
-	return "", nil
+	return m.anthropicKey, nil
 }
 
 func (m *mockClientStore) GetByMCPToken(_ context.Context, _ string) (*Client, error) {
-	return nil, nil
+	return m.mcpClient, nil
 }
 
 func (m *mockClientStore) GetByClientID(_ context.Context, clientID string) (*Client, error) {

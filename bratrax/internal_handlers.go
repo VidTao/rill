@@ -1,6 +1,7 @@
 package bratrax
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
@@ -14,6 +15,18 @@ import (
 // with fresh per-client config. The CLI's local.App.RefreshInstanceForClient
 // satisfies this.
 type RefreshInstanceFn func(clientDB string) error
+
+// EnsureReadyFn registers the client's Rill instance if it isn't already, then
+// blocks (bounded by the caller's context) until the instance's controller is
+// ready to serve queries. It returns an error only if the instance can't be
+// made ready in time (or the client isn't provisioned).
+//
+// The /bratrax/mcp handler calls this before proxying so that MCP tool calls
+// self-register their instance instead of relying on prior browser traffic —
+// the InstanceRouterMiddleware runs this for /bratrax/* requests, but the MCP
+// inner route (/v1/instances/{id}/mcp) bypasses that middleware. The CLI's
+// local.App satisfies this with EnsureInstanceForClient + Runtime.Controller.
+type EnsureReadyFn func(ctx context.Context, clientDB, anthropicKey string) error
 
 // RegisterInternalHandlers mounts /bratrax/internal/* endpoints. These are
 // intended for the Bratrax Flask backend to notify the Go runtime when

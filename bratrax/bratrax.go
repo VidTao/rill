@@ -35,8 +35,11 @@ type Handlers struct {
 //   - GET  /bratrax/health                — local health check
 //   - /bratrax/                            — catch-all proxy to Flask API
 //
+// ensureReady (may be nil) is invoked by the /bratrax/mcp handler to register
+// and warm the client's instance before proxying; see EnsureReadyFn.
+//
 // Returns the constructed Handlers so the caller can install additional middleware.
-func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error) {
+func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady EnsureReadyFn) (*Handlers, error) {
 	cfg, err := ConfigFromEnv()
 	if err != nil {
 		return nil, err
@@ -270,7 +273,7 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger) (*Handlers, error)
 	// /bratrax/mcp — public MCP endpoint for Claude Desktop. Auths an opaque
 	// per-client token and forwards into the runtime's existing per-instance
 	// MCP handler. Registered before the catch-all proxy so it takes precedence.
-	RegisterMCPHandler(mux, clientStore, authSvc, cfg.AudienceURL, logger)
+	RegisterMCPHandler(mux, clientStore, authSvc, cfg.RuntimeAddr, ensureReady, logger)
 
 	// Middleware chain: observability → auth → proxy (catch-all)
 	proxyHandler := observability.Middleware("bratrax", logger, authMapper.Middleware(proxy))

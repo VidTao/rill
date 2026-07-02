@@ -17,6 +17,13 @@ type Config struct {
 	IssuerURL string
 	// AudienceURL is the expected `aud` claim value.
 	AudienceURL string
+	// RuntimeAddr is the local-loopback address of the in-process Rill HTTP
+	// server (e.g. "http://127.0.0.1:9009"). The /bratrax/mcp handler
+	// reverse-proxies to this address to reach the runtime's per-instance MCP
+	// route. It MUST stay loopback: pointing it at the public URL makes every
+	// MCP tool call hairpin back out through DNS/TLS/nginx, so any edge hiccup
+	// or restart window surfaces as "upstream MCP server unavailable".
+	RuntimeAddr string
 	// SecureCookie controls the `Secure` attribute on the auth cookie. Must be
 	// true when Rill is served behind HTTPS (e.g. prod).
 	SecureCookie bool
@@ -67,6 +74,14 @@ func ConfigFromEnv() (*Config, error) {
 		audienceURL = "http://localhost:9009"
 	}
 
+	// Loopback address of our own Rill HTTP server, used only as the MCP
+	// reverse-proxy target. Defaults to the local port; never set this to the
+	// public URL (see Config.RuntimeAddr).
+	runtimeAddr := os.Getenv("BRATRAX_RUNTIME_ADDR")
+	if runtimeAddr == "" {
+		runtimeAddr = "http://127.0.0.1:9009"
+	}
+
 	secureCookie := false
 	if rawSecure := os.Getenv("BRATRAX_SECURE_COOKIE"); rawSecure != "" {
 		v, parseErr := strconv.ParseBool(rawSecure)
@@ -99,6 +114,7 @@ func ConfigFromEnv() (*Config, error) {
 		UsersDSN:           usersDSN,
 		IssuerURL:          issuerURL,
 		AudienceURL:        audienceURL,
+		RuntimeAddr:        runtimeAddr,
 		SecureCookie:       secureCookie,
 		OnlyInvitationLink: onlyInvitationLink,
 		AllowWoocommerce:   allowWoocommerce,

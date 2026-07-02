@@ -43,6 +43,13 @@ const (
 	DefaultDBDir        = "tmp"
 )
 
+// defaultMCPEnsureReadyTimeout bounds how long a /bratrax/mcp request waits for a
+// cold instance's controller to become ready before returning a retryable 503.
+// Kept below typical MCP client request timeouts so the wait resolves as a slow
+// 200, not a client-side timeout. Override with
+// BRATRAX_MCP_ENSURE_READY_TIMEOUT_SECONDS.
+const defaultMCPEnsureReadyTimeout = 8 * time.Second
+
 // App encapsulates the logic associated with configuring and running the UI and the runtime in a local environment.
 // Here, a local environment means a non-authenticated, single-instance and single-project setup on localhost.
 // App encapsulates logic shared between different CLI commands, like start, init, build and source.
@@ -527,8 +534,33 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 		runtimeHandler, err := runtimeServer.HTTPHandler(ctx, func(mux *http.ServeMux) {
 			// Inject local-only endpoints on the runtime server
 			localServer.RegisterHandlers(mux, httpPort, secure, enableUI)
-			// Register Bratrax proxy (non-fatal — most users won't have Flask running)
-			h, err := bratrax.RegisterHandlers(mux, a.BaseLogger)
+			// Register Bratrax proxy (non-fatal — most users won't have Flask running).
+			// In multi-tenant mode, hand the MCP handler a way to register + warm a
+			// client's instance before proxying: the MCP inner route
+			// (/v1/instances/{id}/mcp) bypasses InstanceRouterMiddleware, so without
+			// this a cold instance returns a hard 400 "no server available". Stays
+			// nil in single-tenant mode (the handler then just proxies as before).
+			var ensureReady bratrax.EnsureReadyFn
+			if a.MultiTenant {
+				ensureReadyTimeout := defaultMCPEnsureReadyTimeout
+				if v := os.Getenv("BRATRAX_MCP_ENSURE_READY_TIMEOUT_SECONDS"); v != "" {
+					if secs, perr := strconv.Atoi(v); perr == nil && secs > 0 {
+						ensureReadyTimeout = time.Duration(secs) * time.Second
+					}
+				}
+				ensureReady = func(rctx context.Context, clientDB, key string) error {
+					// Register the instance (idempotent — returns immediately if already
+					// cached), then wait, bounded, for its controller to be ready.
+					if _, ensErr := a.EnsureInstanceForClient(rctx, clientDB, key); ensErr != nil {
+						return ensErr
+					}
+					wctx, cancel := context.WithTimeout(rctx, ensureReadyTimeout)
+					defer cancel()
+					_, ctrlErr := a.Runtime.Controller(wctx, clientDB)
+					return ctrlErr
+				}
+			}
+			h, err := bratrax.RegisterHandlers(mux, a.BaseLogger, ensureReady)
 			if err != nil {
 				a.Logger.Warnf("bratrax proxy not registered: %v", err)
 				return

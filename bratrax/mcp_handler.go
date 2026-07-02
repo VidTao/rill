@@ -43,7 +43,7 @@ const mcpForwardTokenTTL = 5 * time.Minute
 //
 // Token leakage is bounded: deleting/regenerating mcp_token via /settings/mcp
 // instantly invalidates the old token (next request returns 401).
-func RegisterMCPHandler(mux *http.ServeMux, clientStore *ClientStore, authSvc *AuthService, runtimeAddr string, logger *zap.Logger) {
+func RegisterMCPHandler(mux *http.ServeMux, clientStore ClientStoreInterface, authSvc *AuthService, runtimeAddr string, ensureReady EnsureReadyFn, logger *zap.Logger) {
 	// runtimeAddr is the local-loopback address of the Rill HTTP server (e.g.
 	// "http://127.0.0.1:9009"). We resolve it once and rebuild the URL per
 	// request (path varies per client).
@@ -99,6 +99,33 @@ func RegisterMCPHandler(mux *http.ServeMux, clientStore *ClientStore, authSvc *A
 		if client.ClickhouseDB == "" {
 			writeJSONError(w, http.StatusForbidden, "client has no provisioned instance")
 			return
+		}
+
+		// 2b. Ensure the client's instance is registered and its controller is
+		// ready before forwarding. The MCP inner route (/v1/instances/{id}/mcp)
+		// bypasses InstanceRouterMiddleware, so without this a cold instance —
+		// e.g. right after a Rill restart, before any browser opened this client —
+		// makes the runtime return a hard 400 "no server available". ensureReady
+		// registers the instance and waits (bounded) for it to become serveable;
+		// on timeout we return a retryable 503 rather than the opaque 400.
+		if ensureReady != nil {
+			key, keyErr := clientStore.GetAnthropicKey(ctx, client.ClickhouseDB)
+			if keyErr != nil {
+				// Non-fatal: the instance still starts without a BYOK key.
+				logger.Debug("mcp handler: anthropic key lookup failed; continuing without",
+					zap.String("client_id", client.ClientID), zap.Error(keyErr))
+				key = ""
+			}
+			// Use the raw request context so ensureReady's own bounded timeout
+			// governs the wait, not the short token-lookup deadline above.
+			if err := ensureReady(r.Context(), client.ClickhouseDB, key); err != nil {
+				logger.Warn("mcp handler: instance not ready",
+					zap.String("client_id", client.ClientID),
+					zap.String("clickhouse_db", client.ClickhouseDB), zap.Error(err))
+				w.Header().Set("Retry-After", "5")
+				writeJSONError(w, http.StatusServiceUnavailable, "instance warming up, retry shortly")
+				return
+			}
 		}
 
 		// 3. Mint a short-lived Rill runtime JWT for this instance.
