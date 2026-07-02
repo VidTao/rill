@@ -77,7 +77,11 @@ export type MediaSpendScopeMatchField =
   | "ad_id"
   | "account_id";
 
-export type MediaSpendScopeOperator = "equals" | "prefix" | "contains" | "regex";
+export type MediaSpendScopeOperator =
+  | "equals"
+  | "prefix"
+  | "contains"
+  | "regex";
 export type MediaSpendScopeAction = "include" | "exclude";
 
 export interface MediaSpendScopeRuleData {
@@ -113,4 +117,9 @@ export interface MediaSpendScopeGuidance {
 
 export type StoreSettings = Record<string, unknown>;
 
-export type CostTab = "cogs" | "shipping" | "gateway" | "expenses" | "media_scope";
+export type CostTab =
+  | "cogs"
+  | "shipping"
+  | "gateway"
+  | "expenses"
+  | "media_scope";

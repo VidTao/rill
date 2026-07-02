@@ -94,14 +94,17 @@ export async function saveGatewayFee(
   percentageFee: number,
   fixedFee: number,
 ): Promise<void> {
-  await apiFetch(`/bratrax/cost-settings/gateway-fees/${encodeURIComponent(gatewayName)}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      percentage_fee: percentageFee,
-      fixed_fee: fixedFee,
-    }),
-  });
+  await apiFetch(
+    `/bratrax/cost-settings/gateway-fees/${encodeURIComponent(gatewayName)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        percentage_fee: percentageFee,
+        fixed_fee: fixedFee,
+      }),
+    },
+  );
 }
 
 // --- Shipping Profiles ---
