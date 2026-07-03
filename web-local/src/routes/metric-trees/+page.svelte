@@ -2478,10 +2478,6 @@
 </div>
 
 <style>
-  :global(body) {
-    background: #f7f8fa;
-  }
-
   .metric-trees-page {
     box-sizing: border-box;
     display: flex;
@@ -2490,8 +2486,15 @@
     min-height: 0;
     overflow: hidden;
     padding: 20px 24px 28px;
-    color: #17202a;
-    background: #f7f8fa;
+    color: var(--color-text);
+    background: var(--color-bg);
+    --mt-warn: #d97706;
+    --mt-good: #16a34a;
+  }
+
+  :global(.dark) .metric-trees-page {
+    --mt-warn: #f59e0b;
+    --mt-good: #22c55e;
   }
 
   .page-header,
@@ -2522,20 +2525,24 @@
   }
 
   h1 {
+    font-family: "Outfit", sans-serif;
     font-size: 24px;
-    font-weight: 650;
+    font-weight: 900;
+    color: var(--color-text);
   }
 
   h2 {
+    font-family: "Outfit", sans-serif;
     font-size: 18px;
-    font-weight: 650;
+    font-weight: 800;
+    color: var(--color-text);
   }
 
   p,
   .muted,
   .hint,
   small {
-    color: #6b7280;
+    color: var(--color-text-muted);
   }
 
   .header-actions,
@@ -2551,21 +2558,23 @@
   }
 
   .mode-control {
-    border: 1px solid #cbd5df;
+    border: 0.5px solid var(--color-border-strong);
     border-radius: 6px;
     padding: 2px;
-    background: #fff;
+    background: var(--color-elevated);
   }
 
   .mode-control button {
     min-height: 28px;
     border: 0;
     padding: 4px 9px;
+    background: transparent;
+    color: var(--color-text-secondary);
   }
 
   .mode-control button.active {
-    color: #fff;
-    background: #245bdb;
+    color: #0a0a0a;
+    background: var(--color-acid);
   }
 
   .time-control select {
@@ -2573,11 +2582,11 @@
   }
 
   .live-warning {
-    border: 1px solid #f3c969;
+    border: 1px solid color-mix(in srgb, var(--mt-warn) 45%, transparent);
     border-radius: 6px;
     padding: 8px 10px;
-    color: #6f4b00;
-    background: #fff8df;
+    color: var(--mt-warn);
+    background: color-mix(in srgb, var(--mt-warn) 12%, transparent);
     font-size: 12px;
     font-weight: 650;
   }
@@ -2585,24 +2594,26 @@
   .my-operating-band {
     align-items: stretch;
     gap: 8px;
-    border-bottom: 1px solid #dbeafe;
-    background: #f8fbff;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-acid-dim);
   }
 
   .my-operating-band div {
     min-width: 0;
     flex: 1;
-    border: 1px solid #dbeafe;
+    border: 0.5px solid var(--color-border);
     border-radius: 7px;
     padding: 9px 10px;
-    background: #fff;
+    background: var(--color-elevated);
   }
 
   .my-operating-band span {
     display: block;
-    color: #64748b;
+    color: var(--color-acid-text);
+    font-family: "Space Mono", monospace;
     font-size: 11px;
     font-weight: 700;
+    letter-spacing: 1px;
     text-transform: uppercase;
   }
 
@@ -2610,7 +2621,7 @@
     display: block;
     margin-top: 3px;
     overflow: hidden;
-    color: #0f172a;
+    color: var(--color-text);
     font-size: 14px;
     font-weight: 750;
     text-overflow: ellipsis;
@@ -2621,10 +2632,10 @@
   .review-shell {
     flex: 1;
     min-height: 0;
-    border: 1px solid #d9e0e7;
+    border: 0.5px solid var(--color-border);
     border-radius: 8px;
     overflow: hidden;
-    background: #fff;
+    background: var(--color-elevated);
   }
 
   .review-shell {
@@ -2640,17 +2651,17 @@
 
   button {
     min-height: 32px;
-    border: 1px solid #cbd5df;
+    border: 0.5px solid var(--color-border-strong);
     border-radius: 6px;
     padding: 6px 10px;
-    color: #17202a;
-    background: #fff;
+    color: var(--color-text);
+    background: var(--color-elevated);
     cursor: pointer;
   }
 
   button:hover:not(:disabled) {
-    border-color: #73808d;
-    background: #f2f5f8;
+    border-color: var(--color-text-muted);
+    background: var(--color-surface);
   }
 
   button:disabled {
@@ -2659,9 +2670,15 @@
   }
 
   button.primary {
-    border-color: #245bdb;
-    color: #fff;
-    background: #245bdb;
+    border-color: var(--color-acid);
+    color: #0a0a0a;
+    background: var(--color-acid);
+  }
+
+  button.primary:hover:not(:disabled) {
+    border-color: var(--color-acid);
+    background: var(--color-acid);
+    opacity: 0.88;
   }
 
   input,
@@ -2669,10 +2686,11 @@
   textarea {
     width: 100%;
     min-height: 32px;
-    border: 1px solid #cbd5df;
+    border: 0.5px solid var(--color-border-strong);
     border-radius: 6px;
     padding: 6px 8px;
-    background: #fff;
+    color: var(--color-text);
+    background: var(--color-elevated);
   }
 
   textarea {
@@ -2684,7 +2702,7 @@
     gap: 5px;
     font-size: 12px;
     font-weight: 600;
-    color: #4b5563;
+    color: var(--color-text-secondary);
   }
 
   label.inline {
@@ -2710,9 +2728,10 @@
   .inspector,
   .tree-panel {
     min-height: 0;
-    border: 1px solid #d8dee6;
+    border: 0.5px solid var(--color-border);
+    border-top: 4px solid var(--color-acid);
     border-radius: 8px;
-    background: #fff;
+    background: var(--color-elevated);
   }
 
   .rail {
@@ -2738,7 +2757,7 @@
   section,
   .panel-head {
     padding: 14px;
-    border-bottom: 1px solid #edf0f4;
+    border-bottom: 0.5px solid var(--color-border);
   }
 
   section:last-child {
@@ -2747,11 +2766,12 @@
 
   .section-title {
     margin-bottom: 10px;
-    color: #111827;
+    color: var(--color-acid-text);
+    font-family: "Space Mono", monospace;
     font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0;
+    letter-spacing: 1.5px;
   }
 
   .tree-list,
@@ -2788,9 +2808,9 @@
   }
 
   .ownership-summary {
-    border: 1px solid #edf0f4;
+    border: 0.5px solid var(--color-border);
     border-radius: 6px;
-    color: #475569;
+    color: var(--color-text-secondary);
     font-size: 12px;
     font-weight: 700;
     margin-bottom: 8px;
@@ -2798,8 +2818,8 @@
   }
 
   .ownership-list button.warn {
-    border-color: #f0cc78;
-    background: #fff9e8;
+    border-color: color-mix(in srgb, var(--mt-warn) 50%, transparent);
+    background: color-mix(in srgb, var(--mt-warn) 12%, transparent);
   }
 
   .owner-preview {
@@ -2809,7 +2829,7 @@
   }
 
   .owner-preview span {
-    color: #334155;
+    color: var(--color-text-secondary);
     font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2817,7 +2837,7 @@
   }
 
   .owner-preview em {
-    color: #64748b;
+    color: var(--color-text-muted);
     display: block;
     font-style: normal;
   }
@@ -2826,8 +2846,8 @@
   .ownership-list button.active,
   .impact-list button.active,
   .review-experiments button.active {
-    border-color: #245bdb;
-    background: #eef4ff;
+    border-color: var(--color-acid);
+    background: var(--color-acid-dim);
   }
 
   .scoreline {
@@ -2844,8 +2864,8 @@
   }
 
   .empty {
-    color: #6b7280;
-    background: #f7f8fa;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
   }
 
   .empty.large {
@@ -2858,15 +2878,15 @@
   }
 
   .alert.error {
-    border: 1px solid #f0b5b5;
-    color: #8a1f1f;
-    background: #fff2f2;
+    border: 1px solid color-mix(in srgb, var(--bratrax-tomato) 45%, transparent);
+    color: var(--bratrax-tomato);
+    background: color-mix(in srgb, var(--bratrax-tomato) 12%, transparent);
   }
 
   .alert.success {
-    border: 1px solid #b8d9c0;
-    color: #215732;
-    background: #f0fbf3;
+    border: 1px solid color-mix(in srgb, var(--mt-good) 45%, transparent);
+    color: var(--mt-good);
+    background: color-mix(in srgb, var(--mt-good) 12%, transparent);
   }
 
   .panel-head {
@@ -2914,7 +2934,7 @@
 
   .review-summary div,
   .review-lever-card div {
-    border: 1px solid #edf0f4;
+    border: 0.5px solid var(--color-border);
     border-radius: 6px;
     padding: 10px;
   }
@@ -2922,24 +2942,24 @@
   .review-summary span,
   .readiness {
     display: block;
-    color: #6b7280;
+    color: var(--color-text-muted);
     font-size: 12px;
     font-weight: 650;
   }
 
   .readiness {
     margin-top: 10px;
-    border: 1px solid #f3c969;
+    border: 1px solid color-mix(in srgb, var(--mt-warn) 45%, transparent);
     border-radius: 6px;
     padding: 8px 10px;
-    color: #6f4b00;
-    background: #fff8df;
+    color: var(--mt-warn);
+    background: color-mix(in srgb, var(--mt-warn) 12%, transparent);
   }
 
   .readiness.ready {
-    border-color: #b8d9c0;
-    color: #215732;
-    background: #f0fbf3;
+    border-color: color-mix(in srgb, var(--mt-good) 45%, transparent);
+    color: var(--mt-good);
+    background: color-mix(in srgb, var(--mt-good) 12%, transparent);
   }
 
   .decision-lines div,
@@ -2949,7 +2969,7 @@
   }
 
   .decision-lines div {
-    border-bottom: 1px solid #edf0f4;
+    border-bottom: 0.5px solid var(--color-border);
     padding: 6px 0;
   }
 
@@ -2958,7 +2978,7 @@
   }
 
   .decision-lines span {
-    color: #6b7280;
+    color: var(--color-text-muted);
   }
 
   @media (max-width: 1100px) {
@@ -2981,13 +3001,13 @@
   }
 
   .alert.info {
-    border-color: #a9b5c8;
-    background: #eef3f8;
-    color: #334155;
+    border: 0.5px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
   }
 
   .readonly-section {
-    border-top: 1px solid #e2e8f0;
+    border-top: 0.5px solid var(--color-border);
     margin-top: 12px;
     padding-top: 14px;
   }
@@ -2998,11 +3018,13 @@
   }
 
   .evidence-label {
-    border: 1px solid #cbd5e1;
-    background: #f8fafc;
-    color: #334155;
+    border: 0.5px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-acid-text);
+    font-family: "Space Mono", monospace;
     font-size: 11px;
     font-weight: 700;
+    letter-spacing: 1px;
     margin-bottom: 10px;
     padding: 7px 8px;
     text-transform: uppercase;
@@ -3017,8 +3039,8 @@
   .evidence-grid div,
   .guardrails div,
   .event-log button {
-    border: 1px solid #e2e8f0;
-    background: #ffffff;
+    border: 0.5px solid var(--color-border);
+    background: var(--color-elevated);
   }
 
   .evidence-grid div,
@@ -3032,18 +3054,19 @@
 
   .evidence-grid span,
   .guardrails span {
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 11px;
   }
 
   .evidence-grid strong,
   .guardrails strong {
-    color: #0f172a;
+    color: var(--color-text);
     font-size: 13px;
   }
 
   .guardrails small {
-    color: #64748b;
+    color: var(--color-text-muted);
+    font-family: "Space Mono", monospace;
     font-size: 10px;
     text-transform: uppercase;
   }
@@ -3087,18 +3110,18 @@
   }
 
   .event-log button.active {
-    border-color: #245bdb;
-    background: #eef4ff;
+    border-color: var(--color-acid);
+    background: var(--color-acid-dim);
   }
 
   .event-log span {
-    color: #17202a;
+    color: var(--color-text);
     font-size: 12px;
     font-weight: 700;
   }
 
   .event-log small {
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;

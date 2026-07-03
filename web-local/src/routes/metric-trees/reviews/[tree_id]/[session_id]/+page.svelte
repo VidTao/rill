@@ -168,15 +168,17 @@
 </div>
 
 <style>
-  :global(body) {
-    background: #f7f8fa;
-  }
   .readout-page {
     display: grid;
     gap: 18px;
     margin: 0 auto;
     max-width: 980px;
     padding: 32px 20px 56px;
+    color: var(--color-text);
+    --mt-good: #16a34a;
+  }
+  :global(.dark) .readout-page {
+    --mt-good: #22c55e;
   }
   header {
     align-items: flex-start;
@@ -185,15 +187,18 @@
     justify-content: space-between;
   }
   .eyebrow {
-    color: #64748b;
+    color: var(--color-acid-text);
+    font-family: "Space Mono", monospace;
     font-size: 11px;
     font-weight: 800;
-    letter-spacing: 0.5px;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
   }
   h1 {
-    color: #101828;
+    color: var(--color-text);
+    font-family: "Outfit", sans-serif;
     font-size: 28px;
+    font-weight: 900;
     line-height: 1.1;
     margin: 3px 0 0;
   }
@@ -206,10 +211,10 @@
   }
   a,
   button {
-    border: 1px solid #d9e0ea;
+    border: 0.5px solid var(--color-border-strong);
     border-radius: 999px;
-    background: #fff;
-    color: #245bdb;
+    background: var(--color-elevated);
+    color: var(--color-text);
     cursor: pointer;
     font: inherit;
     font-size: 13px;
@@ -220,29 +225,29 @@
   }
   button:hover,
   a:hover {
-    border-color: #245bdb;
-    background: #f4f7ff;
+    border-color: var(--color-acid);
+    background: var(--color-surface);
   }
   .share-message {
-    border: 1px solid #b8dcc7;
+    border: 1px solid color-mix(in srgb, var(--mt-good) 45%, transparent);
     border-radius: 8px;
-    background: #f0f9f3;
-    color: #17663a;
+    background: color-mix(in srgb, var(--mt-good) 12%, transparent);
+    color: var(--mt-good);
     font-size: 13px;
     padding: 10px 12px;
   }
   .state,
   .error {
-    border: 1px solid #d9e0ea;
+    border: 0.5px solid var(--color-border);
     border-radius: 8px;
-    background: #fff;
-    color: #64748b;
+    background: var(--color-elevated);
+    color: var(--color-text-muted);
     padding: 16px;
   }
   .error {
-    border-color: #f0b4a8;
-    color: #9b2c1f;
-    background: #fff5f3;
+    border-color: color-mix(in srgb, var(--bratrax-tomato) 45%, transparent);
+    color: var(--bratrax-tomato);
+    background: color-mix(in srgb, var(--bratrax-tomato) 12%, transparent);
   }
 
   @media print {
@@ -252,6 +257,13 @@
     .readout-page {
       max-width: none;
       padding: 0;
+      color: #101828;
+    }
+    h1 {
+      color: #101828;
+    }
+    .eyebrow {
+      color: #475569;
     }
     .actions,
     .share-message {
