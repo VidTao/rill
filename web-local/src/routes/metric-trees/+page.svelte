@@ -2550,6 +2550,12 @@
     gap: 8px;
   }
 
+  /* The Save/Delete row sits between sections (not inside one), so it needs
+     the same 14px padding sections have to align with the panel content. */
+  .inspector-actions {
+    padding: 14px;
+  }
+
   .mode-control,
   .time-control {
     align-items: center;
