@@ -228,6 +228,9 @@ export function useFilteredResources<T = Array<V1Resource>>(
   kind: ResourceKind,
   selector: (data: V1ListResourcesResponse) => T = (data) =>
     data.resources as T,
+  queryOptions?: Partial<
+    CreateQueryOptions<V1ListResourcesResponse, ErrorType<RpcStatus>, T>
+  >,
 ) {
   return createRuntimeServiceListResources(
     instanceId,
@@ -237,6 +240,7 @@ export function useFilteredResources<T = Array<V1Resource>>(
     {
       query: {
         select: selector,
+        ...queryOptions,
       },
     },
     queryClient,

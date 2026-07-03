@@ -60,6 +60,10 @@ export class SSEConnectionManager {
   private retryAttempts = writable(0);
   private isReconnecting = false;
   private connectionCount = 0;
+  // Set when the connection was CLOSED by exhausting max retry attempts (as
+  // opposed to an intentional close). Lets a later heartbeat (i.e. genuine
+  // user interaction) revive the connection instead of giving up permanently.
+  private retryExhausted = false;
 
   constructor(public params?: Params) {
     if (params?.autoCloseTimeouts) {
@@ -98,6 +102,7 @@ export class SSEConnectionManager {
       const currentAttempts = get(this.retryAttempts);
 
       if (currentAttempts >= (this.params?.maxRetryAttempts ?? 0)) {
+        this.retryExhausted = true;
         this.status.set(ConnectionStatus.CLOSED);
         return;
       }
@@ -124,6 +129,18 @@ export class SSEConnectionManager {
     // Don't reconnect if CONNECTING (already in progress) or CLOSED (fatal error)
     if (status === ConnectionStatus.PAUSED) {
       await this.reconnect();
+    } else if (
+      status === ConnectionStatus.CLOSED &&
+      this.retryExhausted &&
+      this.url
+    ) {
+      // The connection died after exhausting its retries (e.g. while offline).
+      // A heartbeat means the user is interacting again, so give the
+      // connection a fresh set of retries rather than staying dead until a
+      // full page reload.
+      this.retryExhausted = false;
+      this.retryAttempts.set(0);
+      await this.reconnect();
     }
 
     if (this.params?.autoCloseTimeouts) {
@@ -137,6 +154,8 @@ export class SSEConnectionManager {
   public close = (cleanup = false) => {
     this.pause();
 
+    // Intentional close: must not be revived by a later heartbeat
+    this.retryExhausted = false;
     this.status.set(ConnectionStatus.CLOSED);
 
     if (cleanup) {
@@ -198,6 +217,7 @@ export class SSEConnectionManager {
     this.status.set(ConnectionStatus.OPEN);
 
     this.retryAttempts.set(0);
+    this.retryExhausted = false;
 
     if (this.connectionCount > 1) {
       this.events.emit("reconnect");

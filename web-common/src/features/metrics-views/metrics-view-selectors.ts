@@ -1,6 +1,7 @@
 import {
   MetricsViewSpecDimensionType,
   MetricsViewSpecMeasureType,
+  V1ReconcileStatus,
   type MetricsViewSpecDimension,
   type MetricsViewSpecMeasure,
   type V1MetricsView,
@@ -14,6 +15,9 @@ import {
 } from "../entity-management/resource-selectors";
 
 type MetricsViewsData = Readable<Record<string, V1MetricsView | undefined>>;
+
+// Matches PollIntervalWhenDashboardErrored in CanvasInitialization.svelte.
+const METRICS_VIEW_LIST_HEAL_POLL_MS = 5000;
 
 export class MetricsViewSelectors {
   metricViewNames: Readable<string[]>;
@@ -66,6 +70,30 @@ export class MetricsViewSelectors {
     this.allMetricsViews = useFilteredResources(
       instanceId,
       ResourceKind.MetricsView,
+      undefined,
+      // Self-healing options, scoped to this observer only. The global query
+      // client disables retry and all refetchOn* triggers, so without these a
+      // snapshot cached while a metrics view was mid-reconcile (validSpec nil),
+      // or an errored fetch, would be served forever on SPA return-navigation
+      // and widgets would red-box "Metrics view not found" until a full reload.
+      {
+        retry: 3,
+        refetchOnMount: "always",
+        refetchInterval: (query) => {
+          if (query.state.status === "error") {
+            return METRICS_VIEW_LIST_HEAL_POLL_MS;
+          }
+          const resources = query.state.data?.resources;
+          if (!resources) return false;
+          const stillReconciling = resources.some(
+            (res) =>
+              !res.metricsView?.state?.validSpec &&
+              res.meta?.reconcileStatus !==
+                V1ReconcileStatus.RECONCILE_STATUS_IDLE,
+          );
+          return stillReconciling ? METRICS_VIEW_LIST_HEAL_POLL_MS : false;
+        },
+      },
     );
 
     // If metricsViewsData is not provided, create it from allMetricsViews
@@ -90,14 +118,36 @@ export class MetricsViewSelectors {
     );
 
     this.getMetricsViewFromName = (metricViewName: string) =>
-      derived(this.allMetricsViews, ($metricsViews) => {
-        return {
-          metricsView: $metricsViews?.data?.find(
+      derived(
+        [this.allMetricsViews, metricsViewResources],
+        ([$metricsViews, $snapshot]) => {
+          const resource = $metricsViews?.data?.find(
             (res) => res?.meta?.name?.name === metricViewName,
-          )?.metricsView?.state?.validSpec,
-          isLoading: $metricsViews?.isLoading,
-        };
-      });
+          );
+          const liveSpec = resource?.metricsView?.state?.validSpec;
+          // Serve the last-known valid spec (e.g. the ResolveCanvas snapshot
+          // held by the canvas entity) when the live list is errored or the
+          // resource is mid-reconcile. Mirrors CanvasInitialization's policy
+          // of serving a previous validSpec over an error.
+          const spec =
+            liveSpec ?? $snapshot?.[metricViewName]?.state?.validSpec;
+
+          const stillReconciling =
+            !!resource &&
+            !liveSpec &&
+            resource.meta?.reconcileStatus !==
+              V1ReconcileStatus.RECONCILE_STATUS_IDLE;
+
+          return {
+            metricsView: spec,
+            isLoading:
+              !spec &&
+              ($metricsViews.isLoading ||
+                $metricsViews.isError ||
+                stillReconciling),
+          };
+        },
+      );
 
     this.getMeasuresForMetricView = (metricViewName: string) =>
       derived(metricsViewResources, ($metricsViewResources) => {
