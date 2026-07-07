@@ -113,6 +113,31 @@ export async function requestAccess(
   return res.json();
 }
 
+// Public, unauthenticated. Submits a self-serve "Try demo" request from the
+// marketing landing page: mints a viewer invitation to the Bratrax Demo Account
+// and emails the accept link. Returns 2xx in all known cases (no enumeration
+// oracle): "sent" for a fresh/reused invite, "already_user" if the email already
+// has an account (UI should point them at login).
+export interface DemoRequestResult {
+  status: "sent" | "already_user";
+}
+
+export async function requestDemo(
+  email: string,
+  firstName?: string,
+): Promise<DemoRequestResult> {
+  const res = await fetch(`${getBaseUrl()}/bratrax/demo-request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, first_name: firstName ?? "" }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function bratraxGetMe(
   fetchFn: typeof fetch = fetch,
 ): Promise<BratraxUser | null> {

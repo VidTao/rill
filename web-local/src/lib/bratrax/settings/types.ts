@@ -49,11 +49,12 @@ export interface BillingSummary {
 export interface InvitationPreview {
   email: string;
   role: Role;
-  // kind distinguishes the three flavors of invitation:
+  // kind distinguishes the flavors of invitation:
   //   team       — joining an existing client as admin/viewer
   //   superadmin — cross-client super_admin (client_id=NULL)
   //   signup     — pre-authorized public signup; creates a brand-new client
-  kind: "team" | "superadmin" | "signup";
+  //   demo       — self-serve "Try demo"; viewer on the Bratrax Demo Account
+  kind: "team" | "superadmin" | "signup" | "demo";
   company_name: string;
   inviter_name: string;
   expired: boolean;

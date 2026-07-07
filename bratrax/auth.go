@@ -68,8 +68,12 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		// /bratrax/onboard/check-company is a single public route inside the
 		// otherwise-gated /bratrax/onboard/* namespace — exact-match (not a
 		// prefix) so we don't accidentally expose adjacent onboard routes.
+		// /bratrax/demo-request is the public self-serve "Try demo" submit
+		// endpoint (email -> viewer invitation on the demo client), same
+		// pre-authentication rationale as access-requests.
 		if strings.HasPrefix(r.URL.Path, "/bratrax/invitations/") ||
 			strings.HasPrefix(r.URL.Path, "/bratrax/access-requests") ||
+			strings.HasPrefix(r.URL.Path, "/bratrax/demo-request") ||
 			r.URL.Path == "/bratrax/onboard/check-company" {
 			stripBratraxHeaders(r.Header)
 			next.ServeHTTP(w, r)

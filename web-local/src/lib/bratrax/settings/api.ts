@@ -134,7 +134,7 @@ export function getInvitation(token: string): Promise<InvitationPreview> {
 
 export interface InvitationAcceptResult {
   user_id: number;
-  kind: "team" | "superadmin" | "signup";
+  kind: "team" | "superadmin" | "signup" | "demo";
   email: string;
   company_name: string | null;
   // Only meaningful for kind='signup'. Frontend forwards to onboardStart so

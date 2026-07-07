@@ -143,6 +143,17 @@
         return;
       }
 
+      // Demo invites: log the visitor straight into the demo dashboards — no
+      // manual login step. The apex "/" loader redirects an authed user to
+      // their first Canvas (the Bratrax Demo Account dashboards).
+      if (result.kind === "demo") {
+        const { user } = await bratraxLogin(result.email, password);
+        bratraxUser.set(user);
+        queryClient.clear();
+        await goto("/");
+        return;
+      }
+
       // team / superadmin invites: existing flow — user logs in manually.
       await goto("/login?invited=1");
     } catch (e: any) {
