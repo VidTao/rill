@@ -393,7 +393,7 @@
 
 <style>
   .signup-page {
-    background-color: #0A0A0A;
+    background-color: var(--color-bg);
     position: relative;
     overflow: hidden;
   }
@@ -407,6 +407,12 @@
       transparent 1.5px
     );
     background-size: 8px 8px;
+  }
+
+  /* The acid-dot texture is tuned for the dark canvas; hide it in light so the
+     background matches the rest of the app. */
+  :global(html:not(.dark)) .halftone-bg {
+    background-image: none;
   }
 
   .signup-input {
