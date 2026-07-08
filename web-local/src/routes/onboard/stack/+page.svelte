@@ -1893,10 +1893,10 @@
                   class="flex items-center gap-2 border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-all
                   {radioToggleIds.has(platform.id)
                     ? isSelected(platform.id)
-                      ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
+                      ? 'border-bratrax-acid/50 bg-bratrax-acid/10 bratrax-acid-text'
                       : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'
                     : isConnected(platform.id)
-                      ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
+                      ? 'border-bratrax-acid/50 bg-bratrax-acid/10 bratrax-acid-text'
                       : isSelected(platform.id)
                         ? 'border-bratrax-cyan/50 bg-bratrax-cyan/10 text-bratrax-cyan'
                         : platform.type === 'coming_soon'

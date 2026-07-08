@@ -563,6 +563,15 @@ button.section-header:hover {
   color: var(--color-acid-text) !important;
 }
 
+/* Acid text for selected states that sit on an acid-tinted background, where the
+   override above is intentionally skipped. Olive on cream (light), full acid
+   (dark) — so selected cards stay readable in light without changing dark. The
+   class name deliberately lacks the `text-bratrax-acid` substring so it doesn't
+   re-trigger the excluded selector. */
+.bratrax-acid-text {
+  color: var(--color-acid-text);
+}
+
 /* ═══════════════════════════════════════════════════════════
    11d. ACID TOP BAR — every card-like surface (brief Round 2 §5, §7)
    The single biggest brand-energy lever. KPI tiles, chart cards, and

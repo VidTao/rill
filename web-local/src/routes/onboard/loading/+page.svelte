@@ -589,7 +589,7 @@
               <span class="capitalize text-bratrax-text-body">{tap.label}</span>
               <span class="font-mono">
                 {#if tap.failed}
-                  <span class="text-red-500" title="Extract reported an error">✗ error</span>
+                  <span class="text-bratrax-tomato" title="Extract reported an error">✗ error</span>
                 {:else if tap.ready}
                   <span class="text-bratrax-acid">✓ ready</span>
                 {:else}
@@ -606,7 +606,7 @@
 
 <style>
   .loading-page {
-    background-color: #0A0A0A;
+    background-color: var(--color-bg);
     position: relative;
     overflow: hidden;
   }
@@ -620,5 +620,11 @@
       transparent 1.5px
     );
     background-size: 8px 8px;
+  }
+
+  /* The acid-dot texture is tuned for the dark canvas; hide it in light so the
+     background matches the rest of the app (clean cream, like Settings). */
+  :global(html:not(.dark)) .halftone-bg {
+    background-image: none;
   }
 </style>

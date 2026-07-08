@@ -163,7 +163,7 @@
             {lockedStore === 'woocommerce'
               ? 'cursor-not-allowed border-bratrax-border bg-bratrax-bg text-bratrax-text-muted opacity-50'
               : selectedStore === 'shopify'
-                ? 'border-bratrax-acid bg-bratrax-acid/10 text-bratrax-acid ring-1 ring-bratrax-acid'
+                ? 'border-bratrax-acid bg-bratrax-acid/10 bratrax-acid-text ring-1 ring-bratrax-acid'
                 : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}"
           aria-pressed={selectedStore === "shopify"}
         >
@@ -189,7 +189,7 @@
             {(!allowWoocommerce || lockedStore === 'shopify')
               ? 'cursor-not-allowed border-bratrax-border bg-bratrax-bg text-bratrax-text-muted'
               : selectedStore === 'woocommerce'
-                ? 'border-bratrax-acid bg-bratrax-acid/10 text-bratrax-acid ring-1 ring-bratrax-acid'
+                ? 'border-bratrax-acid bg-bratrax-acid/10 bratrax-acid-text ring-1 ring-bratrax-acid'
                 : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}"
           aria-pressed={selectedStore === "woocommerce"}
         >
@@ -275,7 +275,7 @@
 
 <style>
   .onboard-page {
-    background-color: #0a0a0a;
+    background-color: var(--color-bg);
     position: relative;
     overflow: hidden;
   }
@@ -289,5 +289,11 @@
       transparent 1.5px
     );
     background-size: 8px 8px;
+  }
+
+  /* The acid-dot texture is tuned for the dark canvas; hide it in light so the
+     background matches the rest of the app (clean cream, like Settings). */
+  :global(html:not(.dark)) .halftone-bg {
+    background-image: none;
   }
 </style>
