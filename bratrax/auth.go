@@ -74,6 +74,7 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		if strings.HasPrefix(r.URL.Path, "/bratrax/invitations/") ||
 			strings.HasPrefix(r.URL.Path, "/bratrax/access-requests") ||
 			strings.HasPrefix(r.URL.Path, "/bratrax/demo-request") ||
+			strings.HasPrefix(r.URL.Path, "/bratrax/signup-link") ||
 			r.URL.Path == "/bratrax/onboard/check-company" {
 			stripBratraxHeaders(r.Header)
 			next.ServeHTTP(w, r)

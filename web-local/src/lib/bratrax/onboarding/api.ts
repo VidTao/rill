@@ -186,7 +186,11 @@ export interface OnboardStatus {
 
 export async function onboardStart(
   companyName: string,
-  options: { requiresPayment?: boolean; isMultiStore?: boolean } = {},
+  options: {
+    requiresPayment?: boolean;
+    isMultiStore?: boolean;
+    lockedStore?: "shopify" | "woocommerce";
+  } = {},
 ): Promise<OnboardStartResult> {
   // requires_payment defaults true on the backend, so we only send the field
   // explicitly when the caller wants to opt out of the LS paywall (inceptly
@@ -200,6 +204,11 @@ export async function onboardStart(
   }
   if (options.isMultiStore === true) {
     body.is_multi_store = true;
+  }
+  // Store-locked signup links pass the link's store so /onboard/store preselects
+  // + disables the other option (persisted in stack_selections.locked_store_platform).
+  if (options.lockedStore) {
+    body.locked_store_platform = options.lockedStore;
   }
   return apiFetch<OnboardStartResult>("/bratrax/onboard/start", {
     method: "POST",

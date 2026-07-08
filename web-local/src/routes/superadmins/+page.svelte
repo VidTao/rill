@@ -8,6 +8,9 @@
     listSignupInvitations,
     createSignupInvite,
     revokeSignupInvitation,
+    listStoreSignupLinks,
+    createStoreSignupLink,
+    revokeStoreSignupLink,
     listAccessRequests,
     approveAccessRequest,
     dismissAccessRequest,
@@ -16,6 +19,8 @@
     type SuperadminMember,
     type SuperadminPendingInvite,
     type SignupPendingInvite,
+    type StoreSignupLink,
+    type StorePlatform,
     type AccessRequest,
     type SequenceEnrollment,
   } from "$lib/bratrax/superadmins/api";
@@ -61,6 +66,19 @@
   let signupInviteResultMultiStore = false;
   let signupInviteCopied = false;
 
+  // Store signup link modal (multi-use, store-locked, capped). Every signup from
+  // the link defaults to a paying, single-store account with the store preselected.
+  let storeLinkOpen = false;
+  let storeLinkStore: StorePlatform = "shopify";
+  let storeLinkMaxUsers = 10;
+  let storeLinkSaving = false;
+  let storeLinkResultUrl = "";
+  let storeLinkResultStore: StorePlatform = "shopify";
+  let storeLinkResultMaxUsers = 0;
+  let storeLinkResultExpiresAt = "";
+  let storeLinkCopied = false;
+  let storePending: StoreSignupLink[] = [];
+
   // Access-request actions in flight per id, so the right row's button shows
   // a loading state without blocking the others.
   let accessActionId: number | null = null;
@@ -82,14 +100,16 @@
   async function loadData() {
     topError = "";
     try {
-      const [superadmins, signups, requests] = await Promise.all([
+      const [superadmins, signups, requests, storeLinks] = await Promise.all([
         getSuperadmins(),
         listSignupInvitations(),
         listAccessRequests(),
+        listStoreSignupLinks(),
       ]);
       data = superadmins;
       signupPending = signups.pending;
       accessRequests = requests.pending;
+      storePending = storeLinks.pending;
       void loadInviteExpiryEnrollments();
     } catch (e: any) {
       topError = e?.message ?? "Failed to load superadmins";
@@ -274,6 +294,69 @@
   async function revokeSignupPending(p: SignupPendingInvite) {
     try {
       await revokeSignupInvitation(p.token);
+      await loadData();
+    } catch (e: any) {
+      topError = e?.message ?? "Failed to revoke";
+    }
+  }
+
+  // ---- Store signup links --------------------------------------------------
+
+  function openStoreLink() {
+    storeLinkStore = "shopify";
+    storeLinkMaxUsers = 10;
+    storeLinkResultUrl = "";
+    storeLinkResultStore = "shopify";
+    storeLinkResultMaxUsers = 0;
+    storeLinkResultExpiresAt = "";
+    storeLinkCopied = false;
+    storeLinkOpen = true;
+  }
+
+  async function submitStoreLink() {
+    const max = Number(storeLinkMaxUsers);
+    if (!Number.isInteger(max) || max < 1) {
+      topError = "Max users must be a positive whole number";
+      return;
+    }
+    storeLinkSaving = true;
+    topError = "";
+    try {
+      const result = await createStoreSignupLink(storeLinkStore, max);
+      storeLinkResultUrl = result.join_url;
+      storeLinkResultStore = result.store;
+      storeLinkResultMaxUsers = result.max_users;
+      storeLinkResultExpiresAt = result.expires_at ?? "";
+      await loadData();
+    } catch (e: any) {
+      topError = e?.message ?? "Failed to create store signup link";
+    } finally {
+      storeLinkSaving = false;
+    }
+  }
+
+  async function copyStoreLinkUrl() {
+    if (!storeLinkResultUrl) return;
+    try {
+      await navigator.clipboard.writeText(storeLinkResultUrl);
+      storeLinkCopied = true;
+      setTimeout(() => (storeLinkCopied = false), 2000);
+    } catch {
+      // ignore — user can manually copy
+    }
+  }
+
+  async function copyStorePendingUrl(p: StoreSignupLink) {
+    try {
+      await navigator.clipboard.writeText(p.join_url);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function revokeStorePending(p: StoreSignupLink) {
+    try {
+      await revokeStoreSignupLink(p.token);
       await loadData();
     } catch (e: any) {
       topError = e?.message ?? "Failed to revoke";
@@ -547,6 +630,68 @@
               <button
                 type="button"
                 on:click={() => revokeSignupPending(p)}
+                class="btn-bratrax btn-destructive btn-compact"
+              >
+                Revoke
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+
+    <!-- Store signup links: multi-use, store-locked, capped links for a batch of
+         new customers (distributed via external email listings). No email is sent
+         — copy the URL out. Each use = one client; the link dies at the cap or
+         after 90 days. -->
+    <div class="mt-10 border-t border-bratrax-border pt-6">
+      <div class="flex items-baseline justify-between">
+        <h2 class="font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
+          Store signup links
+        </h2>
+        <button
+          type="button"
+          on:click={openStoreLink}
+          class="btn-bratrax btn-primary btn-compact"
+        >
+          Generate store signup link
+        </button>
+      </div>
+      <p class="mt-2 text-sm font-light text-bratrax-text-body">
+        A reusable link for a batch of new customers. Pick a store platform and a max number of signups. Anyone can use it with their own email until the cap is hit (or 90 days pass); the chosen store is preselected during their onboarding.
+      </p>
+
+      {#if storePending.length === 0}
+        <p class="mt-4 font-mono text-[10px] text-bratrax-text-muted">
+          No active store signup links.
+        </p>
+      {:else}
+        <ul class="mt-3 flex flex-col gap-2">
+          {#each storePending as p (p.token)}
+            <li class="flex items-center gap-3 border border-bratrax-border bg-bratrax-bg px-4 py-3">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="shrink-0 border border-bratrax-acid/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-bratrax-acid">
+                    {p.store_platform}
+                  </span>
+                  <span class="font-mono text-xs font-bold text-bratrax-text-headline">
+                    {p.used_count} / {p.max_uses} used
+                  </span>
+                </div>
+                <div class="truncate font-mono text-[10px] text-bratrax-text-muted">
+                  {p.join_url} · expires {formatDate(p.expires_at)}
+                </div>
+              </div>
+              <button
+                type="button"
+                on:click={() => copyStorePendingUrl(p)}
+                class="btn-bratrax btn-neutral btn-compact"
+              >
+                Copy link
+              </button>
+              <button
+                type="button"
+                on:click={() => revokeStorePending(p)}
                 class="btn-bratrax btn-destructive btn-compact"
               >
                 Revoke
@@ -860,6 +1005,132 @@
           <button
             type="button"
             on:click={() => (signupInviteOpen = false)}
+            class="btn-bratrax btn-neutral btn-compact"
+          >
+            Done
+          </button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
+
+<!-- Store-signup-link modal -->
+{#if storeLinkOpen}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    on:click={() => (storeLinkOpen = false)}
+    on:keydown={(e) => e.key === "Escape" && (storeLinkOpen = false)}
+    role="presentation"
+  >
+    <div
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
+
+      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        STORE SIGNUP LINK
+      </div>
+      <h2 class="text-lg font-black text-bratrax-text-headline">
+        Generate a store signup link
+      </h2>
+      <p class="mt-2 text-sm font-light text-bratrax-text-body">
+        Multi-use, expires in 90 days or when the cap is hit. Distribute via your email listings — every signup defaults to a paying, single-store account with this store preselected.
+      </p>
+
+      {#if !storeLinkResultUrl}
+        <div class="mt-4 flex flex-col gap-4">
+          <div>
+            <div class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              Store platform
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                on:click={() => (storeLinkStore = "shopify")}
+                class="border px-3 py-3 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {storeLinkStore === 'shopify' ? 'border-bratrax-acid text-bratrax-acid bg-bratrax-acid bg-opacity-10' : 'border-bratrax-border text-bratrax-text-muted hover:border-bratrax-acid/40'}"
+              >
+                Shopify
+              </button>
+              <button
+                type="button"
+                on:click={() => (storeLinkStore = "woocommerce")}
+                class="border px-3 py-3 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {storeLinkStore === 'woocommerce' ? 'border-bratrax-acid text-bratrax-acid bg-bratrax-acid bg-opacity-10' : 'border-bratrax-border text-bratrax-text-muted hover:border-bratrax-acid/40'}"
+              >
+                WooCommerce
+              </button>
+            </div>
+          </div>
+          <div>
+            <label
+              for="store-link-max"
+              class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+            >
+              Max users (clients)
+            </label>
+            <input
+              id="store-link-max"
+              type="number"
+              min="1"
+              step="1"
+              bind:value={storeLinkMaxUsers}
+              class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm text-bratrax-text-body focus:border-bratrax-acid focus:outline-none"
+              placeholder="10"
+            />
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            on:click={() => (storeLinkOpen = false)}
+            class="btn-bratrax btn-neutral btn-compact"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            on:click={submitStoreLink}
+            disabled={storeLinkSaving}
+            class="btn-bratrax btn-primary btn-compact"
+          >
+            {storeLinkSaving ? "Creating…" : "Create store link"}
+          </button>
+        </div>
+      {:else}
+        <div class="mt-4 flex flex-col gap-3">
+          <div class="font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+            {storeLinkResultStore} · up to {storeLinkResultMaxUsers} users
+          </div>
+          <div class="flex items-center gap-2">
+            <input
+              type="text"
+              readonly
+              value={storeLinkResultUrl}
+              class="w-full border border-bratrax-border bg-bratrax-bg px-3 py-2 font-mono text-xs text-bratrax-text-body focus:border-bratrax-acid focus:outline-none"
+            />
+            <button
+              type="button"
+              on:click={copyStoreLinkUrl}
+              class="btn-bratrax btn-primary btn-compact"
+            >
+              {storeLinkCopied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p class="font-mono text-[10px] text-bratrax-text-muted">
+            Expires {formatDate(storeLinkResultExpiresAt)}.
+          </p>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end">
+          <button
+            type="button"
+            on:click={() => (storeLinkOpen = false)}
             class="btn-bratrax btn-neutral btn-compact"
           >
             Done

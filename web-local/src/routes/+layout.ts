@@ -89,7 +89,8 @@ export async function load({ url, depends, untrack, fetch }) {
     url.pathname.startsWith("/terms-of-service") ||
     url.pathname.startsWith("/vs/") ||
     url.pathname.startsWith("/faq") ||
-    url.pathname.startsWith("/try-demo");
+    url.pathname.startsWith("/try-demo") ||
+    url.pathname.startsWith("/join");
 
   if (isPublicRoute) {
     return { initialized: false };

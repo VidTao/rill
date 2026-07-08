@@ -66,6 +66,49 @@ export async function bratraxLogout(): Promise<void> {
   });
 }
 
+// Public, unauthenticated. Validate a store signup link before rendering the
+// /join form. Returns { valid, store_platform, remaining } — valid:false for a
+// full / expired / unknown token (no enumeration detail).
+export interface StoreSignupLinkInfo {
+  valid: boolean;
+  store_platform?: "shopify" | "woocommerce";
+  remaining?: number;
+}
+
+export async function getStoreSignupLink(
+  token: string,
+): Promise<StoreSignupLinkInfo> {
+  const res = await fetch(`${getBaseUrl()}/bratrax/signup-link/${token}`);
+  if (!res.ok) return { valid: false };
+  return res.json();
+}
+
+// Public, unauthenticated. Atomically reserves one slot AND creates the account
+// server-side (Flask) — the account is NOT created via /auth/signup because that
+// path is gated by ONLY_INVITATION_LINK. The caller then logs in. On failure
+// throws an Error whose message is a stable status string: "already_user" or
+// "link_full_or_expired".
+export async function consumeStoreSignupLink(
+  token: string,
+  email: string,
+  password: string,
+  name: string,
+): Promise<{ store_platform: "shopify" | "woocommerce" }> {
+  const res = await fetch(
+    `${getBaseUrl()}/bratrax/signup-link/${token}/consume`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, name }),
+    },
+  );
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.status ?? body.error ?? `Request failed (${res.status})`);
+  }
+  return body;
+}
+
 export interface BratraxAuthConfig {
   invite_only: boolean;
   // Gates the WooCommerce store connector on /onboard/store + /connectors.

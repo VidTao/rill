@@ -5,6 +5,7 @@
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import { onMount } from "svelte";
   import { getAuthConfig } from "$lib/bratrax/auth";
+  import { onboardMe } from "$lib/bratrax/onboarding/api";
 
   // Store-provider chooser. Shopify is connectable by everyone. WooCommerce is
   // gated behind the ALLOW_WOOCOMMERCE env flag (surfaced via /bratrax/auth/config)
@@ -13,12 +14,29 @@
   // friction-free.
   type StoreProvider = "shopify" | "woocommerce";
   let selectedStore: StoreProvider = "shopify";
+  // Set when the user arrived via a store-locked signup link — forces this store
+  // and disables the other card. Read from onboarding stack_selections in onMount.
+  let lockedStore: StoreProvider | "" = "";
 
   // ALLOW_WOOCOMMERCE on the Go proxy. Fetched on mount; defaults to false so a
   // transient failure keeps WooCommerce gated rather than exposing it.
   let allowWoocommerce = false;
   onMount(async () => {
     allowWoocommerce = (await getAuthConfig()).allow_woocommerce;
+    // Store-locked signup link: preselect + lock the store from onboarding state
+    // (stack_selections.locked_store_platform, stamped at onboard_start).
+    try {
+      const me = await onboardMe();
+      const locked = (me?.stack_selections as Record<string, unknown> | undefined)?.[
+        "locked_store_platform"
+      ];
+      if (locked === "shopify" || locked === "woocommerce") {
+        lockedStore = locked;
+        selectedStore = locked;
+      }
+    } catch {
+      // No lock / not resolvable → normal store chooser.
+    }
   });
 
   // /connectors sends super_admins here with ?provider=woocommerce to jump
@@ -40,6 +58,8 @@
   let loading = false;
 
   function selectStore(provider: StoreProvider) {
+    // A store lock (from a store-locked signup link) forbids switching away.
+    if (lockedStore && provider !== lockedStore) return;
     // WooCommerce is only selectable when ALLOW_WOOCOMMERCE is on.
     if (provider === "woocommerce" && !allowWoocommerce) return;
     selectedStore = provider;
@@ -138,10 +158,13 @@
         <button
           type="button"
           on:click={() => selectStore("shopify")}
+          disabled={lockedStore === "woocommerce"}
           class="flex flex-col items-center gap-2 border px-4 py-4 transition-all
-            {selectedStore === 'shopify'
-              ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
-              : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}"
+            {lockedStore === 'woocommerce'
+              ? 'cursor-not-allowed border-bratrax-border bg-bratrax-bg text-bratrax-text-muted opacity-50'
+              : selectedStore === 'shopify'
+                ? 'border-bratrax-acid bg-bratrax-acid/10 text-bratrax-acid ring-1 ring-bratrax-acid'
+                : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}"
           aria-pressed={selectedStore === "shopify"}
         >
           <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none">
@@ -161,12 +184,12 @@
         <button
           type="button"
           on:click={() => selectStore("woocommerce")}
-          disabled={!allowWoocommerce}
+          disabled={!allowWoocommerce || lockedStore === "shopify"}
           class="flex flex-col items-center gap-2 border px-4 py-4 transition-all
-            {!allowWoocommerce
+            {(!allowWoocommerce || lockedStore === 'shopify')
               ? 'cursor-not-allowed border-bratrax-border bg-bratrax-bg text-bratrax-text-muted'
               : selectedStore === 'woocommerce'
-                ? 'border-bratrax-acid/50 bg-bratrax-acid/10 text-bratrax-acid'
+                ? 'border-bratrax-acid bg-bratrax-acid/10 text-bratrax-acid ring-1 ring-bratrax-acid'
                 : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover'}"
           aria-pressed={selectedStore === "woocommerce"}
         >

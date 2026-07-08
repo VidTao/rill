@@ -151,6 +151,61 @@ export function revokeSignupInvitation(
   });
 }
 
+// -----------------------------------------------------------------------------
+// Store signup links (rill_signup_links) — multi-use, store-locked, capped.
+// Distributed via external email listings; no email is sent. Consumed publicly
+// via /join/<token>.
+// -----------------------------------------------------------------------------
+
+export type StorePlatform = "shopify" | "woocommerce";
+
+export interface StoreSignupLink {
+  token: string;
+  store_platform: StorePlatform;
+  max_uses: number;
+  used_count: number;
+  expires_at: string | null;
+  created_at: string | null;
+  invited_by_email: string | null;
+  join_url: string;
+}
+
+export interface StoreSignupLinkResult {
+  token: string;
+  join_url: string;
+  store: StorePlatform;
+  max_users: number;
+  expires_at: string | null;
+}
+
+export function listStoreSignupLinks(): Promise<{
+  pending: StoreSignupLink[];
+}> {
+  return apiFetch("/bratrax/superadmins/store-signup-links");
+}
+
+export function createStoreSignupLink(
+  store: StorePlatform,
+  maxUsers: number,
+): Promise<StoreSignupLinkResult> {
+  return apiFetch<StoreSignupLinkResult>(
+    "/bratrax/superadmins/store-signup-link",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ store, max_users: maxUsers }),
+    },
+  );
+}
+
+export function revokeStoreSignupLink(
+  token: string,
+): Promise<{ revoked: string }> {
+  return apiFetch(`/bratrax/superadmins/store-signup-links/${token}`, {
+    method: "DELETE",
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Access requests — submitted from /signup's invite-only screen, reviewed by
 // super_admin. Approve generates a kind='signup' invite (same shape as
