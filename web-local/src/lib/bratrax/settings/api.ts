@@ -8,6 +8,8 @@ import type {
   InviteResult,
   MCPSettings,
   Role,
+  SlackInstallLink,
+  SlackSettings,
   TeamData,
 } from "./types";
 
@@ -39,7 +41,9 @@ export function getAccount(): Promise<AccountInfo> {
   return apiFetch<AccountInfo>("/bratrax/settings/account");
 }
 
-export function updateAccount(payload: Partial<AccountInfo>): Promise<AccountInfo> {
+export function updateAccount(
+  payload: Partial<AccountInfo>,
+): Promise<AccountInfo> {
   return apiFetch<AccountInfo>("/bratrax/settings/account", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -98,7 +102,9 @@ export function getAISettings(): Promise<AISettings> {
   return apiFetch<AISettings>("/bratrax/settings/ai");
 }
 
-export function updateAISettings(anthropic_api_key: string): Promise<AISettings> {
+export function updateAISettings(
+  anthropic_api_key: string,
+): Promise<AISettings> {
   return apiFetch<AISettings>("/bratrax/settings/ai", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -124,6 +130,22 @@ export function regenerateMCPToken(): Promise<MCPSettings> {
 
 export function deleteMCPToken(): Promise<MCPSettings> {
   return apiFetch<MCPSettings>("/bratrax/settings/mcp", { method: "DELETE" });
+}
+
+// ----- Slack (@bratrax assistant) ---------------------------------------------
+
+export function getSlackSettings(): Promise<SlackSettings> {
+  return apiFetch<SlackSettings>("/bratrax/settings/slack");
+}
+
+export function createSlackInstallLink(): Promise<SlackInstallLink> {
+  return apiFetch<SlackInstallLink>("/bratrax/settings/slack/install", {
+    method: "POST",
+  });
+}
+
+export function disconnectSlack(teamId: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/bratrax/settings/slack/${teamId}`, { method: "DELETE" });
 }
 
 // ----- Invitation acceptance (public, used by /accept-invite/[token]) --------

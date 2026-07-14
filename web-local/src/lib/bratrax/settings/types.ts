@@ -73,3 +73,21 @@ export interface MCPSettings {
   created_at: string | null;
   claude_desktop_config: Record<string, unknown> | null;
 }
+
+export interface SlackWorkspace {
+  team_id: string;
+  team_name: string | null;
+  installed_at: string | null;
+  installed_by_email: string | null;
+}
+
+export interface SlackSettings {
+  workspaces: SlackWorkspace[];
+  // false when the server has no Slack app credentials configured
+  configured: boolean;
+}
+
+export interface SlackInstallLink {
+  install_url: string;
+  expires_in_minutes: number;
+}

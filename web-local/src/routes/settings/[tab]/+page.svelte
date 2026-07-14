@@ -17,6 +17,9 @@
     getMCPSettings,
     regenerateMCPToken,
     deleteMCPToken,
+    getSlackSettings,
+    createSlackInstallLink,
+    disconnectSlack,
   } from "$lib/bratrax/settings/api";
   import type {
     AccountInfo,
@@ -25,11 +28,12 @@
     MCPSettings,
     PendingInvite,
     Role,
+    SlackSettings,
     TeamData,
     TeamMember,
   } from "$lib/bratrax/settings/types";
 
-  type TabId = "account" | "team" | "billing" | "ai" | "mcp";
+  type TabId = "account" | "team" | "billing" | "ai" | "mcp" | "slack";
 
   const TABS: { id: TabId; label: string }[] = [
     { id: "account", label: "Account" },
@@ -37,6 +41,7 @@
     { id: "billing", label: "Billing" },
     { id: "ai", label: "AI" },
     { id: "mcp", label: "MCP" },
+    { id: "slack", label: "Slack" },
   ];
 
   const INVITE_ROLE_OPTIONS: ("admin" | "viewer")[] = ["admin", "viewer"];
@@ -128,10 +133,19 @@
   let mcpConfirmRegenerateOpen = false;
   let mcpConfirmRemoveOpen = false;
 
+  // ----- Slack state ---------------------------------------------------------
+  let slack: SlackSettings | null = null;
+  let slackError = "";
+  let slackStatusMessage = "";
+  let slackConnecting = false;
+  let slackDisconnectingTeam = "";
+  let slackConfirmDisconnectTeam: string | null = null;
+
   // ---------------------------------------------------------------------------
   // Permission helpers (mirror server rules)
   // ---------------------------------------------------------------------------
-  $: isAdminOrSuper = account?.role === "super_admin" || account?.role === "admin";
+  $: isAdminOrSuper =
+    account?.role === "super_admin" || account?.role === "admin";
   $: selfId = team.members.find((m) => m.email === account?.email)?.id ?? null;
 
   function canEditMember(m: TeamMember): boolean {
@@ -292,6 +306,52 @@
     }
   }
 
+  // ---------- Slack -----------------------------------------------------------
+  async function loadSlack() {
+    slackError = "";
+    try {
+      slack = await getSlackSettings();
+    } catch (e: any) {
+      slackError = e.message ?? "Failed to load Slack settings";
+    }
+  }
+
+  async function connectSlack() {
+    slackConnecting = true;
+    slackError = "";
+    slackStatusMessage = "";
+    try {
+      const link = await createSlackInstallLink();
+      // Slack's consent screen finishes with a redirect back to this tab
+      // (?connected=1), so navigating the current tab is the smoothest flow —
+      // but open in a new tab so an aborted install doesn't lose the app.
+      window.open(link.install_url, "_blank", "noopener");
+      slackStatusMessage =
+        "Continue in the Slack tab that just opened, then come back here and refresh.";
+    } catch (e: any) {
+      slackError = e.message ?? "Failed to start the Slack install";
+    } finally {
+      slackConnecting = false;
+    }
+  }
+
+  async function confirmDisconnectSlack() {
+    if (!slackConfirmDisconnectTeam) return;
+    slackDisconnectingTeam = slackConfirmDisconnectTeam;
+    slackError = "";
+    slackStatusMessage = "";
+    try {
+      await disconnectSlack(slackConfirmDisconnectTeam);
+      slackStatusMessage = "Workspace disconnected";
+      await loadSlack();
+    } catch (e: any) {
+      slackError = e.message ?? "Failed to disconnect workspace";
+    } finally {
+      slackDisconnectingTeam = "";
+      slackConfirmDisconnectTeam = null;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Account actions
   // ---------------------------------------------------------------------------
@@ -346,7 +406,11 @@
     inviteSaving = true;
     topError = "";
     try {
-      const result = await inviteMember(inviteEmail.trim().toLowerCase(), inviteRole, inviteName.trim());
+      const result = await inviteMember(
+        inviteEmail.trim().toLowerCase(),
+        inviteRole,
+        inviteName.trim(),
+      );
       inviteResultUrl = result.accept_url;
       inviteResultExpiresAt = result.expires_at;
       inviteResultEmail = result.email;
@@ -465,16 +529,29 @@
   // The dropdown links to /settings/<tab> directly; in-page tab clicks
   // navigate via goto() so the URL stays in sync.
   onMount(async () => {
-    await Promise.all([loadAccount(), loadTeam(), loadBilling(), loadAI(), loadMCP()]);
+    await Promise.all([
+      loadAccount(),
+      loadTeam(),
+      loadBilling(),
+      loadAI(),
+      loadMCP(),
+      loadSlack(),
+    ]);
   });
 </script>
 
-<div class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12">
-  <div class="relative w-full max-w-3xl border border-bratrax-border bg-bratrax-surface p-8">
+<div
+  class="flex h-full w-full items-start justify-center overflow-y-auto bg-bratrax-bg py-12"
+>
+  <div
+    class="relative w-full max-w-3xl border border-bratrax-border bg-bratrax-surface p-8"
+  >
     <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
     <div class="mb-6">
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+      >
         SETTINGS
       </div>
       <h1 class="text-2xl font-black text-bratrax-text-headline">
@@ -486,7 +563,9 @@
     </div>
 
     {#if topError}
-      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+      <div
+        class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+      >
         {topError}
       </div>
     {/if}
@@ -496,7 +575,8 @@
       {#each TABS as tab}
         <button
           type="button"
-          class="border-b-2 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {activeTab === tab.id
+          class="border-b-2 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {activeTab ===
+          tab.id
             ? 'border-bratrax-acid text-bratrax-acid'
             : 'border-transparent text-bratrax-text-muted hover:text-bratrax-text-body'}"
           on:click={() => goto(`/settings/${tab.id}`)}
@@ -511,7 +591,9 @@
       {#if account}
         <div class="flex flex-col gap-4">
           <div>
-            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+            <label
+              class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+            >
               Company name
             </label>
             <input
@@ -522,7 +604,9 @@
             />
           </div>
           <div>
-            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+            <label
+              class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+            >
               Your email
             </label>
             <input
@@ -532,7 +616,9 @@
             />
           </div>
           <div>
-            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+            <label
+              class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+            >
               Timezone
             </label>
             <select
@@ -556,7 +642,9 @@
               {accountSaving ? "Saving…" : "Save changes"}
             </button>
             {#if accountSavedMessage}
-              <span class="font-mono text-xs text-bratrax-text-muted">{accountSavedMessage}</span>
+              <span class="font-mono text-xs text-bratrax-text-muted"
+                >{accountSavedMessage}</span
+              >
             {/if}
           </div>
         </div>
@@ -568,7 +656,9 @@
     <!-- Team tab -->
     {#if activeTab === "team"}
       <div class="flex items-baseline justify-between">
-        <h2 class="font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
+        <h2
+          class="font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+        >
           Members ({team.members.length})
         </h2>
         {#if isAdminOrSuper}
@@ -584,15 +674,25 @@
 
       <ul class="mt-3 flex flex-col gap-2">
         {#each team.members as m (m.id)}
-          <li class="flex items-center gap-3 border border-bratrax-border bg-bratrax-bg px-4 py-3">
-            <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center bg-bratrax-acid/15 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-acid">
+          <li
+            class="flex items-center gap-3 border border-bratrax-border bg-bratrax-bg px-4 py-3"
+          >
+            <div
+              class="flex h-9 w-9 flex-shrink-0 items-center justify-center bg-bratrax-acid/15 font-mono text-xs font-bold uppercase tracking-wider text-bratrax-acid"
+            >
               {initialsOf(m.name, m.email)}
             </div>
             <div class="min-w-0 flex-1">
-              <div class="truncate font-mono text-xs font-bold text-bratrax-text-headline">
+              <div
+                class="truncate font-mono text-xs font-bold text-bratrax-text-headline"
+              >
                 {m.name || m.email}
               </div>
-              <div class="truncate font-mono text-[10px] text-bratrax-text-muted">{m.email}</div>
+              <div
+                class="truncate font-mono text-[10px] text-bratrax-text-muted"
+              >
+                {m.email}
+              </div>
             </div>
 
             {#if m.role === "super_admin"}
@@ -609,7 +709,9 @@
                 <option value="viewer">VIEWER</option>
               </select>
             {:else}
-              <span class="border border-bratrax-border bg-bratrax-surface px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              <span
+                class="border border-bratrax-border bg-bratrax-surface px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+              >
                 {roleLabel(m.role)}
               </span>
             {/if}
@@ -628,15 +730,25 @@
       </ul>
 
       {#if team.pending.length > 0}
-        <h2 class="mt-6 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
+        <h2
+          class="mt-6 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+        >
           Pending invitations ({team.pending.length})
         </h2>
         <ul class="mt-3 flex flex-col gap-2">
           {#each team.pending as p (p.token)}
-            <li class="flex items-center gap-3 border border-bratrax-border bg-bratrax-bg px-4 py-3">
+            <li
+              class="flex items-center gap-3 border border-bratrax-border bg-bratrax-bg px-4 py-3"
+            >
               <div class="min-w-0 flex-1">
-                <div class="truncate font-mono text-xs font-bold text-bratrax-text-headline">{p.email}</div>
-                <div class="truncate font-mono text-[10px] text-bratrax-text-muted">
+                <div
+                  class="truncate font-mono text-xs font-bold text-bratrax-text-headline"
+                >
+                  {p.email}
+                </div>
+                <div
+                  class="truncate font-mono text-[10px] text-bratrax-text-muted"
+                >
                   {roleLabel(p.role)} · expires {formatDate(p.expires_at)}
                 </div>
               </div>
@@ -665,7 +777,9 @@
     <!-- Billing tab -->
     {#if activeTab === "billing"}
       {#if billingError}
-        <div class="border border-bratrax-border bg-bratrax-bg px-4 py-6 text-center font-mono text-xs text-bratrax-text-muted">
+        <div
+          class="border border-bratrax-border bg-bratrax-bg px-4 py-6 text-center font-mono text-xs text-bratrax-text-muted"
+        >
           {billingError}
         </div>
       {:else if billing}
@@ -673,11 +787,20 @@
           <div class="border border-bratrax-border bg-bratrax-bg p-4">
             <div class="flex items-baseline justify-between">
               <div>
-                <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+                <div
+                  class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+                >
                   Current plan
                 </div>
                 <div class="mt-1 text-xl font-black text-bratrax-text-headline">
-                  {billing.plan} <span class="font-mono text-sm font-normal text-bratrax-text-muted">— {formatPrice(billing.price_cents, billing.currency)}/{billing.interval}</span>
+                  {billing.plan}
+                  <span
+                    class="font-mono text-sm font-normal text-bratrax-text-muted"
+                    >— {formatPrice(
+                      billing.price_cents,
+                      billing.currency,
+                    )}/{billing.interval}</span
+                  >
                 </div>
               </div>
               <span
@@ -688,7 +811,9 @@
               </span>
             </div>
             {#if billing.current_period_end}
-              <p class="mt-2 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted">
+              <p
+                class="mt-2 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted"
+              >
                 Expires {formatDate(billing.current_period_end)}
               </p>
             {/if}
@@ -712,7 +837,9 @@
     <!-- AI tab -->
     {#if activeTab === "ai"}
       {#if aiError && !ai}
-        <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+        <div
+          class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+        >
           {aiError}
         </div>
       {:else if ai}
@@ -722,30 +849,32 @@
               Anthropic API key
             </h2>
             <p class="mt-2 text-sm font-light text-bratrax-text-body">
-              Bratrax routes Claude chat through your own Anthropic account. Paste an API key
-              from
+              Bratrax routes Claude chat through your own Anthropic account.
+              Paste an API key from
               <a
                 href="https://console.anthropic.com/settings/keys"
                 target="_blank"
                 rel="noopener"
                 class="text-bratrax-acid hover:underline"
-              >console.anthropic.com</a>.
-              We verify it works before saving.
+                >console.anthropic.com</a
+              >. We verify it works before saving.
             </p>
           </div>
 
           {#if ai.key_set}
             <div class="border border-bratrax-border bg-bratrax-bg p-4">
-              <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+              <div
+                class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+              >
                 Current key
               </div>
               <div class="mt-2 flex items-center justify-between gap-3">
-                <span class="font-mono text-sm text-bratrax-text-headline truncate">
+                <span
+                  class="font-mono text-sm text-bratrax-text-headline truncate"
+                >
                   {ai.key_preview}
                 </span>
-                <span class="bratrax-status-pill flex-shrink-0">
-                  Active
-                </span>
+                <span class="bratrax-status-pill flex-shrink-0"> Active </span>
               </div>
               <div class="mt-3 flex items-center gap-2">
                 <button
@@ -760,7 +889,9 @@
             </div>
           {:else}
             <div class="border border-bratrax-border bg-bratrax-bg p-4">
-              <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
+              <div
+                class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+              >
                 Status
               </div>
               <p class="mt-2 font-mono text-xs text-bratrax-text-muted">
@@ -770,7 +901,9 @@
           {/if}
 
           <div>
-            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+            <label
+              class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+            >
               {ai.key_set ? "Replace key" : "Add key"}
             </label>
             <div class="flex items-center gap-2">
@@ -792,17 +925,22 @@
               </button>
             </div>
             <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
-              We send a single test request to Anthropic to confirm the key works before saving.
+              We send a single test request to Anthropic to confirm the key
+              works before saving.
             </p>
           </div>
 
           {#if aiError}
-            <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+            <div
+              class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+            >
               {aiError}
             </div>
           {/if}
           {#if aiSavedMessage}
-            <div class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-acid">
+            <div
+              class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-acid"
+            >
               {aiSavedMessage}
             </div>
           {/if}
@@ -815,7 +953,9 @@
     <!-- MCP tab -->
     {#if activeTab === "mcp"}
       {#if mcpError && !mcp}
-        <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+        <div
+          class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+        >
           {mcpError}
         </div>
       {:else if mcp}
@@ -826,15 +966,18 @@
             </h2>
             <p class="mt-2 text-sm font-light text-bratrax-text-body">
               Paste the config below into Claude Desktop's
-              <code class="font-mono text-[11px] text-bratrax-acid">claude_desktop_config.json</code>
-              to query your Bratrax data with Claude. The token authenticates as your workspace
-              and gives Claude access to all 22 MCP tools (metrics queries, SQL, file operations,
-              workshop tools).
+              <code class="font-mono text-[11px] text-bratrax-acid"
+                >claude_desktop_config.json</code
+              >
+              to query your Bratrax data with Claude. The token authenticates as
+              your workspace and gives Claude access to all 22 MCP tools (metrics
+              queries, SQL, file operations, workshop tools).
             </p>
             <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
               On macOS the config file lives at
-              <code class="text-bratrax-text-body">~/Library/Application Support/Claude/claude_desktop_config.json</code>.
-              Restart Claude Desktop after pasting.
+              <code class="text-bratrax-text-body"
+                >~/Library/Application Support/Claude/claude_desktop_config.json</code
+              >. Restart Claude Desktop after pasting.
             </p>
           </div>
 
@@ -843,11 +986,17 @@
             <div class="border border-bratrax-border bg-bratrax-bg p-4">
               <div class="flex items-baseline justify-between">
                 <div>
-                  <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+                  <div
+                    class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+                  >
                     Token status
                   </div>
-                  <div class="mt-1 font-mono text-sm text-bratrax-text-headline">
-                    Active{mcp.created_at ? ` · created ${formatDate(mcp.created_at)}` : ""}
+                  <div
+                    class="mt-1 font-mono text-sm text-bratrax-text-headline"
+                  >
+                    Active{mcp.created_at
+                      ? ` · created ${formatDate(mcp.created_at)}`
+                      : ""}
                   </div>
                 </div>
                 <span class="bratrax-status-pill flex-shrink-0">
@@ -876,7 +1025,9 @@
 
             <!-- Token (separately copyable) -->
             <div>
-              <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              <label
+                class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+              >
                 Token
               </label>
               <div class="flex items-center gap-2">
@@ -899,10 +1050,17 @@
 
             <!-- Full config JSON (the canonical paste-into-Claude-Desktop blob) -->
             <div>
-              <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+              <label
+                class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+              >
                 claude_desktop_config.json
               </label>
-              <pre class="border border-bratrax-border bg-bratrax-bg px-3 py-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body overflow-x-auto">{JSON.stringify(mcp.claude_desktop_config, null, 2)}</pre>
+              <pre
+                class="border border-bratrax-border bg-bratrax-bg px-3 py-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body overflow-x-auto">{JSON.stringify(
+                  mcp.claude_desktop_config,
+                  null,
+                  2,
+                )}</pre>
               <div class="mt-2 flex items-center gap-2">
                 <button
                   type="button"
@@ -912,13 +1070,16 @@
                   {mcpConfigCopied ? "Copied!" : "Copy config"}
                 </button>
                 <p class="font-mono text-[10px] text-bratrax-text-muted">
-                  Anyone with this token can query your Bratrax data — keep it private.
+                  Anyone with this token can query your Bratrax data — keep it
+                  private.
                 </p>
               </div>
             </div>
           {:else}
             <div class="border border-bratrax-border bg-bratrax-bg p-4">
-              <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted">
+              <div
+                class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+              >
                 Status
               </div>
               <p class="mt-2 font-mono text-xs text-bratrax-text-muted">
@@ -938,13 +1099,147 @@
           {/if}
 
           {#if mcpError}
-            <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+            <div
+              class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+            >
               {mcpError}
             </div>
           {/if}
           {#if mcpStatusMessage}
-            <div class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-acid">
+            <div
+              class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-acid"
+            >
               {mcpStatusMessage}
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <p class="font-mono text-xs text-bratrax-text-muted">Loading…</p>
+      {/if}
+    {/if}
+
+    <!-- Slack tab -->
+    {#if activeTab === "slack"}
+      {#if slackError && !slack}
+        <div
+          class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+        >
+          {slackError}
+        </div>
+      {:else if slack}
+        <div class="flex flex-col gap-4">
+          <div>
+            <h2 class="text-lg font-black text-bratrax-text-headline">
+              @bratrax in Slack
+            </h2>
+            <p class="mt-2 text-sm font-light text-bratrax-text-body">
+              Install the <span class="font-mono text-[12px] text-bratrax-acid"
+                >@bratrax</span
+              >
+              assistant into your Slack workspace and ask your data anything — "what
+              was my spend today?", "top campaigns by ROAS this week", "chart revenue
+              by channel" — without opening the app. Mention it in a channel or message
+              it directly; answers include numbers, tables, charts, and a link into
+              the matching dashboard.
+            </p>
+            <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
+              Anyone in the connected workspace can ask questions, and answers
+              use this account's data — connect it to a workspace your whole
+              team should trust with these numbers. Uses your Anthropic key from
+              the AI tab when set.
+            </p>
+          </div>
+
+          {#if slack.workspaces.length > 0}
+            <div class="border border-bratrax-border bg-bratrax-bg p-4">
+              <div
+                class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+              >
+                Connected workspaces
+              </div>
+              <div class="mt-2 flex flex-col gap-2">
+                {#each slack.workspaces as ws (ws.team_id)}
+                  <div
+                    class="flex items-center justify-between gap-3 border-b border-bratrax-border/50 pb-2 last:border-b-0 last:pb-0"
+                  >
+                    <div class="min-w-0">
+                      <div
+                        class="font-mono text-sm text-bratrax-text-headline truncate"
+                      >
+                        {ws.team_name || ws.team_id}
+                      </div>
+                      <div
+                        class="font-mono text-[10px] text-bratrax-text-muted"
+                      >
+                        {#if ws.installed_at}connected {formatDate(
+                            ws.installed_at,
+                          )}{/if}
+                        {#if ws.installed_by_email}&nbsp;by {ws.installed_by_email}{/if}
+                      </div>
+                    </div>
+                    <div class="flex flex-shrink-0 items-center gap-2">
+                      <span class="bratrax-status-pill">Connected</span>
+                      <button
+                        type="button"
+                        on:click={() =>
+                          (slackConfirmDisconnectTeam = ws.team_id)}
+                        disabled={slackDisconnectingTeam === ws.team_id}
+                        class="btn-bratrax btn-destructive btn-compact"
+                      >
+                        {slackDisconnectingTeam === ws.team_id
+                          ? "Disconnecting…"
+                          : "Disconnect"}
+                      </button>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {:else}
+            <div class="border border-bratrax-border bg-bratrax-bg p-4">
+              <div
+                class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+              >
+                Status
+              </div>
+              <p class="mt-2 font-mono text-xs text-bratrax-text-muted">
+                No Slack workspace connected yet.
+              </p>
+            </div>
+          {/if}
+
+          <div>
+            <button
+              type="button"
+              on:click={connectSlack}
+              disabled={slackConnecting || !slack.configured || !isAdminOrSuper}
+              class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+            >
+              {slackConnecting
+                ? "Preparing…"
+                : slack.workspaces.length > 0
+                  ? "Connect another workspace"
+                  : "Connect Slack"}
+            </button>
+            {#if !slack.configured}
+              <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
+                The Slack app isn't configured on this server yet.
+              </p>
+            {/if}
+          </div>
+
+          {#if slackError}
+            <div
+              class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+            >
+              {slackError}
+            </div>
+          {/if}
+          {#if slackStatusMessage}
+            <div
+              class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-acid"
+            >
+              {slackStatusMessage}
             </div>
           {/if}
         </div>
@@ -974,7 +1269,9 @@
       <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
       <div class="mb-2 flex items-baseline justify-between">
-        <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        <div
+          class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+        >
           {inviteResultUrl ? "Invite link" : "Invite teammate"}
         </div>
         <button
@@ -986,14 +1283,18 @@
       </div>
 
       {#if !inviteResultUrl}
-        <h2 class="text-lg font-black text-bratrax-text-headline">Generate invite link</h2>
+        <h2 class="text-lg font-black text-bratrax-text-headline">
+          Generate invite link
+        </h2>
         <p class="mt-2 text-sm font-light text-bratrax-text-body">
           We'll create a secure link. You copy it and send it however you like.
         </p>
 
         <div class="mt-4 flex flex-col gap-3">
           <div>
-            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+            <label
+              class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+            >
               Email
             </label>
             <input
@@ -1004,7 +1305,9 @@
             />
           </div>
           <div>
-            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+            <label
+              class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+            >
               Name (optional)
             </label>
             <input
@@ -1015,7 +1318,9 @@
             />
           </div>
           <div>
-            <label class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted">
+            <label
+              class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+            >
               Role
             </label>
             <div class="flex gap-2">
@@ -1023,7 +1328,8 @@
                 <button
                   type="button"
                   on:click={() => (inviteRole = r)}
-                  class="flex-1 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {inviteRole === r
+                  class="flex-1 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {inviteRole ===
+                  r
                     ? 'border-bratrax-acid bg-bratrax-acid/10 text-bratrax-acid'
                     : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-muted hover:border-bratrax-text-muted'}"
                 >
@@ -1052,10 +1358,12 @@
           </button>
         </div>
       {:else}
-        <h2 class="text-lg font-black text-bratrax-text-headline">Send this link to {inviteResultEmail}</h2>
+        <h2 class="text-lg font-black text-bratrax-text-headline">
+          Send this link to {inviteResultEmail}
+        </h2>
         <p class="mt-2 text-sm font-light text-bratrax-text-body">
-          The link expires {formatDate(inviteResultExpiresAt)}. Anyone with the link can sign up
-          using this email.
+          The link expires {formatDate(inviteResultExpiresAt)}. Anyone with the
+          link can sign up using this email.
         </p>
 
         <div class="mt-4 flex items-center gap-2">
@@ -1107,14 +1415,17 @@
     >
       <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-tomato"></div>
 
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80">
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80"
+      >
         Confirm remove
       </div>
       <h2 class="text-lg font-black text-bratrax-text-headline">
         Remove {confirmTarget.name || confirmTarget.email}?
       </h2>
       <p class="mt-3 text-sm font-light text-bratrax-text-body">
-        They will lose access to this workspace immediately. You can re-invite them later if needed.
+        They will lose access to this workspace immediately. You can re-invite
+        them later if needed.
       </p>
 
       <div class="mt-6 flex items-center justify-end gap-2">
@@ -1135,7 +1446,6 @@
   </div>
 {/if}
 
-
 <!-- AI key remove confirmation modal -->
 {#if aiConfirmRemoveOpen}
   <div
@@ -1154,12 +1464,17 @@
     >
       <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-tomato"></div>
 
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80">
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80"
+      >
         Confirm remove
       </div>
-      <h2 class="text-lg font-black text-bratrax-text-headline">Remove your Anthropic API key?</h2>
+      <h2 class="text-lg font-black text-bratrax-text-headline">
+        Remove your Anthropic API key?
+      </h2>
       <p class="mt-3 text-sm font-light text-bratrax-text-body">
-        Claude chat will be disabled for everyone in your workspace until a new key is added.
+        Claude chat will be disabled for everyone in your workspace until a new
+        key is added.
       </p>
 
       <div class="mt-6 flex items-center justify-end gap-2">
@@ -1180,7 +1495,6 @@
   </div>
 {/if}
 
-
 <!-- MCP regenerate confirmation modal -->
 {#if mcpConfirmRegenerateOpen}
   <div
@@ -1199,13 +1513,17 @@
     >
       <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+      >
         Confirm regenerate
       </div>
-      <h2 class="text-lg font-black text-bratrax-text-headline">Generate a new MCP token?</h2>
+      <h2 class="text-lg font-black text-bratrax-text-headline">
+        Generate a new MCP token?
+      </h2>
       <p class="mt-3 text-sm font-light text-bratrax-text-body">
-        The current token will stop working immediately. Any Claude Desktop instance still using
-        it will fail until you paste the new config.
+        The current token will stop working immediately. Any Claude Desktop
+        instance still using it will fail until you paste the new config.
       </p>
 
       <div class="mt-6 flex items-center justify-end gap-2">
@@ -1244,13 +1562,17 @@
     >
       <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-tomato"></div>
 
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80">
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80"
+      >
         Confirm revoke
       </div>
-      <h2 class="text-lg font-black text-bratrax-text-headline">Revoke MCP token?</h2>
+      <h2 class="text-lg font-black text-bratrax-text-headline">
+        Revoke MCP token?
+      </h2>
       <p class="mt-3 text-sm font-light text-bratrax-text-body">
-        Claude Desktop instances using this token will stop working immediately. You can generate
-        a new one any time.
+        Claude Desktop instances using this token will stop working immediately.
+        You can generate a new one any time.
       </p>
 
       <div class="mt-6 flex items-center justify-end gap-2">
@@ -1265,6 +1587,56 @@
           class="btn-bratrax btn-destructive btn-compact"
         >
           Revoke
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Slack disconnect confirmation modal -->
+{#if slackConfirmDisconnectTeam}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    on:click={() => (slackConfirmDisconnectTeam = null)}
+    on:keydown={(e) =>
+      e.key === "Escape" && (slackConfirmDisconnectTeam = null)}
+    role="presentation"
+  >
+    <div
+      class="relative w-full max-w-md border border-bratrax-border bg-bratrax-surface p-6"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+    >
+      <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-tomato"></div>
+
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-tomato/80"
+      >
+        Confirm disconnect
+      </div>
+      <h2 class="text-lg font-black text-bratrax-text-headline">
+        Disconnect this Slack workspace?
+      </h2>
+      <p class="mt-3 text-sm font-light text-bratrax-text-body">
+        @bratrax will immediately stop answering questions there. You can
+        reconnect at any time from this page.
+      </p>
+
+      <div class="mt-6 flex items-center justify-end gap-2">
+        <button
+          on:click={() => (slackConfirmDisconnectTeam = null)}
+          class="btn-bratrax btn-neutral btn-compact"
+        >
+          Cancel
+        </button>
+        <button
+          on:click={confirmDisconnectSlack}
+          class="btn-bratrax btn-destructive btn-compact"
+        >
+          Disconnect
         </button>
       </div>
     </div>
