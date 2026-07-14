@@ -138,14 +138,39 @@ export function getSlackSettings(): Promise<SlackSettings> {
   return apiFetch<SlackSettings>("/bratrax/settings/slack");
 }
 
-export function createSlackInstallLink(): Promise<SlackInstallLink> {
+export function createSlackInstallLink(
+  community = false,
+): Promise<SlackInstallLink> {
   return apiFetch<SlackInstallLink>("/bratrax/settings/slack/install", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ community }),
   });
 }
 
 export function disconnectSlack(teamId: string): Promise<{ ok: boolean }> {
   return apiFetch(`/bratrax/settings/slack/${teamId}`, { method: "DELETE" });
+}
+
+export function createSlackLinkCode(): Promise<SlackLinkCode> {
+  return apiFetch<SlackLinkCode>("/bratrax/settings/slack/link-code", {
+    method: "POST",
+  });
+}
+
+export function createCommunityChannel(): Promise<SlackChannelCreateResult> {
+  return apiFetch<SlackChannelCreateResult>("/bratrax/settings/slack/channel", {
+    method: "POST",
+  });
+}
+
+export function unlinkSlackChannel(
+  teamId: string,
+  channelId: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/bratrax/settings/slack/channel/${teamId}/${channelId}`, {
+    method: "DELETE",
+  });
 }
 
 // ----- Invitation acceptance (public, used by /accept-invite/[token]) --------

@@ -20,6 +20,9 @@
     getSlackSettings,
     createSlackInstallLink,
     disconnectSlack,
+    createSlackLinkCode,
+    createCommunityChannel,
+    unlinkSlackChannel,
   } from "$lib/bratrax/settings/api";
   import type {
     AccountInfo,
@@ -28,6 +31,7 @@
     MCPSettings,
     PendingInvite,
     Role,
+    SlackLinkCode,
     SlackSettings,
     TeamData,
     TeamMember,
@@ -140,6 +144,11 @@
   let slackConnecting = false;
   let slackDisconnectingTeam = "";
   let slackConfirmDisconnectTeam: string | null = null;
+  let slackConnectAsCommunity = false;
+  let slackChannelCreating = false;
+  let slackCodeGenerating = false;
+  let slackLinkCode: SlackLinkCode | null = null;
+  let slackUnlinkingChannel = "";
 
   // ---------------------------------------------------------------------------
   // Permission helpers (mirror server rules)
@@ -321,7 +330,7 @@
     slackError = "";
     slackStatusMessage = "";
     try {
-      const link = await createSlackInstallLink();
+      const link = await createSlackInstallLink(slackConnectAsCommunity);
       // Slack's consent screen finishes with a redirect back to this tab
       // (?connected=1), so navigating the current tab is the smoothest flow —
       // but open in a new tab so an aborted install doesn't lose the app.
@@ -349,6 +358,57 @@
     } finally {
       slackDisconnectingTeam = "";
       slackConfirmDisconnectTeam = null;
+    }
+  }
+
+  async function createChannel() {
+    slackChannelCreating = true;
+    slackError = "";
+    slackStatusMessage = "";
+    try {
+      const result = await createCommunityChannel();
+      if (result.already_linked) {
+        slackStatusMessage = `Already linked to #${result.channel_name} in ${result.team_name ?? "the community workspace"}.`;
+      } else {
+        const invited = result.invited?.length
+          ? ` Invited: ${result.invited.join(", ")}.`
+          : "";
+        const missing = result.not_in_workspace?.length
+          ? ` Not in the workspace yet (invite them to Slack first): ${result.not_in_workspace.join(", ")}.`
+          : "";
+        slackStatusMessage = `Created and linked #${result.channel_name} in ${result.team_name ?? "the community workspace"}.${invited}${missing}`;
+      }
+      await loadSlack();
+    } catch (e: any) {
+      slackError = e.message ?? "Failed to create the channel";
+    } finally {
+      slackChannelCreating = false;
+    }
+  }
+
+  async function generateLinkCode() {
+    slackCodeGenerating = true;
+    slackError = "";
+    try {
+      slackLinkCode = await createSlackLinkCode();
+    } catch (e: any) {
+      slackError = e.message ?? "Failed to generate a link code";
+    } finally {
+      slackCodeGenerating = false;
+    }
+  }
+
+  async function unlinkChannel(teamId: string, channelId: string) {
+    slackUnlinkingChannel = channelId;
+    slackError = "";
+    try {
+      await unlinkSlackChannel(teamId, channelId);
+      slackStatusMessage = "Channel unlinked";
+      await loadSlack();
+    } catch (e: any) {
+      slackError = e.message ?? "Failed to unlink channel";
+    } finally {
+      slackUnlinkingChannel = "";
     }
   }
 
@@ -1178,7 +1238,9 @@
                       </div>
                     </div>
                     <div class="flex flex-shrink-0 items-center gap-2">
-                      <span class="bratrax-status-pill">Connected</span>
+                      <span class="bratrax-status-pill"
+                        >{ws.is_hub ? "Community" : "Connected"}</span
+                      >
                       <button
                         type="button"
                         on:click={() =>
@@ -1208,19 +1270,134 @@
             </div>
           {/if}
 
+          {#if slack.community_available}
+            <div class="border border-bratrax-border bg-bratrax-bg p-4">
+              <div
+                class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+              >
+                Community workspace{slack.community_team_name
+                  ? ` · ${slack.community_team_name}`
+                  : ""}
+              </div>
+              <p class="mt-2 text-sm font-light text-bratrax-text-body">
+                Get a private channel in the shared
+                {slack.community_team_name ?? "community"} Slack workspace, linked
+                to this account. Anyone in that channel gets answers about
+                <em>your</em> data; your teammates who are already workspace members
+                are invited automatically. DMs to @bratrax there work too — it recognizes
+                you by your Bratrax email.
+              </p>
+
+              {#if slack.channels.length > 0}
+                <div class="mt-3 flex flex-col gap-2">
+                  {#each slack.channels as ch (ch.team_id + ch.channel_id)}
+                    <div
+                      class="flex items-center justify-between gap-3 border-b border-bratrax-border/50 pb-2 last:border-b-0 last:pb-0"
+                    >
+                      <div class="min-w-0">
+                        <div
+                          class="font-mono text-sm text-bratrax-text-headline truncate"
+                        >
+                          #{ch.channel_name || ch.channel_id}
+                        </div>
+                        <div
+                          class="font-mono text-[10px] text-bratrax-text-muted"
+                        >
+                          {ch.team_name ?? ch.team_id}
+                          {#if ch.created_at}&nbsp;· linked {formatDate(
+                              ch.created_at,
+                            )}{/if}
+                        </div>
+                      </div>
+                      <div class="flex flex-shrink-0 items-center gap-2">
+                        <span class="bratrax-status-pill">Linked</span>
+                        <button
+                          type="button"
+                          on:click={() =>
+                            unlinkChannel(ch.team_id, ch.channel_id)}
+                          disabled={slackUnlinkingChannel === ch.channel_id}
+                          class="btn-bratrax btn-destructive btn-compact"
+                        >
+                          {slackUnlinkingChannel === ch.channel_id
+                            ? "Unlinking…"
+                            : "Unlink"}
+                        </button>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                {#if slack.channels.length === 0}
+                  <button
+                    type="button"
+                    on:click={createChannel}
+                    disabled={slackChannelCreating || !isAdminOrSuper}
+                    class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+                  >
+                    {slackChannelCreating
+                      ? "Creating…"
+                      : `Create #${slack.suggested_channel_name}`}
+                  </button>
+                {/if}
+                <button
+                  type="button"
+                  on:click={generateLinkCode}
+                  disabled={slackCodeGenerating || !isAdminOrSuper}
+                  class="btn-bratrax btn-neutral btn-compact"
+                >
+                  {slackCodeGenerating
+                    ? "Generating…"
+                    : "Link an existing channel"}
+                </button>
+              </div>
+
+              {#if slackLinkCode}
+                <div
+                  class="mt-3 border border-bratrax-acid/30 bg-bratrax-acid/10 p-3"
+                >
+                  <p class="font-mono text-xs text-bratrax-text-body">
+                    Post this in the channel you want to link (expires in
+                    {slackLinkCode.expires_in_minutes} min):
+                  </p>
+                  <code
+                    class="mt-2 block font-mono text-sm font-bold text-bratrax-acid"
+                    >@bratrax connect {slackLinkCode.code}</code
+                  >
+                </div>
+              {/if}
+            </div>
+          {/if}
+
           <div>
-            <button
-              type="button"
-              on:click={connectSlack}
-              disabled={slackConnecting || !slack.configured || !isAdminOrSuper}
-              class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
-            >
-              {slackConnecting
-                ? "Preparing…"
-                : slack.workspaces.length > 0
-                  ? "Connect another workspace"
-                  : "Connect Slack"}
-            </button>
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                on:click={connectSlack}
+                disabled={slackConnecting ||
+                  !slack.configured ||
+                  !isAdminOrSuper}
+                class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+              >
+                {slackConnecting
+                  ? "Preparing…"
+                  : slack.workspaces.length > 0
+                    ? "Connect another workspace"
+                    : "Connect Slack"}
+              </button>
+              {#if slack.can_install_community}
+                <label
+                  class="flex cursor-pointer items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted"
+                >
+                  <input
+                    type="checkbox"
+                    bind:checked={slackConnectAsCommunity}
+                  />
+                  Community workspace (multi-client hub)
+                </label>
+              {/if}
+            </div>
             {#if !slack.configured}
               <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
                 The Slack app isn't configured on this server yet.

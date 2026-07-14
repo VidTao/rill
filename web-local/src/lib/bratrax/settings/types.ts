@@ -77,17 +77,47 @@ export interface MCPSettings {
 export interface SlackWorkspace {
   team_id: string;
   team_name: string | null;
+  // true = the shared multi-client community workspace (channel links + DM-by-email)
+  is_hub: boolean;
   installed_at: string | null;
   installed_by_email: string | null;
 }
 
+export interface SlackChannelLink {
+  team_id: string;
+  team_name: string | null;
+  channel_id: string;
+  channel_name: string | null;
+  created_at: string | null;
+}
+
 export interface SlackSettings {
   workspaces: SlackWorkspace[];
+  channels: SlackChannelLink[];
   // false when the server has no Slack app credentials configured
   configured: boolean;
+  community_available: boolean;
+  community_team_name: string | null;
+  suggested_channel_name: string;
+  can_install_community: boolean;
 }
 
 export interface SlackInstallLink {
   install_url: string;
   expires_in_minutes: number;
+}
+
+export interface SlackLinkCode {
+  code: string;
+  expires_in_minutes: number;
+  instructions: string;
+}
+
+export interface SlackChannelCreateResult {
+  already_linked?: boolean;
+  channel_id: string;
+  channel_name: string;
+  team_name: string | null;
+  invited?: string[];
+  not_in_workspace?: string[];
 }

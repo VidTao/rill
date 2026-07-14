@@ -5,7 +5,9 @@ export function createQueryClient() {
     defaultOptions: {
       queries: {
         refetchOnMount: false,
-        refetchOnReconnect: false,
+        // Refetch when the browser regains network connectivity — recovers stale
+        // data after wifi/VPN blips without requiring a hard refresh.
+        refetchOnReconnect: true,
         refetchOnWindowFocus: false,
         retry: false,
         networkMode: "always",
