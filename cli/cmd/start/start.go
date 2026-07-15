@@ -33,6 +33,7 @@ func StartCmd(ch *cmdutil.Helper) *cobra.Command {
 	var tlsKeyPath string
 	var multiTenant bool
 	var projectsDir string
+	var localURL string
 
 	startCmd := &cobra.Command{
 		Use:   "start [<path>]",
@@ -143,11 +144,14 @@ func StartCmd(ch *cmdutil.Helper) *cobra.Command {
 				}
 			}
 
-			scheme := "http"
-			if tlsCertPath != "" && tlsKeyPath != "" {
-				scheme = "https"
+			// Determine LocalURL: use the flag if provided, otherwise compute from scheme+port
+			if localURL == "" {
+				scheme := "http"
+				if tlsCertPath != "" && tlsKeyPath != "" {
+					scheme = "https"
+				}
+				localURL = fmt.Sprintf("%s://localhost:%d", scheme, httpPort)
 			}
-			localURL := fmt.Sprintf("%s://localhost:%d", scheme, httpPort)
 
 			allowedOrigins = append(allowedOrigins, localURL)
 
@@ -202,6 +206,7 @@ func StartCmd(ch *cmdutil.Helper) *cobra.Command {
 	startCmd.Flags().StringSliceVarP(&allowedOrigins, "allowed-origins", "", []string{}, "Override allowed origins for CORS")
 	startCmd.Flags().BoolVar(&multiTenant, "multi-tenant", false, "Bratrax: start with no project loaded; create per-user instances on-demand from --projects-dir")
 	startCmd.Flags().StringVar(&projectsDir, "projects-dir", "", "Bratrax: directory containing per-client Rill projects (default $BRATRAX_PROJECTS_DIR or ./generated)")
+	startCmd.Flags().StringVar(&localURL, "local-url", "", "Bratrax: override the frontend URL for instance deep links (e.g. https://bratrax.com)")
 
 	// Deprecated support for "--var": replaced by "--env".
 	startCmd.Flags().StringSliceVarP(&envVarsOld, "var", "v", []string{}, "Set environment variables")
