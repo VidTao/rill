@@ -20,7 +20,6 @@
   import OutbrainLoginModal from "../../connectors/OutbrainLoginModal.svelte";
   import BloomreachCredentialModal from "../../connectors/BloomreachCredentialModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
-  import WooTrackingInstall from "$lib/bratrax/onboarding/WooTrackingInstall.svelte";
 
   // ---------------------------------------------------------------------------
   // Onboarding-time tracking-template flows (paused — pending team alignment)
@@ -1858,12 +1857,6 @@
           class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
         >
           {error}
-        </div>
-      {/if}
-
-      {#if clientId && isConnected("woocommerce")}
-        <div class="mb-6">
-          <WooTrackingInstall {clientId} />
         </div>
       {/if}
 
