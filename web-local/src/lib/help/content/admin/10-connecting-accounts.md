@@ -16,9 +16,11 @@ This almost always means the ad account lives in a Business Manager that isn't a
 
 If neither works, post in the Bratrax Slack #support channel with your ad account name (not the ID) and we'll dig in.
 
-## How do I connect multiple Facebook Business Managers?
+## Can I connect ad accounts across multiple Business Managers?
 
-Multi-BM support is built and currently going through Facebook's app review process. In the meantime, the workaround above (adding your Bratrax email to the relevant ad account) lets you pull data from any BM where you can grant user access. Once Facebook approves the integration, BMs will list automatically.
+Yes. Bratrax pulls every Facebook ad account your connected login can access — across all of your Business Managers. There's no separate "add a Business Manager" step: when you connect Facebook, just select all the ad accounts you want to track, whichever BM they live in.
+
+If an ad account doesn't appear, the Facebook login you connected with doesn't have access to it. Grant that login access in Business Settings → Ad Accounts → People, or reconnect with a login that already has access — then the account shows up for selection.
 
 ## I connected Google Ads but it doesn't show as connected on the dashboard. What now?
 
