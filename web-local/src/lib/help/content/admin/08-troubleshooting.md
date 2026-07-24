@@ -21,7 +21,7 @@ The editor shows a line and column. The most common causes:
 
 The metrics view points to a column that doesn't exist on its model.
 
-1. Check the spelling exactly — DuckDB is case-sensitive.
+1. Check the spelling exactly — ClickHouse is case-sensitive.
 2. Open the model and confirm the column is in the SELECT list.
 3. If you just changed the model, save it first, then the metrics view.
 
