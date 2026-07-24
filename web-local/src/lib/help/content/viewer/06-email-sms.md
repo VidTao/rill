@@ -9,6 +9,12 @@ status: ready
 
 Use **Email & SMS** to understand lifecycle marketing: campaigns, flows, sends, opens, clicks, unsubs, and email-attributed sales.
 
+**Video walkthrough**
+
+```loom
+5094aa525d134bf4b3056f9cfd87edf2
+```
+
 ## Look first at
 
 - **Campaigns & Flows** — performance by one-off campaign and automated flow.

@@ -99,6 +99,39 @@ export function canAccess(
   return false;
 }
 
+export type HelpSegment =
+  | { kind: "markdown"; value: string }
+  | { kind: "loom"; id: string };
+
+// Splits a help body into markdown runs and Loom video embeds. A video is
+// authored as a fenced ```loom block whose only content is the Loom video id:
+//
+//   ```loom
+//   58f3efa9a75e483892ebe484a6c59afa
+//   ```
+//
+// The shared Markdown component sanitizes out iframes (it also renders AI chat
+// output), so the help page renders loom segments with the LoomEmbed component
+// instead of loosening that sanitizer.
+export function splitHelpBody(body: string): HelpSegment[] {
+  const re = /```loom\s*\n([\s\S]*?)```/g;
+  const segments: HelpSegment[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    if (m.index > last) {
+      const md = body.slice(last, m.index).trim();
+      if (md) segments.push({ kind: "markdown", value: md });
+    }
+    const id = m[1].trim();
+    if (id) segments.push({ kind: "loom", id });
+    last = re.lastIndex;
+  }
+  const tail = body.slice(last).trim();
+  if (tail) segments.push({ kind: "markdown", value: tail });
+  return segments;
+}
+
 // Sentinels wrap matched terms inside snippet strings so the rendering layer
 // can split on them and emit <mark> without ever calling {@html}.
 export const HELP_SNIPPET_MARK_START = "";

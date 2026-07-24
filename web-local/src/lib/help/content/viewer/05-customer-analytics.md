@@ -9,6 +9,12 @@ status: ready
 
 Use **Customer Analytics** to understand customer quality, subscriber health, MRR, LTV, retention, and which acquisition sources create valuable subscribers.
 
+**Video walkthrough**
+
+```loom
+ccd23ffea3b34320b2637286045f4821
+```
+
 ## Look first at
 
 - **Active Subscribers** — current active subscriber count.

@@ -13,6 +13,12 @@ bought), and anonymous visitors. Bratrax stitches store data, email/SMS data,
 and on-site activity into one deduplicated profile per person, then segments
 each profile and suggests what to do with it.
 
+**Video walkthrough**
+
+```loom
+05bc62dcba1f4cce8e6e08d2b2ca5bf1
+```
+
 ## How profiles are built
 
 - **Customers** are built from attributed sales — a profile becomes a customer

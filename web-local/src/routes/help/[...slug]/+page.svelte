@@ -2,12 +2,14 @@
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { bratraxUser } from "$lib/bratrax/auth-store";
-  import { canAccess, getHelpPage } from "$lib/help";
+  import { canAccess, getHelpPage, splitHelpBody } from "$lib/help";
   import Markdown from "@rilldata/web-common/components/markdown/Markdown.svelte";
+  import LoomEmbed from "$lib/help/LoomEmbed.svelte";
 
   $: slug = $page.params.slug ?? "";
   $: helpPage = getHelpPage(slug);
   $: role = $bratraxUser?.role ?? null;
+  $: segments = helpPage ? splitHelpBody(helpPage.body) : [];
 
   // If a viewer hits an admin-only page, send them to /help.
   $: if (helpPage && !canAccess(helpPage, role)) {
@@ -35,7 +37,13 @@
       {/if}
     </div>
 
-    <Markdown content={helpPage.body} />
+    {#each segments as segment}
+      {#if segment.kind === "loom"}
+        <LoomEmbed id={segment.id} />
+      {:else}
+        <Markdown content={segment.value} />
+      {/if}
+    {/each}
   </article>
 {/if}
 

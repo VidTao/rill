@@ -9,6 +9,12 @@ status: ready
 
 Use **Attribution** when you want to know where sales came from and which channels, campaigns, ad sets, or ads deserve credit.
 
+**Video walkthrough**
+
+```loom
+c3a62d5c20d245aab5f86f578a5a851e
+```
+
 The dashboard defaults to **last-touch** attribution. That means the last eligible source before the purchase gets credit.
 
 ## Look first at
