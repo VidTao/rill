@@ -65,9 +65,9 @@ Use acquisition metrics for acquisition decisions, and use Store Performance for
 
 ## Numbers look stale
 
-Every dashboard shows an "as of" timestamp. Bratrax refreshes every 1–3 hours.
+Every dashboard shows an "as of" timestamp. Store orders refresh hourly; every other integration every 4 hours.
 
-If the timestamp is older than 3 hours, a refresh is overdue. Wait 15 minutes and reload. If it's still stale, contact support.
+If store data is more than about two hours stale — or other integrations more than about five — a refresh is overdue. Wait 15 minutes and reload. If it's still stale, contact support.
 
 ## The page won't load or is blank
 

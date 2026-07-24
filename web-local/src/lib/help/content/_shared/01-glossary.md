@@ -57,7 +57,7 @@ Plain-English definitions of every term used across Bratrax dashboards, Claude a
 ## Data freshness
 
 - **As of** — timestamp of the last successful refresh. Numbers reflect that moment, not "now."
-- **Refresh window** — how often Bratrax pulls fresh data. Default: every 1–3 hours.
+- **Refresh window** — how often Bratrax pulls fresh data. Store orders refresh hourly; every other integration every 4 hours.
 - **Backfill** — the initial historical pull when you first connect a platform.
 
 ## Building blocks (admin)
