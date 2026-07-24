@@ -41,7 +41,7 @@ Then move down:
 - If Total Sales dropped, check whether order count, AOV, or returns changed.
 - If Paid ROAS dropped, open **Attribution** and find the channel or campaign that moved.
 - If MER dropped but Paid ROAS is stable, look for non-paid sales weakness, custom spend, or subscription mix.
-- If new-customer orders dropped, open **New Customer Source Report**.
+- If new-customer orders dropped, open **Attribution** and check new-customer ROAS/CPA by source.
 
 ## Good Claude questions
 
