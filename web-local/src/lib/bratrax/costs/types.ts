@@ -73,8 +73,10 @@ export type MediaSpendScopeChannel =
 export type MediaSpendScopeMatchField =
   | "campaign_name"
   | "campaign_id"
+  | "ad_set_name"
   | "ad_set_id"
   | "ad_id"
+  | "ad_name"
   | "account_id";
 
 export type MediaSpendScopeOperator =
@@ -102,6 +104,11 @@ export interface MediaSpendScopeRule {
   entity_id: string;
   data: MediaSpendScopeRuleData;
   updated_at: string;
+}
+
+export interface MediaSpendScopeAccountOption {
+  channel: MediaSpendScopeChannel;
+  account_id: string;
 }
 
 export interface MediaSpendScopeGuidance {

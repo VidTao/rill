@@ -6,6 +6,7 @@ import type {
   ProductCogs,
   GatewayFee,
   ShippingProfile,
+  MediaSpendScopeAccountOption,
   ExpenseRule,
   MediaSpendScopeGuidance,
   MediaSpendScopeRule,
@@ -192,12 +193,20 @@ export async function deleteExpenseRule(ruleId: string): Promise<void> {
 export async function getMediaSpendScopeRules(): Promise<{
   rules: MediaSpendScopeRule[];
   guidance: MediaSpendScopeGuidance | null;
+  availableAccounts: MediaSpendScopeAccountOption[];
 }> {
   const res = await apiFetch<{
     data: MediaSpendScopeRule[];
-    meta?: { ui_guidance?: MediaSpendScopeGuidance };
+    meta?: {
+      ui_guidance?: MediaSpendScopeGuidance;
+      available_accounts?: MediaSpendScopeAccountOption[];
+    };
   }>("/bratrax/cost-settings/media-spend-scope-rules");
-  return { rules: res.data, guidance: res.meta?.ui_guidance ?? null };
+  return {
+    rules: res.data,
+    guidance: res.meta?.ui_guidance ?? null,
+    availableAccounts: res.meta?.available_accounts ?? [],
+  };
 }
 
 export async function createMediaSpendScopeRule(

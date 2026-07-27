@@ -6,6 +6,7 @@
     GatewayFee,
     ExpenseRule,
     MediaSpendScopeGuidance,
+    MediaSpendScopeAccountOption,
     MediaSpendScopeRule,
     MediaSpendScopeRuleData,
     MediaSpendScopeAction,
@@ -52,6 +53,11 @@
   let gateways: GatewayFee[] = [];
   let expenseRules: ExpenseRule[] = [];
   let mediaScopeRules: MediaSpendScopeRule[] = [];
+  let mediaScopeAvailableAccounts: MediaSpendScopeAccountOption[] = [];
+  $: filteredMediaScopeAccounts = mediaScopeAvailableAccounts.filter(
+    (account) =>
+      !mediaScopeForm.channel || account.channel === mediaScopeForm.channel,
+  );
   let mediaScopeGuidance: MediaSpendScopeGuidance | null = null;
 
   // COGS state
@@ -59,6 +65,10 @@
   let globalCogsPercent = 0;
   let enableHandlingFee = false;
   let showCogsModal = false;
+
+  // Shipping state
+  let shippingCostMode: "customer_charges" | "flat_rate" = "customer_charges";
+  let defaultShippingCost = 0;
 
   // Gateway edit state
   let editingGateway: string | null = null;
@@ -95,7 +105,7 @@
     priority: 100,
     start_date: "",
     end_date: "",
-    is_active: true,
+    is_active: false,
   };
 
   function showError(msg: string) {
@@ -134,7 +144,7 @@
         }),
         getMediaSpendScopeRules().catch((e) => {
           console.error("Media scope:", e);
-          return { rules: [], guidance: null };
+          return { rules: [], guidance: null, availableAccounts: [] };
         }),
       ]);
       storeSettings = settings;
@@ -143,6 +153,7 @@
       expenseRules = rules;
       mediaScopeRules = mediaRules.rules;
       mediaScopeGuidance = mediaRules.guidance;
+      mediaScopeAvailableAccounts = mediaRules.availableAccounts;
 
       // Hydrate COGS settings
       const mode = storeSettings?.cogs_mode as
@@ -157,6 +168,23 @@
         | Record<string, string>
         | undefined;
       if (hf?.value) enableHandlingFee = hf.value === "true";
+
+      const shippingMode = storeSettings?.shipping_cost_mode as
+        | { value?: unknown }
+        | undefined;
+      if (
+        shippingMode?.value === "customer_charges" ||
+        shippingMode?.value === "flat_rate"
+      ) {
+        shippingCostMode = shippingMode.value;
+      }
+      const shippingCost = storeSettings?.default_shipping_cost as
+        | { value?: unknown }
+        | undefined;
+      const parsedShippingCost = Number(shippingCost?.value);
+      if (Number.isFinite(parsedShippingCost) && parsedShippingCost >= 0) {
+        defaultShippingCost = parsedShippingCost;
+      }
     } catch (e) {
       showError(e instanceof Error ? e.message : "Failed to load settings");
     } finally {
@@ -188,6 +216,30 @@
     } catch (e) {
       showError(
         e instanceof Error ? e.message : "Failed to save COGS settings",
+      );
+    } finally {
+      saving = false;
+    }
+  }
+
+  // --- Shipping handlers ---
+
+  async function handleSaveShippingSettings() {
+    if (!Number.isFinite(defaultShippingCost) || defaultShippingCost < 0) {
+      showError("Default shipping cost must be a non-negative number");
+      return;
+    }
+
+    saving = true;
+    try {
+      await saveStoreSettings({
+        shipping_cost_mode: shippingCostMode,
+        default_shipping_cost: defaultShippingCost,
+      });
+      showSaved("Shipping settings saved. Dashboard refresh queued.");
+    } catch (e) {
+      showError(
+        e instanceof Error ? e.message : "Failed to save shipping settings",
       );
     } finally {
       saving = false;
@@ -333,7 +385,9 @@
   }> = [
     { value: "campaign_name", label: "Campaign name" },
     { value: "campaign_id", label: "Campaign ID" },
+    { value: "ad_set_name", label: "Ad set / ad group name" },
     { value: "ad_set_id", label: "Ad set ID" },
+    { value: "ad_name", label: "Ad name" },
     { value: "ad_id", label: "Ad ID" },
     { value: "account_id", label: "Account ID" },
   ];
@@ -369,7 +423,7 @@
       priority: 100,
       start_date: "",
       end_date: "",
-      is_active: true,
+      is_active: false,
     };
   }
 
@@ -410,6 +464,7 @@
     const result = await getMediaSpendScopeRules();
     mediaScopeRules = result.rules;
     mediaScopeGuidance = result.guidance;
+    mediaScopeAvailableAccounts = result.availableAccounts;
   }
 
   async function handleSaveMediaScopeRule() {
@@ -424,9 +479,7 @@
       showMediaScopeModal = false;
       resetMediaScopeForm();
       await reloadMediaScopeRules();
-      showSaved(
-        "Media scope rule saved. Dashboard metrics update after the next data refresh.",
-      );
+      showSaved("Media scope rule saved. Dashboard refresh queued.");
     } catch (e) {
       showError(
         e instanceof Error ? e.message : "Failed to save media scope rule",
@@ -444,9 +497,7 @@
         is_active: !rule.data.is_active,
       });
       await reloadMediaScopeRules();
-      showSaved(
-        "Media scope rule updated. Dashboard metrics update after the next data refresh.",
-      );
+      showSaved("Media scope rule updated. Dashboard refresh queued.");
     } catch (e) {
       showError(
         e instanceof Error ? e.message : "Failed to update media scope rule",
@@ -463,9 +514,7 @@
       mediaScopeRules = mediaScopeRules.filter(
         (rule) => rule.entity_id !== ruleId,
       );
-      showSaved(
-        "Media scope rule deleted. Dashboard metrics update after the next data refresh.",
-      );
+      showSaved("Media scope rule deleted. Dashboard refresh queued.");
     } catch (e) {
       showError(
         e instanceof Error ? e.message : "Failed to delete media scope rule",
@@ -722,20 +771,63 @@
                   <input
                     type="radio"
                     name="shipping_mode"
-                    value="shopify_charges"
-                    checked
+                    value="customer_charges"
+                    bind:group={shippingCostMode}
                   />
                   <div>
                     <div class="font-medium text-bratrax-text-headline">
                       Use Shipping Charges for Shipping Costs
                     </div>
                     <div class="text-xs text-bratrax-text-muted">
-                      Shipping cost equals what your customers were charged.
+                      Shipping cost equals what customers were charged.
                     </div>
                   </div>
                 </label>
+
                 <label
-                  class="flex items-start gap-3 border border-bratrax-border p-4 hover:bg-bratrax-hover cursor-pointer opacity-50"
+                  class="flex items-start gap-3 border border-bratrax-border p-4 hover:bg-bratrax-hover cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="shipping_mode"
+                    value="flat_rate"
+                    bind:group={shippingCostMode}
+                  />
+                  <div>
+                    <div class="font-medium text-bratrax-text-headline">
+                      Default Shipping Costs
+                    </div>
+                    <div class="text-xs text-bratrax-text-muted">
+                      Apply one operational shipping cost to every
+                      sales-eligible order, including free-shipping orders.
+                    </div>
+                  </div>
+                </label>
+
+                {#if shippingCostMode === "flat_rate"}
+                  <div
+                    class="border border-bratrax-border bg-bratrax-surface p-4"
+                  >
+                    <label
+                      class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted"
+                    >
+                      Cost per order
+                    </label>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-bratrax-text-muted">€</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="w-32 border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
+                        bind:value={defaultShippingCost}
+                      />
+                    </div>
+                  </div>
+                {/if}
+
+                <label
+                  class="flex items-start gap-3 border border-bratrax-border p-4 opacity-50"
                 >
                   <input
                     type="radio"
@@ -752,25 +844,16 @@
                     </div>
                   </div>
                 </label>
-                <label
-                  class="flex items-start gap-3 border border-bratrax-border p-4 hover:bg-bratrax-hover cursor-pointer opacity-50"
+              </div>
+
+              <div class="flex justify-end">
+                <button
+                  class="btn-bratrax btn-primary btn-compact"
+                  disabled={saving}
+                  on:click={handleSaveShippingSettings}
                 >
-                  <input
-                    type="radio"
-                    name="shipping_mode"
-                    value="default_profile"
-                    disabled
-                  />
-                  <div>
-                    <div class="font-medium text-bratrax-text-headline">
-                      Default Shipping Costs
-                    </div>
-                    <div class="text-xs text-bratrax-text-muted">
-                      Create fulfillment profiles with custom rates. Coming
-                      soon.
-                    </div>
-                  </div>
-                </label>
+                  {saving ? "Saving…" : "Save Shipping Settings"}
+                </button>
               </div>
             </div>
 
@@ -1455,9 +1538,17 @@
                           id="media-scope-account-id"
                           type="text"
                           class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
-                          placeholder="Optional"
+                          placeholder="Optional; choose a known account or type an ID"
+                          list="media-scope-account-options"
                           bind:value={mediaScopeForm.account_id}
                         />
+                        <datalist id="media-scope-account-options">
+                          {#each filteredMediaScopeAccounts as account}
+                            <option value={account.account_id}>
+                              {account.channel} · {account.account_id}
+                            </option>
+                          {/each}
+                        </datalist>
                       </div>
                       <div>
                         <label
