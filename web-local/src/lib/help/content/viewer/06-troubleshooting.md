@@ -69,6 +69,10 @@ Every dashboard shows an "as of" timestamp. Store orders refresh hourly; every o
 
 If store data is more than about two hours stale — or other integrations more than about five — a refresh is overdue. Wait 15 minutes and reload. If it's still stale, contact support.
 
+One WooCommerce-specific cause: your site's firewall can silently block the
+order sync — an admin can fix it in a few minutes with
+[the firewall allowlist](/help/admin/connecting-accounts).
+
 ## The page won't load or is blank
 
 In order:
