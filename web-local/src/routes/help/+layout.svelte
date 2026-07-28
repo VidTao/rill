@@ -34,6 +34,22 @@
       bind:query={searchQuery}
     />
 
+    {#if !searching}
+      <div class="nav-section">
+        <ul class="nav-list">
+          <li>
+            <a
+              class="nav-link ask-link"
+              class:active={currentSlug === "ask"}
+              href="/help/ask"
+            >
+              Ask support
+            </a>
+          </li>
+        </ul>
+      </div>
+    {/if}
+
     {#if !searching && viewerPages.length > 0}
       <div class="nav-section">
         <div class="nav-header">For everyone</div>
@@ -153,7 +169,10 @@
     color: var(--color-text);
     text-decoration: none;
     border-left: 2px solid transparent;
-    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+    transition:
+      background-color 0.15s,
+      color 0.15s,
+      border-color 0.15s;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -166,6 +185,15 @@
     background-color: var(--color-acid-mid);
     border-left-color: var(--color-acid);
     font-weight: 500;
+  }
+
+  .ask-link {
+    font-family: "Space Mono", monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--color-acid-text);
   }
 
   .status-tag {
