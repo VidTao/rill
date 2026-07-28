@@ -3,6 +3,7 @@
   import LocalAvatarButton from "@rilldata/web-common/features/authentication/LocalAvatarButton.svelte";
   import CanvasPreviewCTAs from "@rilldata/web-common/features/canvas/CanvasPreviewCTAs.svelte";
   import ChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/ChatToggle.svelte";
+  import SupportChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/SupportChatToggle.svelte";
   import { themeControl } from "@rilldata/web-common/features/themes/theme-control";
   import ExplorePreviewCTAs from "@rilldata/web-common/features/explores/ExplorePreviewCTAs.svelte";
   import { featureFlags } from "@rilldata/web-common/features/feature-flags.ts";
@@ -11,7 +12,11 @@
   const { developerChat } = featureFlags;
 
   export let mode: string;
-  export let externalUser: { email: string; name: string; role?: string } | null = null;
+  export let externalUser: {
+    email: string;
+    name: string;
+    role?: string;
+  } | null = null;
   export let onLogout: (() => void) | null = null;
   export let onboardingLink: { href: string; label: string } | null = null;
 
@@ -95,38 +100,61 @@
     </div>
 
     <div class="icon-cluster flex gap-x-2 h-full items-center py-2">
-    {#if mode === "Preview"}
-      {#if route.id?.includes("explore")}
-        <ExplorePreviewCTAs exploreName={dashboardName} />
-      {:else if route.id?.includes("canvas")}
-        <CanvasPreviewCTAs {isAdminOrSuper} />
-      {/if}
-    {:else if showDeveloperChat}
-      <button
-        type="button"
-        on:click={() =>
-          themeControl.set[$themePreference === "dark" ? "light" : "dark"]()}
-        class="bratrax-theme-toggle"
-        title={$themePreference === "dark"
-          ? "Switch to light theme"
-          : "Switch to dark theme"}
-        aria-label="Toggle theme"
-      >
-        {#if $themePreference === "dark"}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-          </svg>
-        {:else}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </svg>
+      {#if mode === "Preview"}
+        {#if route.id?.includes("explore")}
+          <ExplorePreviewCTAs exploreName={dashboardName} />
+        {:else if route.id?.includes("canvas")}
+          <CanvasPreviewCTAs {isAdminOrSuper} />
         {/if}
-      </button>
-      <ChatToggle />
-    {/if}
+      {:else if showDeveloperChat}
+        <button
+          type="button"
+          on:click={() =>
+            themeControl.set[$themePreference === "dark" ? "light" : "dark"]()}
+          class="bratrax-theme-toggle"
+          title={$themePreference === "dark"
+            ? "Switch to light theme"
+            : "Switch to dark theme"}
+          aria-label="Toggle theme"
+        >
+          {#if $themePreference === "dark"}
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+              />
+            </svg>
+          {:else}
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          {/if}
+        </button>
+        <ChatToggle />
+      {/if}
+      <!-- "?" support-bot toggle: unlike the AI ChatToggle it renders in every
+           mode and for every role — product help is not gated on a BYOK key. -->
+      <SupportChatToggle />
       <LocalAvatarButton {externalUser} {onLogout} {onboardingLink} />
     </div>
   </div>
@@ -225,14 +253,17 @@
     border: 1px solid var(--color-border-strong, var(--border));
     color: var(--color-text-secondary, var(--fg-secondary));
     cursor: pointer;
-    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease,
+      border-color 120ms ease;
   }
   .bratrax-theme-toggle:hover {
     background: var(--color-acid-dim, rgba(212, 255, 0, 0.06));
     color: var(--color-text, var(--fg-primary));
   }
   .bratrax-theme-toggle:focus-visible {
-    outline: 2px solid var(--color-acid, #D4FF00);
+    outline: 2px solid var(--color-acid, #d4ff00);
     outline-offset: 2px;
   }
 </style>

@@ -3,6 +3,7 @@
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import HelpSearch from "$lib/help/HelpSearch.svelte";
   import { pagesFor, type HelpPage } from "$lib/help";
+  import { supportChatActions } from "@rilldata/web-common/features/chat/layouts/sidebar/support-chat-store";
 
   $: role = $bratraxUser?.role ?? null;
   $: visiblePages = pagesFor(role);
@@ -38,13 +39,15 @@
       <div class="nav-section">
         <ul class="nav-list">
           <li>
-            <a
+            <!-- Opens the support-bot sidebar (same panel as the "?" header
+                 button) instead of navigating — one chat, two doors. -->
+            <button
+              type="button"
               class="nav-link ask-link"
-              class:active={currentSlug === "ask"}
-              href="/help/ask"
+              on:click={supportChatActions.open}
             >
               Ask support
-            </a>
+            </button>
           </li>
         </ul>
       </div>
@@ -194,6 +197,13 @@
     letter-spacing: 1px;
     text-transform: uppercase;
     color: var(--color-acid-text);
+    /* button reset — this entry is a <button>, its siblings are <a> */
+    width: 100%;
+    background: none;
+    border: none;
+    border-left: 2px solid transparent;
+    text-align: left;
+    cursor: pointer;
   }
 
   .status-tag {
