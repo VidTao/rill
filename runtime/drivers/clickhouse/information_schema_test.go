@@ -17,7 +17,11 @@ import (
 func TestInformationSchema(t *testing.T) {
 	testmode.Expensive(t)
 	dsn := testclickhouse.Start(t)
-	conn, err := drivers.Open("clickhouse", "default", map[string]any{"dsn": dsn, "mode": "readwrite"}, storage.MustNew(t.TempDir(), nil), activity.NewNoopClient(), zap.NewNop())
+	// Bratrax: the no-whitelist default now confines listing to the connector's own database
+	// (see information_schema.go). These cases exercise multi-database listing, so they opt in
+	// explicitly via database_whitelist. testInformationSchemaConfinedByDefault covers the
+	// secure default.
+	conn, err := drivers.Open("clickhouse", "default", map[string]any{"dsn": dsn, "mode": "readwrite", "database_whitelist": "clickhouse,default,other"}, storage.MustNew(t.TempDir(), nil), activity.NewNoopClient(), zap.NewNop())
 	require.NoError(t, err)
 
 	infoSchema, ok := conn.AsInformationSchema()
@@ -27,9 +31,14 @@ func TestInformationSchema(t *testing.T) {
 	t.Run("testInformationSchemaAll", func(t *testing.T) { testInformationSchemaAll(t, conn) })
 	t.Run("testInformationSchemaAllLike", func(t *testing.T) { testInformationSchemaAllLike(t, conn) })
 	t.Run("testInformationSchemaSystemAllLike", func(t *testing.T) {
-		conn, err := drivers.Open("clickhouse", "default", map[string]any{"dsn": dsn + "/system", "mode": "readwrite"}, storage.MustNew(t.TempDir(), nil), activity.NewNoopClient(), zap.NewNop())
+		conn, err := drivers.Open("clickhouse", "default", map[string]any{"dsn": dsn + "/system", "mode": "readwrite", "database_whitelist": "system,other"}, storage.MustNew(t.TempDir(), nil), activity.NewNoopClient(), zap.NewNop())
 		require.NoError(t, err)
 		testInformationSchemaSystemAllLike(t, conn)
+	})
+	t.Run("testInformationSchemaConfinedByDefault", func(t *testing.T) {
+		conn, err := drivers.Open("clickhouse", "default", map[string]any{"dsn": dsn, "mode": "readwrite"}, storage.MustNew(t.TempDir(), nil), activity.NewNoopClient(), zap.NewNop())
+		require.NoError(t, err)
+		testInformationSchemaConfinedByDefault(t, conn)
 	})
 	t.Run("testInformationSchemaLookup", func(t *testing.T) { testInformationSchemaLookup(t, conn) })
 	t.Run("testInformationSchemaAllPagination", func(t *testing.T) { testInformationSchemaAllPagination(t, conn) })
@@ -102,6 +111,35 @@ func testInformationSchemaSystemAllLike(t *testing.T, conn drivers.Handle) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(tables))
 	require.Equal(t, "bar", tables[0].Name)
+}
+
+// testInformationSchemaConfinedByDefault pins the Bratrax security property: with no
+// database_whitelist configured, a connector must only see its own database. Bratrax hosts many
+// tenants' databases on one ClickHouse server, so a connector that can enumerate other databases
+// leaks the existence (and schema) of other customers. Regression test for the incident where a
+// tenant's AI chat listed every other tenant's tables.
+func testInformationSchemaConfinedByDefault(t *testing.T, conn drivers.Handle) {
+	olap, _ := conn.AsOLAP("")
+	ctx := context.Background()
+
+	tables, _, err := olap.InformationSchema().All(ctx, "", 0, "")
+	require.NoError(t, err)
+	require.NotEmpty(t, tables)
+	for _, tbl := range tables {
+		require.Equal(t, "default", tbl.DatabaseSchema, "table %q leaked from another database", tbl.Name)
+	}
+
+	// An explicitly qualified reference to another database must not return anything either.
+	tables, _, err = olap.InformationSchema().All(ctx, "other.%", 0, "")
+	require.NoError(t, err)
+	require.Empty(t, tables, "listing leaked tables from the 'other' database")
+
+	infoSchema, ok := conn.AsInformationSchema()
+	require.True(t, ok)
+	schemas, _, err := infoSchema.ListDatabaseSchemas(ctx, 0, "")
+	require.NoError(t, err)
+	require.Len(t, schemas, 1)
+	require.Equal(t, "default", schemas[0].DatabaseSchema)
 }
 
 func testInformationSchemaLookup(t *testing.T, conn drivers.Handle) {

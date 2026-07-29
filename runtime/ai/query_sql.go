@@ -41,8 +41,22 @@ func (t *QuerySQL) Spec() *mcp.Tool {
 	}
 }
 
-func (t *QuerySQL) CheckAccess(ctx context.Context) (bool, error) {
-	return checkDeveloperAccess(ctx, t.Runtime, false)
+func (t *QuerySQL) CheckAccess(_ context.Context) (bool, error) {
+	// Bratrax: disabled outright, on every surface.
+	//
+	// Every other developer tool can be confined to the caller's own tenant by constraining its
+	// arguments. This one cannot: the payload is free-text SQL, so there is no argument to scope.
+	// Inspecting the SQL is not sufficient either — ClickHouse table functions reach other
+	// databases without naming them in a way a validator would catch, e.g.
+	//     SELECT * FROM merge(REGEXP('.*'), '^dim_orders$')       -- every tenant, one query
+	//     SELECT * FROM remote('127.0.0.1:9000', 'other.table')   -- verified: needs no credentials
+	// Both were confirmed working against this ClickHouse (25.6.2.5) while all tenants share a
+	// single GRANT ALL account.
+	//
+	// Re-enable only once tenants are separated at the database layer (a per-tenant ClickHouse
+	// user granted SELECT on its own databases only), which makes the engine, not a parser, the
+	// thing that says no.
+	return false, nil
 }
 
 func (t *QuerySQL) Handler(ctx context.Context, args *QuerySQLArgs) (*QuerySQLResult, error) {

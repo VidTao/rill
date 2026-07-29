@@ -168,6 +168,13 @@ Task: {{ .prompt }}
 
 // checkDeveloperAccess checks whether developer tools should be available in the current session.
 // If internal is true, it indicates that the tool should not be exposed to external clients (like MCP).
+//
+// Bratrax note: the tools behind this gate are individually confined to the caller's own tenant —
+// list_tables/ListDatabaseSchemas filter on currentDatabase(), show_table takes no database
+// argument, and the file driver refuses paths that escape the project root. The one tool that
+// CANNOT be confined this way is query_sql, because free-text SQL can reach other databases via
+// table functions such as merge() and remote() without ever naming them; it is therefore denied
+// outright in its own CheckAccess rather than here.
 func checkDeveloperAccess(ctx context.Context, rt *runtime.Runtime, internal bool) (bool, error) {
 	// Must be able to use AI and edit the project
 	s := GetSession(ctx)

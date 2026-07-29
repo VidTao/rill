@@ -8,6 +8,7 @@ import type { KPISpec } from "./kpi";
 import type { LeaderboardSpec } from "./leaderboard";
 import type { MarkdownSpec } from "./markdown";
 import type { MetricTreeSpec } from "./metric-tree";
+import type { FinancialStatementSpec } from "./financial-statement";
 import type { PivotSpec, TableSpec } from "./pivot";
 
 export type ComponentWithMetricsView =
@@ -19,7 +20,8 @@ export type ComponentWithMetricsView =
   | KPISpec
   | KPIGridSpec
   | LeaderboardSpec
-  | MetricTreeSpec;
+  | MetricTreeSpec
+  | FinancialStatementSpec;
 
 export type ComponentSpec = ComponentWithMetricsView | ImageSpec | MarkdownSpec;
 
@@ -59,7 +61,8 @@ export type CanvasComponentType =
   | "pivot"
   | "table"
   | "leaderboard"
-  | "metric_tree";
+  | "metric_tree"
+  | "financial_statement";
 
 interface LineChart {
   line_chart: CartesianCanvasChartSpec;

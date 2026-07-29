@@ -21,6 +21,7 @@ import { ImageComponent } from "./image";
 import { LeaderboardComponent } from "./leaderboard";
 import { MarkdownCanvasComponent } from "./markdown";
 import { MetricTreeComponent } from "./metric-tree";
+import { FinancialStatementComponent } from "./financial-statement";
 import { PivotCanvasComponent } from "./pivot";
 import type {
   CanvasComponentType,
@@ -107,6 +108,7 @@ const NON_CHART_TYPES = [
   "pivot",
   "leaderboard",
   "metric_tree",
+  "financial_statement",
 ] as const;
 const ALL_COMPONENT_TYPES = [...CHART_TYPES, ...NON_CHART_TYPES] as const;
 
@@ -139,6 +141,7 @@ const baseComponentMap = {
   table: PivotCanvasComponent,
   pivot: PivotCanvasComponent,
   metric_tree: MetricTreeComponent,
+  financial_statement: FinancialStatementComponent,
 } as const;
 const IconMap = {
   markdown: TextIcon,
@@ -146,6 +149,7 @@ const IconMap = {
   leaderboard: LeaderboardIcon,
   table: TableIcon,
   metric_tree: MetricTreeIcon,
+  financial_statement: TableIcon,
 };
 
 const chartComponentMap = Object.fromEntries(
@@ -166,6 +170,7 @@ const baseDisplayMap = {
   image: "Image",
   leaderboard: "Leaderboard",
   metric_tree: "Metric Tree",
+  financial_statement: "Financial Statement",
 } as const;
 
 const chartDisplayMap = Object.fromEntries(

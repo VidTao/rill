@@ -18,10 +18,8 @@ type ShowTable struct {
 var _ Tool[*ShowTableArgs, *ShowTableResult] = (*ShowTable)(nil)
 
 type ShowTableArgs struct {
-	Connector      string `json:"connector,omitempty" jsonschema:"Optional OLAP connector name. Defaults to the instance's default OLAP connector."`
-	Table          string `json:"table" jsonschema:"Name of the table to describe. Must be a simple table name; database/schema names should be provided using the separate fields."`
-	Database       string `json:"database,omitempty" jsonschema:"Database that contains the table (defaults to the connector's default database if applicable)."`
-	DatabaseSchema string `json:"database_schema,omitempty" jsonschema:"Database schema that contains the table (defaults to the connector's default schema if applicable)."`
+	Connector string `json:"connector,omitempty" jsonschema:"Optional OLAP connector name. Defaults to the instance's default OLAP connector."`
+	Table     string `json:"table" jsonschema:"Name of the table to describe. Must be a simple table name in the connector's own database."`
 }
 
 type ShowTableResult struct {
@@ -50,6 +48,8 @@ func (t *ShowTable) Spec() *mcp.Tool {
 }
 
 func (t *ShowTable) CheckAccess(ctx context.Context) (bool, error) {
+	// Bratrax: safe for customers — this tool takes no database argument, so it can only
+	// describe tables in the connector's own database.
 	return checkDeveloperAccess(ctx, t.Runtime, false)
 }
 
@@ -67,8 +67,11 @@ func (t *ShowTable) Handler(ctx context.Context, args *ShowTableArgs) (*ShowTabl
 	}
 	defer release()
 
-	// Lookup the table
-	table, err := olap.InformationSchema().Lookup(ctx, args.Database, args.DatabaseSchema, args.Table)
+	// Lookup the table.
+	// Bratrax: database/schema are deliberately NOT caller-supplied. Passing empty strings
+	// makes the driver use the connector's own database, so this tool cannot be pointed at
+	// another tenant's database on a shared ClickHouse server.
+	table, err := olap.InformationSchema().Lookup(ctx, "", "", args.Table)
 	if err != nil {
 		return nil, err
 	}

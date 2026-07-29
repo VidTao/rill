@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"strings"
 
 	"github.com/rilldata/rill/runtime"
 )
@@ -43,6 +44,34 @@ func getBratraxClientID(ctx context.Context) string {
 		return pid
 	}
 	return ""
+}
+
+// bratraxSessionClientName resolves the client that owns the current session.
+// It is the single source of truth for tenant identity in the Bratrax AI tools: the client is
+// derived from the session's claims (falling back to the instance's display name), never from a
+// caller-supplied argument. Tools that accepted a client name as a tool argument allowed one
+// tenant to read and overwrite another tenant's knowledge base.
+// Returns "" if the client cannot be determined; callers must treat that as a hard error.
+func bratraxSessionClientName(ctx context.Context, rt *runtime.Runtime) string {
+	s := GetSession(ctx)
+	if s == nil {
+		return ""
+	}
+
+	// Prefer the instance ID. In Bratrax it IS the tenant slug — instance ID ==
+	// rill_clients.clickhouse_db == the clients/<name>/ directory the Flask API keys on — and it
+	// is the boundary the runtime already enforces, so it is both the correct value and the
+	// safest source. Note claims carry client_id as a UUID, which this API does not accept.
+	if id := s.InstanceID(); id != "" && id != "default" {
+		return id
+	}
+
+	// Fall back to the project display name (e.g. "Ziva Analytics" → "ziva").
+	inst, err := rt.Instance(ctx, s.InstanceID())
+	if err != nil || inst == nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSuffix(inst.ProjectDisplayName, " Analytics"))
 }
 
 // getBratraxUserRole extracts the user role from session claims.

@@ -3,7 +3,6 @@ package ai
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rilldata/rill/runtime"
@@ -18,7 +17,6 @@ type WorkshopWriteKnowledge struct {
 var _ Tool[*WorkshopWriteKnowledgeArgs, *WorkshopWriteKnowledgeResult] = (*WorkshopWriteKnowledge)(nil)
 
 type WorkshopWriteKnowledgeArgs struct {
-	Name     string `json:"name,omitempty" jsonschema:"Client name (auto-resolved if not provided)"`
 	Category string `json:"category" jsonschema:"Knowledge category: discoveries, insights, or patterns"`
 	Filename string `json:"filename" jsonschema:"Filename (e.g., roas_drop_2026-04-06.md)"`
 	Content  string `json:"content" jsonschema:"Markdown content to write"`
@@ -56,24 +54,11 @@ func (t *WorkshopWriteKnowledge) Handler(ctx context.Context, args *WorkshopWrit
 		return nil, fmt.Errorf("invalid category %q: must be discoveries, insights, or patterns", args.Category)
 	}
 
-	// Resolve client name: explicit arg > session claims > fallback
-	clientName := args.Name
-	if clientName == "" || clientName == "client" {
-		clientName = getBratraxClientID(ctx)
-	}
+	// Bratrax: the client is derived from the session ONLY. A caller-supplied name would let
+	// one tenant overwrite another tenant's knowledge base.
+	clientName := bratraxSessionClientName(ctx, t.Runtime)
 	if clientName == "" {
-		s := GetSession(ctx)
-		if s != nil {
-			inst, err := t.Runtime.Instance(ctx, s.InstanceID())
-			if err == nil && inst != nil {
-				clientName = inst.ProjectDisplayName
-				clientName = strings.TrimSuffix(clientName, " Analytics")
-				clientName = strings.ToLower(clientName)
-			}
-		}
-	}
-	if clientName == "" {
-		return nil, fmt.Errorf("could not determine client name — pass it explicitly or ensure the session has a client_id")
+		return nil, fmt.Errorf("could not determine the client for this session")
 	}
 
 	body := map[string]string{"content": args.Content}

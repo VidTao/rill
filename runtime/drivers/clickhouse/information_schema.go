@@ -30,7 +30,11 @@ func (c *Connection) ListDatabaseSchemas(ctx context.Context, pageSize uint32, p
 		}
 		condFilter = fmt.Sprintf("(schema_name IN (%s))", sb.String())
 	} else {
-		condFilter = "(schema_name == currentDatabase() OR lower(schema_name) NOT IN ('information_schema', 'system'))"
+		// Bratrax: multi-tenant deployments put many customers' databases on one ClickHouse
+		// server, so the fallback must confine listing to the connector's own database.
+		// The previous "OR lower(schema_name) NOT IN (...)" made the currentDatabase() check
+		// dead and exposed every tenant's schema names.
+		condFilter = "(schema_name == currentDatabase())"
 	}
 
 	if pageToken != "" {
@@ -224,7 +228,10 @@ func (c *Connection) All(ctx context.Context, like string, pageSize uint32, page
 		}
 		filter = fmt.Sprintf("(T.database IN (%s))", sb.String())
 	} else {
-		filter = "(T.database == currentDatabase() OR lower(T.database) NOT IN ('information_schema', 'system'))"
+		// Bratrax: see ListDatabaseSchemas. Confine table listing to the connector's own
+		// database; the previous OR clause returned every database on the server, which is
+		// how a tenant's chat enumerated other customers' tables.
+		filter = "(T.database == currentDatabase())"
 	}
 
 	if like != "" {

@@ -48,6 +48,8 @@ func (t *ListTables) Spec() *mcp.Tool {
 }
 
 func (t *ListTables) CheckAccess(ctx context.Context) (bool, error) {
+	// Bratrax: safe for customers — the ClickHouse information schema is filtered to
+	// currentDatabase(), so this lists only the caller's own tables.
 	return checkDeveloperAccess(ctx, t.Runtime, false)
 }
 
