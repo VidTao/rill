@@ -210,6 +210,60 @@
   let clientId = "";
   let shopifyShopDomain = "";
   let connectedAt: Record<string, string> = {};
+  let stackSelections: Record<string, unknown> = {};
+
+  // ---------------------------------------------------------------------------
+  // Store gating — mirrors /connectors. A client picks exactly ONE store, and
+  // that choice is what _determine_stack() compiles into config.yaml, so the
+  // "YOUR STORE" section only shows the store they actually have.
+  //
+  // Note this page has no ALLOW_WOOCOMMERCE gate (unlike /connectors and
+  // /onboard/store) — pre-existing inconsistency, left as-is. Because the Woo
+  // card always renders here, suppressing Shopify can never leave no store.
+  // ---------------------------------------------------------------------------
+
+  // Fail closed: hide both store cards until /onboard/me answers, so neither
+  // flashes in and back out.
+  let storeResolved = false;
+
+  // The lock beats the connected set — see the long note in
+  // routes/connectors/+page.svelte for why (the credential write that feeds
+  // connectedPlatforms bypasses the backend's store-lock guard).
+  $: lockedStore =
+    stackSelections?.locked_store_platform === "shopify" ||
+    stackSelections?.locked_store_platform === "woocommerce"
+      ? (stackSelections.locked_store_platform as "shopify" | "woocommerce")
+      : "";
+
+  $: storeChoice =
+    lockedStore ||
+    (connectedPlatforms.has("shopify")
+      ? "shopify"
+      : connectedPlatforms.has("woocommerce")
+        ? "woocommerce"
+        : "");
+
+  $: suppressedStore =
+    storeChoice === "shopify"
+      ? "woocommerce"
+      : storeChoice === "woocommerce"
+        ? "shopify"
+        : "";
+
+  $: visibleCategories = categories
+    .map((c) => ({
+      ...c,
+      platforms: c.platforms.filter((p) => {
+        if (p.id !== "shopify" && p.id !== "woocommerce") return true;
+        if (!storeResolved) return false;
+        // A connected store is always shown, even against the lock.
+        if (connectedPlatforms.has(p.id)) return true;
+        return p.id !== suppressedStore;
+      }),
+    }))
+    // "YOUR STORE" empties out during the pre-resolve window; drop the section
+    // rather than leaving a dangling heading with no cards under it.
+    .filter((c) => c.platforms.length > 0);
 
   // Two-step external-pages flow: clicking "I have external landing pages"
   // opens the builder picker; picking Funnelish opens the install snippet
@@ -466,11 +520,18 @@
 
   async function refreshFromServer() {
     const me = await onboardMe();
-    if (!me?.client_id) return;
+    // No client → nothing to suppress; open the store gate so both store cards
+    // still render (see visibleCategories).
+    if (!me?.client_id) {
+      storeResolved = true;
+      return;
+    }
     clientId = me.client_id;
 
-    const stack = (me.stack_selections || {}) as Record<string, unknown>;
-    const creds = stack.shopify_credentials as { shop?: string } | undefined;
+    stackSelections = (me.stack_selections || {}) as Record<string, unknown>;
+    const creds = stackSelections.shopify_credentials as
+      | { shop?: string }
+      | undefined;
     shopifyShopDomain = creds?.shop ?? "";
 
     const next = new Set<string>();
@@ -486,6 +547,7 @@
     }
     connectedPlatforms = next;
     connectedAt = dates;
+    storeResolved = true;
 
     // If any external-pages builder (Funnelish, …) is connected, default
     // the "pages" radio to "I have external landing pages" on hard refresh
@@ -1861,7 +1923,7 @@
       {/if}
 
       <div class="flex flex-col gap-6">
-        {#each categories as category}
+        {#each visibleCategories as category}
           <div>
             <div class="mb-2 flex items-baseline gap-2">
               <span

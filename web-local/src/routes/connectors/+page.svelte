@@ -145,9 +145,70 @@
   // surfaced via /bratrax/auth/config). Off → filtered out of the grid.
   // Defaults false until getAuthConfig() resolves in onMount.
   let allowWoocommerce = false;
-  $: visiblePlatforms = platforms.filter(
-    (p) => p.id !== "woocommerce" || allowWoocommerce,
-  );
+
+  // ---------------------------------------------------------------------------
+  // Store gating
+  //
+  // A client picks exactly ONE store during onboarding (/onboard/store), and
+  // that choice is what _determine_stack() compiles into config.yaml — there is
+  // no dual-store stack. So we hide the store they didn't pick, rather than
+  // offering a Connect button that would contradict their compiled stack.
+  //
+  // Derived from the same inputs _determine_stack() reads (onboarding.py:1417).
+  // Explicitly NOT from me.template_name, which is hardcoded server-side to
+  // "shopify-paid-media" (onboarding.py:1951, :2057) and lies for Woo clients.
+  // ---------------------------------------------------------------------------
+
+  // True once /onboard/me has answered. Until then BOTH store rows are hidden
+  // (fail closed) — rendering a Connect button we're about to remove is worse
+  // than a brief gap: it is live and navigates straight to /onboard/store.
+  let storeResolved = false;
+
+  // Precedence: the LOCK wins over the connected set. The lock is an explicit
+  // admin decision stamped once at /onboard/start (onboarding.py:1174) and
+  // never rewritten or cleared. The connected set is derived and CAN be
+  // polluted: the store-lock guard lives only in _record_platform_connection
+  // (onboarding.py:2342), while the credential write that precedes it
+  // (onboarding.py:2171 shopify / :4666 woo) is unguarded — so a refused store
+  // still lands in stack_selections.{p}_credentials, and
+  // connectedFromStackSelections() turns that key alone into "connected".
+  // Connected-first would hide the locked store the client is licensed for.
+  $: lockedStore =
+    stackSelections?.locked_store_platform === "shopify" ||
+    stackSelections?.locked_store_platform === "woocommerce"
+      ? (stackSelections.locked_store_platform as "shopify" | "woocommerce")
+      : "";
+
+  $: storeChoice =
+    lockedStore ||
+    (connectedPlatforms.has("shopify")
+      ? "shopify"
+      : connectedPlatforms.has("woocommerce")
+        ? "woocommerce"
+        : "");
+
+  // Never suppress Shopify in favour of a WooCommerce row we can't render.
+  // getAuthConfig() fails CLOSED to allow_woocommerce=false (auth.ts:127,130),
+  // so without the allowWoocommerce term one flaky /bratrax/auth/config would
+  // leave a Woo client with no store row at all.
+  $: suppressedStore =
+    storeChoice === "shopify"
+      ? "woocommerce"
+      : storeChoice === "woocommerce" && allowWoocommerce
+        ? "shopify"
+        : "";
+
+  $: visiblePlatforms = platforms.filter((p) => {
+    if (p.id !== "shopify" && p.id !== "woocommerce") return true;
+    // ALLOW_WOOCOMMERCE deployment gate (unchanged).
+    if (p.id === "woocommerce" && !allowWoocommerce) return false;
+    if (!storeResolved) return false;
+    // A connected store is ALWAYS shown — its Disconnect button is the only
+    // cleanup UI for a stray connection, and hiding it would orphan the
+    // Shopify embed banner + WooTrackingInstall panel that sit above the grid.
+    if (connectedPlatforms.has(p.id)) return true;
+    return p.id !== suppressedStore;
+  });
 
   // ---------------------------------------------------------------------------
   // State
@@ -271,7 +332,12 @@
   // ---------------------------------------------------------------------------
   async function refreshFromServer() {
     const me = await onboardMe();
-    if (!me?.client_id) return;
+    // No client → nothing to suppress. Open the store gate so a client-less
+    // user still sees both store rows instead of a grid with no store at all.
+    if (!me?.client_id) {
+      storeResolved = true;
+      return;
+    }
     clientId = me.client_id;
     stackSelections = me.stack_selections || {};
     shopifyEmbedEnabled = !!me.shopify_embed_enabled;
@@ -291,6 +357,12 @@
     for (const p of connectedFromStackSelections(stackSelections)) next.add(p);
     connectedPlatforms = next;
     connectedAt = dates;
+
+    // Open the store gate HERE, not at the end of this function: everything
+    // below is informational and awaits two more round trips (verifyEmbedStatus
+    // hits the Shopify Asset API and can take seconds). The store rows only
+    // need connectedPlatforms + stackSelections, which are now set.
+    storeResolved = true;
 
     // Backfill/sync status — informational, non-fatal. Also polled on an
     // interval (see startSyncPolling) so the pill fills live without a reload.
