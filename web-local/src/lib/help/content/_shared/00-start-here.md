@@ -24,7 +24,7 @@ orders, and shows you which channels, campaigns, and ads truly drive sales —
 in dashboards that reconcile with your store, not with a pixel's opinion.
 
 - **Try:** log in and open the dashboard list in the left nav.
-- **Go deeper:** [Welcome to Bratrax](../viewer/01-welcome.md)
+- **Go deeper:** [Welcome to Bratrax](/help/viewer/welcome)
 
 ## 2. Connect your data (admins)
 
@@ -41,7 +41,7 @@ ad platforms.
 
 - **Try:** open Connectors and confirm every platform you use shows as
   connected.
-- **Go deeper:** [Connecting platforms](../admin/02-connecting-platforms.md)
+- **Go deeper:** [Connecting platforms](/help/admin/connecting-platforms)
 
 ## 3. Set up your costs (admins)
 
@@ -57,7 +57,8 @@ if several stores share one ad account — your media-spend split.
 
 - **Try:** open Cost Settings → Cost of goods and confirm your product costs
   came in from Shopify.
-- **Go deeper:** [Cost settings & COGS](../../qa/setup/cogs-costs.md)
+- **Go deeper:** [Settings](/help/admin/settings) ·
+  [Cost Settings](https://bratrax.com/cost-settings)
 
 ## 4. Your daily health check
 
@@ -71,7 +72,7 @@ The one dashboard to open every morning. Is the business up or down? Revenue,
 returns, spend, MER, blended ROAS, new-vs-returning mix, subscription health.
 
 - **Try:** find yesterday's total sales and compare it to the previous period.
-- **Go deeper:** [Store Performance](../viewer/02-store-performance.md)
+- **Go deeper:** [Store Performance](/help/viewer/store-performance)
 
 ## 5. Where your sales come from
 
@@ -89,8 +90,8 @@ purchase.
 
 - **Try:** expand your biggest channel down to the ad level, then click one
   blue sales number and inspect a customer journey.
-- **Go deeper:** [Attribution](../viewer/03-attribution.md) ·
-  [Filters and time ranges](../viewer/03-filters-and-time.md)
+- **Go deeper:** [Attribution](/help/viewer/attribution) ·
+  [Filters and time ranges](/help/viewer/filters-and-time)
 
 ## 6. What's selling
 
@@ -104,7 +105,7 @@ Product and SKU-level truth: net sales, units, discounts, top products, and a
 full product/variant/SKU breakdown.
 
 - **Try:** find your top SKU by net sales this month.
-- **Go deeper:** [Products](../viewer/04-products.md)
+- **Go deeper:** [Products](/help/viewer/products)
 
 ## 7. Your customers and subscriptions
 
@@ -119,7 +120,7 @@ actually come from — down to the campaign and ad set.
 
 - **Try:** find your average customer LTV and your biggest
   subscriber-acquisition source.
-- **Go deeper:** [Customer Analytics](../viewer/05-customer-analytics.md)
+- **Go deeper:** [Customer Analytics](/help/viewer/customer-analytics)
 
 ## 8. Email & SMS
 
@@ -134,7 +135,7 @@ and the lifetime revenue impact of your email/SMS program.
 
 - **Try:** check the open rate of your latest campaign, then glance at list
   health for rising bounces or unsubscribes.
-- **Go deeper:** [Email & SMS](../viewer/06-email-sms.md)
+- **Go deeper:** [Email & SMS](/help/viewer/email-sms)
 
 ## 9. Meet your whole audience — not just buyers
 
@@ -156,8 +157,8 @@ anonymous, winback, ...), and recommends what to do with each group.
 - **Try:** in Profile Explorer, count your reachable non-buyers; in Commerce
   Profile Graph, find which acquisition channel produces your highest-LTV
   customers.
-- **Go deeper:** [Profile Explorer](../viewer/08-profile-explorer.md) ·
-  [Commerce Profile Graph](../viewer/09-commerce-profile-graph.md)
+- **Go deeper:** [Profile Explorer](/help/viewer/profile-explorer) ·
+  [Commerce Profile Graph](/help/viewer/commerce-profile-graph)
 
 ## 10. Ask the AI
 
@@ -174,8 +175,8 @@ subscription, connect the MCP endpoint instead (Settings → MCP) and query the
 same data at no extra cost.
 
 - **Try:** ask one scoped question, e.g. "ROAS by campaign, last 7 days."
-- **Go deeper:** [Asking Claude](../viewer/04-asking-claude.md) ·
-  [What does the AI cost?](../../qa/ai-mcp/ai-chat-cost.md)
+- **Go deeper:** [Asking Claude](/help/viewer/asking-claude) ·
+  [What does the AI cost?](/help/admin/ai-and-api-keys)
 
 ## 11. Make it yours
 
@@ -189,7 +190,7 @@ Every dashboard is editable: change filters, date ranges, and attribution
 models; add or modify charts; pick dimensions and metrics.
 
 - **Try:** add one chart to any dashboard (edit → + → pick a chart type).
-- **Go deeper:** [Dashboards](../admin/05-dashboards.md)
+- **Go deeper:** [Dashboards](/help/admin/dashboards)
 
 ## 12. Level up: Metric Trees
 
@@ -204,7 +205,7 @@ and experiments, all wired to live data. Best once your data has settled in.
 
 - **Try:** seed the **paid acquisition** template and follow the
   biggest-moving branch.
-- **Go deeper:** [Metric Trees](../admin/15-metric-trees.md)
+- **Go deeper:** [Metric Trees](/help/admin/metric-trees)
 
 ## 13. When you're stuck
 
@@ -221,8 +222,8 @@ a real person reads every email.
 
 - **Try:** search the help section for one metric you weren't sure about
   (start with MER).
-- **Go deeper:** [Getting help](02-getting-help.md) ·
-  [Glossary](01-glossary.md)
+- **Go deeper:** [Getting help](/help/getting-help) ·
+  [Glossary](/help/glossary)
 
 ---
 

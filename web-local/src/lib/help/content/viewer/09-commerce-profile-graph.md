@@ -38,7 +38,7 @@ and so on) with a recommended action. The bar chart shows segment sizes; the
 table pairs each segment with its recommended action, reach, revenue, and
 intent counts (product views, add-to-carts, checkouts). Use it to size an
 audience before building a campaign or flow. The full segment list is in the
-[Profile Explorer](08-profile-explorer.md) article.
+[Profile Explorer](/help/viewer/profile-explorer) article.
 
 ### 3. Customer Intelligence
 
