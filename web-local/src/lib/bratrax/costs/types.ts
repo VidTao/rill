@@ -124,9 +124,26 @@ export interface MediaSpendScopeGuidance {
 
 export type StoreSettings = Record<string, unknown>;
 
+export interface ProfitReadinessCost {
+  key: "cogs" | "fees" | "shipping" | "ad_spend" | "custom_costs";
+  label: string;
+  complete: boolean;
+  coverage: number;
+  status: "ready" | "estimated" | "missing";
+}
+
+export interface ProfitReadiness {
+  available: boolean;
+  reason?: string;
+  profit_ready?: boolean;
+  orders?: number;
+  costs?: ProfitReadinessCost[];
+}
+
 export type CostTab =
   | "cogs"
   | "shipping"
   | "gateway"
   | "expenses"
-  | "media_scope";
+  | "media_scope"
+  | "calculation";

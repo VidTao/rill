@@ -76,6 +76,12 @@
     return value === true || value === 1 || value === "1" || value === "true";
   }
 
+  function textValue(value: unknown): string {
+    return typeof value === "string" || typeof value === "number"
+      ? String(value)
+      : "";
+  }
+
   function periodFor(label: string, grain: "Daily" | "Monthly"): string {
     return grain === "Monthly" ? label.slice(0, 7) : label;
   }
@@ -92,14 +98,14 @@
 
     for (const raw of rows) {
       const sort = numeric(raw.statement_sort);
-      const rawLabel = String(raw.statement_line ?? "");
+      const rawLabel = textValue(raw.statement_line);
       const label =
         sort === 180
           ? profitReady
             ? "Net Profit"
             : "Measured Profit"
           : rawLabel;
-      const period = periodFor(String(raw.period_label ?? ""), grain);
+      const period = periodFor(textValue(raw.period_label), grain);
       if (!period) continue;
       periods.add(period);
       const row = bySort.get(sort) ?? {
@@ -213,17 +219,17 @@
         <thead>
           <tr>
             <th class="line-heading">Line item</th>
-            {#each statement.periods as period}
+            {#each statement.periods as period (period)}
               <th>{period}</th>
             {/each}
             <th class="total-heading">Total</th>
           </tr>
         </thead>
         <tbody>
-          {#each statement.rows as row}
+          {#each statement.rows as row (row.sort)}
             <tr class:subtotal={row.subtotal} class:profit={row.sort >= 170}>
               <th scope="row">{row.label}</th>
-              {#each statement.periods as period}
+              {#each statement.periods as period (period)}
                 <td>{displayValue(row, row.values[period] ?? 0)}</td>
               {/each}
               <td class="total-cell">{displayValue(row, row.total)}</td>

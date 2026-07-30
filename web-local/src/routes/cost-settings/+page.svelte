@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import CalculationPreferences from "$lib/bratrax/costs/CalculationPreferences.svelte";
   import type { CostTab } from "$lib/bratrax/costs/types";
   import type {
     ProductCogs,
@@ -39,6 +40,7 @@
     { id: "gateway", label: "Gateway Costs", icon: "💳" },
     { id: "expenses", label: "Custom Expenses", icon: "📋" },
     { id: "media_scope", label: "Media Scope", icon: "🎯" },
+    { id: "calculation", label: "Profit Rules", icon: "∑" },
   ];
 
   let activeTab: CostTab = "gateway";
@@ -167,7 +169,9 @@
       const hf = storeSettings?.enable_handling_fee as
         | Record<string, string>
         | undefined;
-      if (hf?.value) enableHandlingFee = hf.value === "true";
+      if (hf?.value !== undefined) {
+        enableHandlingFee = hf.value === true || hf.value === "true";
+      }
 
       const shippingMode = storeSettings?.shipping_cost_mode as
         | { value?: unknown }
@@ -209,8 +213,8 @@
     try {
       await saveStoreSettings({
         cogs_mode: cogsMode,
-        global_cogs_percent: String(globalCogsPercent),
-        enable_handling_fee: String(enableHandlingFee),
+        global_cogs_percent: globalCogsPercent,
+        enable_handling_fee: enableHandlingFee,
       });
       showCogsModal = false;
     } catch (e) {
@@ -1211,6 +1215,12 @@
                 </div>
               </div>
             {/if}
+            <!-- ================================================================ -->
+            <!-- TAB: MEDIA SCOPE -->
+            <!-- ================================================================ -->
+          {:else if activeTab === "calculation"}
+            <CalculationPreferences />
+
             <!-- ================================================================ -->
             <!-- TAB: MEDIA SCOPE -->
             <!-- ================================================================ -->

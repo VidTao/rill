@@ -12,6 +12,7 @@ import type {
   MediaSpendScopeRule,
   MediaSpendScopeRuleData,
   StoreSettings,
+  ProfitReadiness,
 } from "./types";
 
 function getBaseUrl(): string {
@@ -54,6 +55,13 @@ export async function saveStoreSettings(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ settings }),
   });
+}
+
+export async function getProfitReadiness(): Promise<ProfitReadiness> {
+  const res = await apiFetch<{ data: ProfitReadiness }>(
+    "/bratrax/cost-settings/profit-readiness",
+  );
+  return res.data;
 }
 
 // --- Product COGS ---
