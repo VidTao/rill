@@ -1,13 +1,10 @@
 <script lang="ts">
   import LoadingSpinner from "@rilldata/web-common/components/icons/LoadingSpinner.svelte";
-  import {
-    createAndExpression,
-    createInExpression,
-  } from "@rilldata/web-common/features/dashboards/stores/filter-utils";
   import { createQueryServiceMetricsViewAggregation } from "@rilldata/web-common/runtime-client";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import ComponentHeader from "../../ComponentHeader.svelte";
   import type { FinancialStatementComponent } from "./index";
+  import { buildFinancialStatementWhere } from "./query";
 
   export let component: FinancialStatementComponent;
 
@@ -34,8 +31,7 @@
     selectedGrain = spec.grain === "Monthly" ? "Monthly" : "Daily";
   }
 
-  $: dailyOnly = createInExpression("period_grain", ["Daily"]);
-  $: queryWhere = where ? createAndExpression([where, dailyOnly]) : dailyOnly;
+  $: queryWhere = buildFinancialStatementWhere(where);
   $: rowsQuery = createQueryServiceMetricsViewAggregation(
     instanceId,
     spec.metrics_view ?? "",
