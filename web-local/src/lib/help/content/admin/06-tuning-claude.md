@@ -23,7 +23,7 @@ Anything that helps Claude answer your specific questions correctly.
 
 **Business rules**
 
-> Subscription orders (Stripe channel) renew automatically and should be excluded from new-customer metrics.
+> Subscription renewals (Shopify-native subscriptions) renew automatically and should be excluded from new-customer metrics.
 
 **Naming conventions**
 

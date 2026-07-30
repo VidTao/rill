@@ -9,6 +9,12 @@ status: ready
 
 Claude is a built-in analyst. Open the chat panel and ask questions about your data in plain English — it answers using the same metrics and dimensions that power your dashboards.
 
+**Video walkthrough**
+
+```loom
+846726e08bd6449382a2520807cbeaec
+```
+
 ## How to phrase a good question
 
 The clearer your question, the better the answer. Include three things:
@@ -55,7 +61,7 @@ A vague question like *"how am I doing?"* gets a vague answer. *"How did ROAS pe
 
 ## What Claude can't do
 
-- See data younger than the last refresh (typically 1–3 hours old)
+- See data younger than the last refresh (store orders refresh hourly; all other integrations every 4 hours)
 - Modify your dashboards or data
 - Pull from sources you haven't connected
 - Take actions outside the chat

@@ -9,6 +9,12 @@ status: ready
 
 Use **Products** to understand what actually sold: products, variants, SKUs, units, discounts, and net sales.
 
+**Video walkthrough**
+
+```loom
+9e8e37c1a3ec4c7a8966a2ac82e1e47c
+```
+
 ## Look first at
 
 - **Product Net Sales** — product-level sales after line-item discounts.

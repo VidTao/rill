@@ -20,7 +20,9 @@ Start with the dashboards. Each one is built for a different job.
 | Which products and SKUs are selling? | **Products** |
 | Are customers and subscriptions growing? | **Customer Analytics** |
 | Are campaigns and flows working? | **Email & SMS** |
-| Which sources bring new customers? | **New Customer Source Report** |
+| Which sources bring new customers? | **Attribution** |
+| Who are my customers, leads, and anonymous visitors? | **Profile Explorer** |
+| How big is my reachable audience, and where do my best customers come from? | **Commerce Profile Graph** |
 
 ## Your first 5 checks
 
@@ -38,7 +40,7 @@ If a KPI moved, do not stop at the tile. Scroll down, click into the channel, pr
 
 ## How fresh is the data
 
-Dashboards refresh on a schedule. Numbers are not live to the second. When you see "today," read it as "today as of the last successful refresh."
+Dashboards refresh on a schedule — store orders hourly, all other integrations every 4 hours — so numbers are not live to the second. When you see "today," read it as "today as of the last successful refresh."
 
 Use the dashboard's "as of" timestamp when a number looks stale or when you are comparing against Shopify or an ad platform.
 

@@ -9,6 +9,12 @@ status: ready
 
 Connect ad platforms, your store, and other data sources from the **Connectors** tab in the top nav.
 
+**Video walkthrough**
+
+```loom
+d3631b9edef54f58abed0cef24de3dfb
+```
+
 ## Adding a platform
 
 1. Click **Connectors** in the top nav.
@@ -19,12 +25,11 @@ Connect ad platforms, your store, and other data sources from the **Connectors**
 
 ## How long until data shows up
 
-| Platform type | First backfill | Ongoing refresh |
+| Platform | First data | Ongoing refresh |
 |---|---|---|
-| Ad platforms (Facebook, Google, TikTok) | 15–60 minutes | Hourly |
-| Shopify | A few minutes for recent orders; longer for full history | Hourly |
-| Email / SMS (Klaviyo) | 30–60 minutes | Hourly |
-| Stripe (subscriptions) | 30–60 minutes | Hourly |
+| Store (Shopify, WooCommerce) | Recent orders in minutes; ~1 year backfilled over hours | Hourly |
+| Ad platforms (Meta, Google, TikTok, Microsoft/Bing, Pinterest, Taboola, Outbrain) | 15–60 min to start; ~60 days backfilled over hours to days | Every 4 hours |
+| Email / SMS (Klaviyo, Bloomreach) | 30–60 minutes | Every 4 hours |
 
 You'll see progress on the connector card while the backfill is running.
 
@@ -32,13 +37,18 @@ You'll see progress on the connector card while the backfill is running.
 
 | Platform | What you get |
 |---|---|
-| Shopify | Orders, customers, products, sessions |
-| Facebook Ads | Spend, impressions, clicks, conversions per campaign / ad set / ad |
-| Google Ads | Same as Facebook, plus search keyword data |
-| TikTok Ads | Same as Facebook |
-| Klaviyo | Email/SMS campaigns, opens, clicks, attributed revenue |
-| Stripe | Subscription orders and recurring revenue |
-| Amazon Ads / SP | Sponsored ads and seller performance |
+| Shopify | Orders, customers, products, sessions — including Shopify-native subscriptions |
+| WooCommerce | Orders, customers, products (via the Bratrax WordPress plugin) |
+| Meta (Facebook / Instagram) | Spend, impressions, clicks, conversions per campaign / ad set / ad |
+| Google Ads | Same as Meta, plus search keyword data |
+| TikTok Ads | Same as Meta |
+| Microsoft (Bing) Ads | Same as Meta |
+| Pinterest Ads | Same as Meta |
+| Taboola | Spend, impressions, clicks, conversions per campaign |
+| Outbrain | Spend, impressions, clicks, conversions per campaign |
+| Klaviyo | Email/SMS campaigns & flows, opens, clicks, attributed revenue |
+| Bloomreach | Email/SMS & engagement campaigns, attributed revenue |
+| External landing pages / Funnelish | Orders + visitor journeys via the Bratrax tracking pixel (no ad connector) |
 
 ## Reconnecting an expired token
 
