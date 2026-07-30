@@ -17,6 +17,10 @@ import { apiFetch } from "./onboarding/api";
 // Filter them out at every canvas-list read site so the user never sees a
 // stale demo tab flash on first login / post-onboarding.
 //
+// KEEP IN SYNC with rillDemoCanvasNames / internalSuperadminCanvasNames in
+// runtime/ai/canvas_list.go — the list_canvases MCP tool filters the same two
+// sets so external clients (the Slack assistant) can't link to them either.
+//
 // Sources of these names:
 //   - rill-cost-monitoring → dashboards/margin_scorecard.yaml
 //   - rill-openrtb-prog-ads → dashboards/auction_explore.yaml
