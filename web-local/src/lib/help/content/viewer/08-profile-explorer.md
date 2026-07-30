@@ -7,7 +7,7 @@ status: ready
 
 # Profile Explorer
 
-**Profile Explorer** is a directory of every person Bratrax can see — paying
+[**Profile Explorer**](https://bratrax.com/canvas/profile_explorer) is a directory of every person Bratrax can see — paying
 customers, known leads (people whose email or phone you have but who haven't
 bought), and anonymous visitors. Bratrax stitches store data, email/SMS data,
 and on-site activity into one deduplicated profile per person, then segments
@@ -107,6 +107,6 @@ Below the directory are two working views:
 
 ## Related
 
-- **Commerce Profile Graph** — the aggregate view of the same profile data:
+- [**Commerce Profile Graph**](https://bratrax.com/canvas/commerce_profile_graph) — the aggregate view of the same profile data:
   coverage, segment sizes, customer value by acquisition, and attribution
   diagnostics.

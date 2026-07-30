@@ -29,10 +29,10 @@ When a chart is split by channel or product, use the legend to focus on one seri
 
 Tables and pivots are where you explain the KPI movement. Sort by the metric that matters:
 
-- Sort **Attribution** by spend, ROAS, CPA, or attributed sales.
-- Sort **Products** by product net sales, units, or discount.
-- Sort **Email & SMS** by attributed sales, open rate, click rate, or unsubs.
-- Sort **Customer Analytics** by subscriber count, retention, or subscriber LTV.
+- Sort [**Attribution**](https://bratrax.com/canvas/campaign_deep_dive) by spend, ROAS, CPA, or attributed sales.
+- Sort [**Products**](https://bratrax.com/canvas/product_performance) by product net sales, units, or discount.
+- Sort [**Email & SMS**](https://bratrax.com/canvas/email_marketing) by attributed sales, open rate, click rate, or unsubs.
+- Sort [**Customer Analytics**](https://bratrax.com/canvas/customer_analytics) by subscriber count, retention, or subscriber LTV.
 
 ## Comparing periods
 

@@ -7,7 +7,7 @@ status: ready
 
 # Products
 
-Use **Products** to understand what actually sold: products, variants, SKUs, units, discounts, and net sales.
+Use [**Products**](https://bratrax.com/canvas/product_performance) to understand what actually sold: products, variants, SKUs, units, discounts, and net sales.
 
 **Video walkthrough**
 
@@ -46,7 +46,7 @@ The detail table is for auditing. Use it when a product looks wrong or when you 
 - If sales rose, check whether the increase came from units, price mix, or discounts.
 - If a product dropped, compare the SKU leaderboard to see whether one variant is responsible.
 - If discounts rose, sort the detail table by discount and inspect the affected products.
-- If product demand changed, open **Attribution** to see which campaign or channel drove it.
+- If product demand changed, open [**Attribution**](https://bratrax.com/canvas/campaign_deep_dive) to see which campaign or channel drove it.
 
 ## Good Claude questions
 

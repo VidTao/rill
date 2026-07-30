@@ -7,9 +7,9 @@ status: ready
 
 # Commerce Profile Graph
 
-**Commerce Profile Graph** is the aggregate view of Bratrax's identity graph —
+[**Commerce Profile Graph**](https://bratrax.com/canvas/commerce_profile_graph) is the aggregate view of Bratrax's identity graph —
 how well your store, email/SMS platform, and on-site activity resolve into
-known people, and what those people are worth. Where **Profile Explorer** is a
+known people, and what those people are worth. Where [**Profile Explorer**](https://bratrax.com/canvas/profile_explorer) is a
 person-level directory you work through, Commerce Profile Graph answers
 portfolio questions: how big is the reachable audience, which segments exist,
 which acquisition sources produce valuable customers, and where attribution

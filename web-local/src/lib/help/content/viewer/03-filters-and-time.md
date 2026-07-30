@@ -42,10 +42,10 @@ To remove a filter, click the × on its chip.
 
 Many charts, tables, and pivots can filter the whole dashboard when clicked. This is the fastest way to investigate:
 
-- In **Attribution**, click a channel or campaign.
-- In **Products**, click a product or SKU.
-- In **Email & SMS**, click a campaign or flow.
-- In **Customer Analytics**, click a subscriber acquisition channel.
+- In [**Attribution**](https://bratrax.com/canvas/campaign_deep_dive), click a channel or campaign.
+- In [**Products**](https://bratrax.com/canvas/product_performance), click a product or SKU.
+- In [**Email & SMS**](https://bratrax.com/canvas/email_marketing), click a campaign or flow.
+- In [**Customer Analytics**](https://bratrax.com/canvas/customer_analytics), click a subscriber acquisition channel.
 
 ## Clearing filters
 

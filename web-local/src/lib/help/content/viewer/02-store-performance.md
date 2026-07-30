@@ -7,7 +7,7 @@ status: ready
 
 # Store Performance
 
-Use **Store Performance** as the daily health check. It answers: "Is the business up or down, and is marketing spend producing enough sales?"
+Use [**Store Performance**](https://bratrax.com/canvas/performance_overview) as the daily health check. It answers: "Is the business up or down, and is marketing spend producing enough sales?"
 
 **Video walkthrough**
 
@@ -45,7 +45,7 @@ Then move down:
 ## Drilldown moves
 
 - If Total Sales dropped, check whether order count, AOV, or returns changed.
-- If Paid ROAS dropped, open **Attribution** and find the channel or campaign that moved.
+- If Paid ROAS dropped, open [**Attribution**](https://bratrax.com/canvas/campaign_deep_dive) and find the channel or campaign that moved.
 - If MER dropped but Paid ROAS is stable, look for non-paid sales weakness, custom spend, or subscription mix.
 - If new-customer orders dropped, open **Attribution** and check new-customer ROAS/CPA by source.
 

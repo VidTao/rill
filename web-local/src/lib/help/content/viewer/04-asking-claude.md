@@ -27,27 +27,27 @@ A vague question like *"how am I doing?"* gets a vague answer. *"How did ROAS pe
 
 ## Dashboard-specific questions
 
-**Store Performance**
+[**Store Performance**](https://bratrax.com/canvas/performance_overview)
 - "Summarize Store Performance for the last 7 days versus the previous 7 days."
 - "Was the sales change caused by orders, AOV, returns, or spend?"
 - "Why did MER move this week?"
 
-**Attribution**
+[**Attribution**](https://bratrax.com/canvas/campaign_deep_dive)
 - "Which channel drove the biggest change in Attributed Sales?"
 - "Which campaigns have high spend and low ROAS?"
 - "Why is Direct high in this period?"
 
-**Products**
+[**Products**](https://bratrax.com/canvas/product_performance)
 - "Which products drove the sales increase?"
 - "Which SKUs sold the most units but generated low net sales?"
 - "Did discounts increase for top products?"
 
-**Customer Analytics**
+[**Customer Analytics**](https://bratrax.com/canvas/customer_analytics)
 - "Which sources acquired the highest-LTV subscribers?"
 - "What changed in active subscribers and MRR this month?"
 - "Which subscriber cohorts have weak retention?"
 
-**Email & SMS**
+[**Email & SMS**](https://bratrax.com/canvas/email_marketing)
 - "Which campaigns drove the most attributed sales?"
 - "Did open rate or click rate cause the email sales change?"
 - "Which flows have high unsubscribes?"
