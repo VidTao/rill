@@ -2,6 +2,7 @@
   import type { PivotCanvasComponent } from "@rilldata/web-common/features/canvas/components/pivot";
   import { getFiltersForCell } from "@rilldata/web-common/features/dashboards/pivot/pivot-utils";
   import { getContext } from "svelte";
+  import { readable } from "svelte/store";
   import ComponentHeader from "../../ComponentHeader.svelte";
   import CanvasPivotRenderer from "./CanvasPivotRenderer.svelte";
   import {
@@ -18,6 +19,8 @@
   const drilldown = getContext<OrderDrilldownContext | undefined>(
     ORDER_DRILLDOWN_CONTEXT,
   );
+  const supportedDrilldownMeasures =
+    drilldown?.supportedMeasures ?? readable<ReadonlySet<string>>(new Set());
 
   $: ({
     parent: {
@@ -53,8 +56,6 @@
   // Column ids are either real measure names (`profiles`) or short aliases
   // (`m0`, `m1`, ...). For nested column dimensions the alias can be prefixed
   // with `c<i>v<j>_...m<k>`, so we also resolve the trailing measure index.
-  const DRILLDOWN_MEASURES = new Set(["metric_attributed_orders", "profiles"]);
-
   function resolveMeasureName(
     columnId: string,
     measureNames: string[],
@@ -78,12 +79,16 @@
     drilldown && $config
       ? (columnId: string) => {
           const name = resolveMeasureName(columnId, $config!.measureNames);
-          return !!name && DRILLDOWN_MEASURES.has(name);
+          return !!name && $supportedDrilldownMeasures.has(name);
         }
       : undefined;
 
   $: onMeasureCellClick = drilldown
-    ? (_rowId: string, columnId: string, _rowData?: Record<string, unknown>) => {
+    ? (
+        _rowId: string,
+        columnId: string,
+        _rowData?: Record<string, unknown>,
+      ) => {
         const pivotConfig = $config;
         const dataStore = $pivotDataStore;
         if (!pivotConfig || !dataStore) return;
@@ -91,7 +96,7 @@
           columnId,
           pivotConfig.measureNames,
         );
-        if (!measureName || !DRILLDOWN_MEASURES.has(measureName)) {
+        if (!measureName || !$supportedDrilldownMeasures.has(measureName)) {
           return;
         }
         const cell = getCellFilters(_rowId, columnId);

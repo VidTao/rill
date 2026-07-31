@@ -9,6 +9,8 @@ import {
 } from "@rilldata/web-common/features/dashboards/stores/filter-utils";
 import type { V1Expression } from "@rilldata/web-common/runtime-client";
 import type {
+  CancelledOrderGroup,
+  CancelledOrderItemRow,
   OrderListRow,
   OrderTimelineRow,
   WinnerSummary,
@@ -278,14 +280,13 @@ export function findWinner(
 //   <source>_classification                      visit URL matched a platform
 //   klaviyo_event:<name>:<id_source>             Klaviyo email/SMS click
 //   fallback_direct_no_signal                    no signal — attributed to Direct
-export function humanizeResolutionReason(
-  reason: string | undefined,
-): string {
+export function humanizeResolutionReason(reason: string | undefined): string {
   if (!reason) return "—";
   const base = reason.split(";")[0].trim();
   if (base === "order_source_rule") return "Shopify source field";
   if (base === "order_url_classification") return "Checkout URL classified";
-  if (base === "fallback_direct_no_signal") return "No signal — counted as Direct";
+  if (base === "fallback_direct_no_signal")
+    return "No signal — counted as Direct";
   if (base.startsWith("order_url_param:")) return "Tracking on checkout URL";
   if (base.startsWith("order_param_ledger:")) return "Saved checkout tracking";
   if (base.startsWith("klaviyo_event:")) return "Klaviyo email/SMS click";
@@ -313,10 +314,100 @@ export function extractCellLabels(
       return;
     }
     // IN: first expr is { ident }, rest are { val }.
-    if (e.cond?.op === "OPERATION_IN" && inner[0]?.ident && inner[1]?.val !== undefined) {
+    if (
+      e.cond?.op === "OPERATION_IN" &&
+      inner[0]?.ident &&
+      inner[1]?.val !== undefined
+    ) {
       out[inner[0].ident] = String(inner[1].val);
     }
   };
   walk(expr);
   return out;
+}
+
+export const CANCELLED_ORDER_ITEMS_METRICS_VIEW =
+  "cancelled_order_items_metrics";
+
+export function groupCancelledOrderItems(
+  rows: CancelledOrderItemRow[] | undefined,
+): CancelledOrderGroup[] {
+  if (!rows) return [];
+
+  type WorkingOrder = {
+    order: CancelledOrderGroup;
+    slices: Map<string, number>;
+    items: Map<string, CancelledOrderItem>;
+  };
+  const byOrder = new Map<string, WorkingOrder>();
+
+  for (const row of rows) {
+    if (!row.order_id) continue;
+    let working = byOrder.get(row.order_id);
+    if (!working) {
+      working = {
+        order: {
+          order_id: row.order_id,
+          order_number: row.order_number,
+          email: row.email,
+          order_created_at: row.order_created_at,
+          cancelled_at: row.cancelled_at,
+          cancel_reason: row.cancel_reason,
+          order_total: Number(row.order_total ?? 0),
+          currency: row.currency || "USD",
+          attribution_weight: 0,
+          items: [],
+        },
+        slices: new Map(),
+        items: new Map(),
+      };
+      byOrder.set(row.order_id, working);
+    }
+
+    const sliceId =
+      row.attribution_slice_id ||
+      [
+        row.order_id,
+        row.attribution_model,
+        row.channel_group,
+        row.source,
+        row.medium,
+        row.campaign,
+        row.adset,
+        row.ad,
+      ].join("|");
+    if (!working.slices.has(sliceId)) {
+      working.slices.set(sliceId, Number(row.attribution_weight ?? 0));
+    }
+
+    const itemKey =
+      row.line_item_id ||
+      [row.sku, row.product_title, row.variant_title].join("|") ||
+      "__missing__";
+    if (!working.items.has(itemKey)) {
+      working.items.set(itemKey, {
+        line_item_id: row.line_item_id ?? "",
+        product_title: row.product_title,
+        variant_title: row.variant_title,
+        sku: row.sku,
+        quantity: Number(row.quantity ?? 0),
+        unit_price: Number(row.unit_price ?? 0),
+        discount_amount: Number(row.discount_amount ?? 0),
+        item_value: Number(row.item_value ?? 0),
+      });
+    }
+  }
+
+  return Array.from(byOrder.values())
+    .map(({ order, slices, items }) => ({
+      ...order,
+      attribution_weight: Array.from(slices.values()).reduce(
+        (total, weight) => total + weight,
+        0,
+      ),
+      items: Array.from(items.values()),
+    }))
+    .sort((a, b) =>
+      (b.order_created_at ?? "").localeCompare(a.order_created_at ?? ""),
+    );
 }

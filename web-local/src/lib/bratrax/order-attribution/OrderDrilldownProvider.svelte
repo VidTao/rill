@@ -1,17 +1,21 @@
 <script lang="ts">
   // Wraps the dashboard area, registers the drilldown handler on Svelte
   // context, and owns the two modals' open state. Mount this once at the
-  // workspace layout level for clients we've enabled the feature for —
-  // currently earths_mushrooms only.
+  // workspace layout level. Runtime resource discovery enables each
+  // drilldown only when the active client exposes its backing metrics view.
 
   import {
     ORDER_DRILLDOWN_CONTEXT,
     type MeasureCellClickContext,
     type OrderDrilldownContext,
   } from "@rilldata/web-common/features/canvas/components/pivot/drilldown-context";
+  import { createRuntimeServiceListResources } from "@rilldata/web-common/runtime-client";
+  import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import { createInExpression } from "@rilldata/web-common/features/dashboards/stores/filter-utils";
   import { setContext } from "svelte";
-  import { extractCellLabels } from "./api";
+  import { writable } from "svelte/store";
+  import { CANCELLED_ORDER_ITEMS_METRICS_VIEW, extractCellLabels } from "./api";
+  import CancelledOrderListModal from "./CancelledOrderListModal.svelte";
   import OrderListModal from "./OrderListModal.svelte";
   import OrderTimelineModal from "./OrderTimelineModal.svelte";
   import ProfileGraphModal from "./ProfileGraphModal.svelte";
@@ -20,6 +24,30 @@
   // Modal 1 state: cell click context drives the orders-list query.
   let cellContext: MeasureCellClickContext | null = null;
   let listOpen = false;
+
+  let cancelledContext: MeasureCellClickContext | null = null;
+  let cancelledOpen = false;
+
+  $: ({ instanceId } = $runtime);
+  $: metricsViewsQuery = createRuntimeServiceListResources(instanceId, {
+    kind: "rill.runtime.v1.MetricsView",
+  });
+  const supportedMeasures = writable<ReadonlySet<string>>(
+    new Set(["metric_attributed_orders", "profiles"]),
+  );
+  $: {
+    const hasCancelledItems = ($metricsViewsQuery.data?.resources ?? []).some(
+      (resource) =>
+        resource.meta?.name?.name === CANCELLED_ORDER_ITEMS_METRICS_VIEW,
+    );
+    supportedMeasures.set(
+      new Set([
+        "metric_attributed_orders",
+        "profiles",
+        ...(hasCancelledItems ? ["metric_cancelled_orders"] : []),
+      ]),
+    );
+  }
 
   // Profile explorer state: grouped profile cells open a list; a single
   // profile row opens the identity graph directly.
@@ -37,6 +65,7 @@
   let timelineOpen = false;
 
   const drilldownContext: OrderDrilldownContext = {
+    supportedMeasures,
     open(ctx) {
       if (ctx.measureName === "profiles") {
         const profileId = extractCellLabels(ctx.filters)["profile_id"];
@@ -49,6 +78,11 @@
         }
         return;
       }
+      if (ctx.measureName === "metric_cancelled_orders") {
+        cancelledContext = ctx;
+        cancelledOpen = true;
+        return;
+      }
       cellContext = ctx;
       listOpen = true;
     },
@@ -56,10 +90,13 @@
 
   setContext(ORDER_DRILLDOWN_CONTEXT, drilldownContext);
 
-  function handleOrderSelect(orderId: string) {
+  function handleOrderSelect(
+    orderId: string,
+    context: MeasureCellClickContext | null,
+  ) {
     selectedOrderId = orderId;
-    selectedAttributionModel = cellContext
-      ? extractCellLabels(cellContext.filters)["attribution_model"]
+    selectedAttributionModel = context
+      ? extractCellLabels(context.filters)["attribution_model"]
       : undefined;
     timelineOpen = true;
   }
@@ -82,6 +119,7 @@
   // if the user re-opens with a different cell. Modal 2's order_id stays
   // available until it closes too.
   $: if (!listOpen) cellContext = null;
+  $: if (!cancelledOpen) cancelledContext = null;
   $: if (!profileListOpen) profileListContext = null;
   $: if (!profileOpen) profileContext = null;
   $: if (!timelineOpen) {
@@ -96,7 +134,15 @@
   <OrderListModal
     bind:open={listOpen}
     {cellContext}
-    onSelectOrder={handleOrderSelect}
+    onSelectOrder={(orderId) => handleOrderSelect(orderId, cellContext)}
+  />
+{/if}
+
+{#if cancelledContext}
+  <CancelledOrderListModal
+    bind:open={cancelledOpen}
+    cellContext={cancelledContext}
+    onSelectOrder={(orderId) => handleOrderSelect(orderId, cancelledContext)}
   />
 {/if}
 

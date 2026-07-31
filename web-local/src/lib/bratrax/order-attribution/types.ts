@@ -78,3 +78,56 @@ export interface WinnerSummary {
   resolution_confidence: string | undefined;
   last_touch_weight: number | undefined;
 }
+
+export interface CancelledOrderItemRow
+  extends V1MetricsViewRowsResponseDataItem {
+  attribution_slice_id?: string;
+  attribution_model?: string;
+  attribution_weight?: number;
+  order_id?: string;
+  order_number?: string | number;
+  email?: string;
+  order_created_at?: string;
+  cancelled_at?: string;
+  cancel_reason?: string;
+  order_total?: number;
+  currency?: string;
+  line_item_id?: string;
+  product_title?: string;
+  variant_title?: string;
+  sku?: string;
+  quantity?: number;
+  unit_price?: number;
+  discount_amount?: number;
+  item_value?: number;
+  channel_group?: string;
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  adset?: string;
+  ad?: string;
+}
+
+export interface CancelledOrderItem {
+  line_item_id: string;
+  product_title?: string;
+  variant_title?: string;
+  sku?: string;
+  quantity: number;
+  unit_price: number;
+  discount_amount: number;
+  item_value: number;
+}
+
+export interface CancelledOrderGroup {
+  order_id: string;
+  order_number?: string | number;
+  email?: string;
+  order_created_at?: string;
+  cancelled_at?: string;
+  cancel_reason?: string;
+  order_total: number;
+  currency: string;
+  attribution_weight: number;
+  items: CancelledOrderItem[];
+}

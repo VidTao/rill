@@ -5,6 +5,7 @@
 // the drilldown isn't gated on) the cell stays inert — zero cost.
 
 import type { V1Expression } from "@rilldata/web-common/runtime-client";
+import type { Readable } from "svelte/store";
 
 export const ORDER_DRILLDOWN_CONTEXT = "bratrax:order-drilldown";
 
@@ -24,4 +25,7 @@ export interface MeasureCellClickContext {
 
 export interface OrderDrilldownContext {
   open: (ctx: MeasureCellClickContext) => void;
+  // Capability store supplied by web-local. Client-specific drilldowns only
+  // become interactive when their backing metrics view exists.
+  supportedMeasures: Readable<ReadonlySet<string>>;
 }
