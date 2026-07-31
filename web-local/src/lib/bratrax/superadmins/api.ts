@@ -645,3 +645,56 @@ export function resetPassword(
     body: JSON.stringify({ token, new_password: newPassword }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Attribution stats — fleet-wide Direct-channel share (Client stats tab)
+// ---------------------------------------------------------------------------
+// Read-only view over rill_attribution_stats, which a 4-hourly Flask job fills
+// by querying each active client's cross_metrics_v1. The percentages arrive
+// pre-computed and pre-sorted worst-first from the API; nulls mean "no
+// attributed orders in that window" (or a failed query, see `error`) rather
+// than a genuine 0%.
+// ---------------------------------------------------------------------------
+
+export interface AttributionStatRow {
+  client_id: string;
+  company_name: string;
+  clickhouse_db: string;
+  computed_at: string | null;
+  attributed_orders_7d: number | null;
+  direct_orders_7d: number | null;
+  attributed_orders_30d: number | null;
+  direct_orders_30d: number | null;
+  attributed_orders_all: number | null;
+  direct_orders_all: number | null;
+  direct_pct_7d: number | null;
+  direct_pct_30d: number | null;
+  direct_pct_all: number | null;
+  error: string | null;
+}
+
+export interface AttributionStatsResponse {
+  stats: AttributionStatRow[];
+  last_computed_at: string | null;
+}
+
+export interface AttributionRecomputeResult {
+  clients_evaluated: number;
+  rows_written: number;
+  errors: number;
+  pruned: number;
+  skipped: string | null;
+}
+
+export function listAttributionStats(): Promise<AttributionStatsResponse> {
+  return apiFetch<AttributionStatsResponse>(
+    "/bratrax/superadmins/attribution-stats",
+  );
+}
+
+export function recomputeAttributionStats(): Promise<AttributionRecomputeResult> {
+  return apiFetch<AttributionRecomputeResult>(
+    "/bratrax/superadmins/attribution-stats/recompute-now",
+    { method: "POST" },
+  );
+}

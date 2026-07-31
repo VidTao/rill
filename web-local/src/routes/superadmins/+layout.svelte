@@ -6,6 +6,7 @@
   const TABS = [
     { href: "/superadmins", label: "Overview" },
     { href: "/superadmins/email-log", label: "Email log" },
+    { href: "/superadmins/client-stats", label: "Client stats" },
   ];
 
   // "Overview" matches /superadmins exactly; "Email log" matches the
