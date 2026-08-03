@@ -7,7 +7,7 @@ status: ready
 
 # Attribution
 
-Use **Attribution** when you want to know where sales came from and which channels, campaigns, ad sets, or ads deserve credit.
+Use [**Attribution**](https://bratrax.com/canvas/campaign_deep_dive) when you want to know where sales came from and which channels, campaigns, ad sets, or ads deserve credit.
 
 **Video walkthrough**
 

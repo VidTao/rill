@@ -14,5 +14,5 @@ It covers:
 - **Revenue and orders** — Revenue, AOV, Orders, Net Revenue
 - **Ad spend and efficiency** — ROAS, MER, CPA / CAC, CPM, CPC, CTR
 - **Customer** — LTV, new vs. returning, repeat rate, cohorts
-- **Attribution** — blended vs. platform-reported, first-touch vs. last-touch, lookback window
+- [**Attribution**](/help/viewer/attribution) — blended vs. platform-reported, first-touch vs. last-touch, lookback window
 - **Data freshness** — what "as of" means, how often Bratrax refreshes

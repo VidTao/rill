@@ -20,7 +20,8 @@ aeca0d86c03641ee959a15ca745d6f8b
 
 Settings is **not** where costs live. COGS, shipping, gateway fees, custom
 expenses, and ad-spend scoping have their own page — **Cost settings**, also in
-the SETTINGS dropdown. See [Cost settings & COGS](../../qa/setup/cogs-costs.md).
+the SETTINGS dropdown — open it at
+[bratrax.com/cost-settings](https://bratrax.com/cost-settings).
 
 ## The six tabs
 
@@ -48,14 +49,14 @@ You can't edit your own role or the workspace owner's.
 Read-only summary of your plan: price, billing interval, status, and current
 period end. **Manage Subscription** opens the external billing portal where
 you can update payment details or cancel. See
-[Billing & subscription](13-billing.md).
+[Billing & subscription](/help/admin/billing).
 
 ### AI
 
 Bring your own Anthropic API key to power Claude chat inside Bratrax. When you
 save a key, Bratrax verifies it with a live test call before storing it.
 Removing the key disables Claude chat for the whole workspace until a new one
-is added. See [AI chat & Anthropic API key](11-ai-and-api-keys.md).
+is added. See [AI chat & Anthropic API key](/help/admin/ai-and-api-keys).
 
 ### MCP
 
