@@ -55,6 +55,7 @@
   import ContinueSetupPill from "$lib/bratrax/onboarding/ContinueSetupPill.svelte";
   import WelcomeCard from "$lib/bratrax/onboarding/WelcomeCard.svelte";
   import MidOnboardingViewer from "$lib/bratrax/onboarding/MidOnboardingViewer.svelte";
+  import SupportChatSidebar from "$lib/bratrax/support-bot/SupportChatSidebar.svelte";
 
   export let data: LayoutData;
 
@@ -134,7 +135,9 @@
   // RILL_DEMO_CANVAS_NAMES in dashboardPrefs.ts.
   $: realCanvases = ($canvasListQuery?.data?.resources ?? []).filter((r) => {
     const name = r.meta?.name?.name;
-    return !isRillDemoCanvas(name) && (isSuper || !isInternalSuperadminCanvas(name));
+    return (
+      !isRillDemoCanvas(name) && (isSuper || !isInternalSuperadminCanvas(name))
+    );
   });
   $: dashboardTabs = mergeDashboardPrefs(realCanvases, $dashboardPrefs)
     .filter((m) => m.visible)
@@ -199,12 +202,7 @@
     { kind: "rill.runtime.v1.Canvas" },
     {
       query: {
-        queryKey: [
-          "bratrax-canvas-list",
-          canvasUserKey,
-          instanceId,
-          "Canvas",
-        ],
+        queryKey: ["bratrax-canvas-list", canvasUserKey, instanceId, "Canvas"],
         refetchOnMount: "always",
         staleTime: 0,
         // Warm-up poll: keep refetching every 2s while the runtime returns
@@ -221,7 +219,10 @@
           }[];
           const realCount = resources.filter((r) => {
             const name = r.meta?.name?.name;
-            return !isRillDemoCanvas(name) && (isSuper || !isInternalSuperadminCanvas(name));
+            return (
+              !isRillDemoCanvas(name) &&
+              (isSuper || !isInternalSuperadminCanvas(name))
+            );
           }).length;
           return realCount > 0 ? false : 2000;
         },
@@ -235,7 +236,12 @@
       const name = r.meta?.name?.name;
       // Skip Rill upstream demo dashboards so the DASHBOARDS link never
       // points at margin_scorecard / auction_explore / etc. during warm-up.
-      if (name && !isRillDemoCanvas(name) && (isSuper || !isInternalSuperadminCanvas(name))) return name;
+      if (
+        name &&
+        !isRillDemoCanvas(name) &&
+        (isSuper || !isInternalSuperadminCanvas(name))
+      )
+        return name;
     }
     return null;
   })();
@@ -390,6 +396,12 @@
           <MidOnboardingViewer />
         {:else}
           <slot />
+        {/if}
+
+        {#if $bratraxUser}
+          <!-- Support-bot panel (the "?" header button). Fixed-position, so it
+               can live here once instead of inside every page layout. -->
+          <SupportChatSidebar />
         {/if}
       </div>
     </OrderDrilldownProvider>

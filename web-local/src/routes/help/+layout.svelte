@@ -3,6 +3,7 @@
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import HelpSearch from "$lib/help/HelpSearch.svelte";
   import { pagesFor, type HelpPage } from "$lib/help";
+  import { supportChatActions } from "@rilldata/web-common/features/chat/layouts/sidebar/support-chat-store";
 
   $: role = $bratraxUser?.role ?? null;
   $: visiblePages = pagesFor(role);
@@ -33,6 +34,24 @@
       placeholder="Search help…"
       bind:query={searchQuery}
     />
+
+    {#if !searching}
+      <div class="nav-section">
+        <ul class="nav-list">
+          <li>
+            <!-- Opens the support-bot sidebar (same panel as the "?" header
+                 button) instead of navigating — one chat, two doors. -->
+            <button
+              type="button"
+              class="nav-link ask-link"
+              on:click={supportChatActions.open}
+            >
+              Ask support
+            </button>
+          </li>
+        </ul>
+      </div>
+    {/if}
 
     {#if !searching && viewerPages.length > 0}
       <div class="nav-section">
@@ -153,7 +172,10 @@
     color: var(--color-text);
     text-decoration: none;
     border-left: 2px solid transparent;
-    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+    transition:
+      background-color 0.15s,
+      color 0.15s,
+      border-color 0.15s;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -166,6 +188,22 @@
     background-color: var(--color-acid-mid);
     border-left-color: var(--color-acid);
     font-weight: 500;
+  }
+
+  .ask-link {
+    font-family: "Space Mono", monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--color-acid-text);
+    /* button reset — this entry is a <button>, its siblings are <a> */
+    width: 100%;
+    background: none;
+    border: none;
+    border-left: 2px solid transparent;
+    text-align: left;
+    cursor: pointer;
   }
 
   .status-tag {
