@@ -15,6 +15,10 @@
   } from "$lib/bratrax/onboarding/api";
   import { TERMS_OF_SERVICE_URL, PRIVACY_POLICY_URL } from "$lib/bratrax/constants";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
+  import {
+    trackOnce,
+    seedConnectedSourcesBaseline,
+  } from "$lib/bratrax/analytics";
 
   // Public entry for a store-locked, multi-use signup link. Unlike accept-invite
   // (prefilled, single-use email), the user types their OWN email; the link only
@@ -119,12 +123,16 @@
       const { user } = await bratraxLogin(value, password);
       bratraxUser.set(user);
       queryClient.clear();
+      // GA4 `sign_up` — consumeStoreSignupLink already created the account
+      // server-side; bratraxLogin just supplies the id to dedupe on.
+      trackOnce(`signup_${user.id}`, "sign_up", { method: "store_link" });
       // 3) Create the client, stamping the store lock so /onboard/store locks it.
       const started = await onboardStart(companyName.trim(), {
         lockedStore: store_platform,
       });
       sessionStorage.setItem("onboard_client_id", started.client_id);
       sessionStorage.setItem("onboard_client_name", started.client_name);
+      seedConnectedSourcesBaseline(started.client_id);
       await goto("/onboard/store");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);

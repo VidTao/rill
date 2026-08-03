@@ -18,6 +18,10 @@
     WAITLIST_TYPEFORM_URL,
   } from "$lib/bratrax/constants";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
+  import {
+    trackOnce,
+    seedConnectedSourcesBaseline,
+  } from "$lib/bratrax/analytics";
 
   let email = "";
   let password = "";
@@ -136,12 +140,25 @@
       bratraxUser.set(user);
       queryClient.clear();
 
+      // GA4 `sign_up`. Fired here — after bratraxSignup resolved, BEFORE
+      // onboardStart — because the user row provably exists now and the two
+      // calls share one try/catch: an onboardStart throw lands in `catch` with
+      // the account already created, and the conversion must not be lost.
+      // Exactly-once is structural: a double-submit races two requests, only one
+      // creates the account and the other 4xxs on "email exists", so this line
+      // is reached once. The guard is belt-and-braces.
+      trackOnce(`signup_${user.id}`, "sign_up", { method: "signup" });
+
       // Step 2: Create client + CH database + template
       const result = await onboardStart(companyName);
 
       // Store client_id for subsequent onboarding steps
       sessionStorage.setItem("onboard_client_id", result.client_id);
       sessionStorage.setItem("onboard_client_name", result.client_name);
+      // Brand-new client ⇒ zero connected sources. Recording that baseline is
+      // what lets trackConnectedSources() report the first Shopify connect
+      // instead of mistaking it for one that already existed.
+      seedConnectedSourcesBaseline(result.client_id);
 
       // Redirect to Connect your store (Screen 2)
       await goto("/onboard/store");

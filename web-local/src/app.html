@@ -1,6 +1,73 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!--
+      Google Analytics 4 — property G-Q78FNCB1BH. Spec:
+      bratrax/docs/ANALYTICS_IMPLEMENTATION.md. ONE property covers bratrax.com
+      and every subdomain (blog, join/Lemon Squeezy) so visit → signup →
+      checkout → onboarding stitches into a single session. The default
+      cookie_domain 'auto' writes _ga on .bratrax.com, which is why no
+      cross-domain config is needed (and why adding it would be harmful).
+
+      FIRST in <head> deliberately: a classic inline script is parser-blocking
+      and waits on any preceding <link rel=stylesheet>, so anything placed below
+      the Google Fonts link is gated on a third-party round-trip.
+
+      Hardcoded, not env-plumbed. SvelteKit's env placeholders only accept names
+      matching kit.env.publicPrefix ('PUBLIC_'), which svelte.config.js does not
+      configure — and it hard-errors at build time on any other prefix, so that
+      route is a non-starter here. import.meta.env is unavailable in this file
+      (it is not a Vite-transformed module), and adapter-static would substitute
+      at build time anyway, where no .env exists: cf. initPylonWidget.ts, which
+      loads widget/undefined today for exactly that reason.
+
+      Suppressed off *.bratrax.com so `vite dev` and Playwright never reach the
+      property. Escape hatches:
+        localStorage.bratrax_ga_force = "1"  → load anyway (local verification)
+        ?ga_debug=1 / localStorage.bratrax_ga_debug = "1" → GA4 DebugView
+    -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <script>
+      (function () {
+        var ID = "G-Q78FNCB1BH";
+        var h = location.hostname;
+        var isProd = h === "bratrax.com" || h.slice(-13) === ".bratrax.com";
+        var force = false;
+        var debug = false;
+        try {
+          force = localStorage.getItem("bratrax_ga_force") === "1";
+          debug =
+            localStorage.getItem("bratrax_ga_debug") === "1" ||
+            /(^|[?&])ga_debug=1(&|$)/.test(location.search);
+        } catch (e) {
+          // localStorage unavailable — fall through with defaults.
+        }
+        if (!isProd && !force) {
+          console.info(
+            "[ga4] suppressed on " +
+              h +
+              " (set localStorage.bratrax_ga_force='1' to override)",
+          );
+          return;
+        }
+
+        window.dataLayer = window.dataLayer || [];
+        // MUST assign to window: a bare `function gtag()` here would be
+        // function-scoped, so window.gtag would stay undefined and every helper
+        // in lib/bratrax/analytics.ts would no-op forever, silently.
+        window.gtag = function () {
+          window.dataLayer.push(arguments);
+        };
+        gtag("js", new Date());
+        gtag("config", ID, debug ? { debug_mode: true } : {});
+
+        var s = document.createElement("script");
+        s.async = true;
+        s.src = "https://www.googletagmanager.com/gtag/js?id=" + ID;
+        (document.head || document.documentElement).appendChild(s);
+      })();
+    </script>
+
     <!-- Bratrax fonts (Outfit, DM Serif Display, Space Mono) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

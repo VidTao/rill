@@ -16,6 +16,10 @@
     PRIVACY_POLICY_URL,
   } from "$lib/bratrax/constants";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
+  import {
+    trackOnce,
+    seedConnectedSourcesBaseline,
+  } from "$lib/bratrax/analytics";
 
   let invite: InvitationPreview | null = null;
   let loadError = "";
@@ -120,6 +124,11 @@
         const { user } = await bratraxLogin(result.email, password);
         bratraxUser.set(user);
         queryClient.clear();
+        // GA4 `sign_up`: only kind === "signup" creates a new customer account.
+        // kind === "demo" (below) is a viewer on the shared demo client, and
+        // team/superadmin invites (the fall-through to /login?invited=1) add a
+        // user to an EXISTING account. Neither is a signup.
+        trackOnce(`signup_${user.id}`, "sign_up", { method: "invite" });
         // Forward requires_payment from the accept response so the new
         // rill_clients row is stamped with the right is_paid_subscriber. If
         // the invite was inceptly (requires_payment=false), the user skips
@@ -136,6 +145,7 @@
         );
         sessionStorage.setItem("onboard_client_id", started.client_id);
         sessionStorage.setItem("onboard_client_name", started.client_name);
+        seedConnectedSourcesBaseline(started.client_id);
         // Layout's resume-onboarding logic will redirect to /onboard/payment
         // for paying users (step=payment_pending) or stay on /onboard/store
         // for inceptly users (step=created).

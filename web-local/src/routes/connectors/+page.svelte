@@ -20,6 +20,7 @@
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
   import { getAuthConfig } from "$lib/bratrax/auth";
   import ConnectorPill from "$lib/bratrax/connectors/ConnectorPill.svelte";
+  import { trackConnectedSources } from "$lib/bratrax/analytics";
   import WooTrackingInstall from "$lib/bratrax/onboarding/WooTrackingInstall.svelte";
   import {
     fetchSyncStatus,
@@ -357,6 +358,12 @@
     for (const p of connectedFromStackSelections(stackSelections)) next.add(p);
     connectedPlatforms = next;
     connectedAt = dates;
+
+    // GA4 `data_source_connected` — post-onboarding connects land here rather
+    // than on /onboard/stack. See trackConnectedSources(); a client with no
+    // recorded baseline stays silent, so this never retro-fires for the sources
+    // an established workspace connected months ago.
+    trackConnectedSources(clientId, [...next]);
 
     // Open the store gate HERE, not at the end of this function: everything
     // below is informational and awaits two more round trips (verifyEmbedStatus

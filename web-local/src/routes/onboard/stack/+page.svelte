@@ -20,6 +20,7 @@
   import OutbrainLoginModal from "../../connectors/OutbrainLoginModal.svelte";
   import BloomreachCredentialModal from "../../connectors/BloomreachCredentialModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
+  import { trackConnectedSources } from "$lib/bratrax/analytics";
 
   // ---------------------------------------------------------------------------
   // Onboarding-time tracking-template flows (paused — pending team alignment)
@@ -548,6 +549,11 @@
     connectedPlatforms = next;
     connectedAt = dates;
     storeResolved = true;
+
+    // GA4 `data_source_connected` — one hook for every connect path, because all
+    // of them (popup OAuth, the four redirect-OAuth returns, WooCommerce,
+    // Funnelish) terminate here. See trackConnectedSources().
+    trackConnectedSources(clientId, [...next]);
 
     // If any external-pages builder (Funnelish, …) is connected, default
     // the "pages" radio to "I have external landing pages" on hard refresh

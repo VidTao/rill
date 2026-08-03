@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
   import { getAuthConfig } from "$lib/bratrax/auth";
   import { onboardMe } from "$lib/bratrax/onboarding/api";
+  import { trackOnce } from "$lib/bratrax/analytics";
 
   // Store-provider chooser. Shopify is connectable by everyone. WooCommerce is
   // gated behind the ALLOW_WOOCOMMERCE env flag (surfaced via /bratrax/auth/config)
@@ -27,6 +28,28 @@
     // (stack_selections.locked_store_platform, stamped at onboard_start).
     try {
       const me = await onboardMe();
+
+      // GA4 `onboarding_started` — the spec's "connect-your-data-sources step".
+      // /onboard/store, not /onboard/stack: the spec's own verification sequence
+      // puts this event immediately after the join.bratrax.com (Lemon Squeezy)
+      // page_view, and this is the screen right after checkout. That also makes
+      // the sign_up → onboarding_started gap measure the PAYMENT drop-off, which
+      // is the split the funnel exists to expose. To move it to /onboard/stack,
+      // delete this block and add the same call in that page's
+      // refreshFromServer(), gated on step === "platforms_connected" and
+      // !isOAuthBounce.
+      //
+      // Gated on the SERVER step, not just the local guard: step === "created"
+      // is exactly "paid or payment-exempt, no store connected yet" — the only
+      // state in which this screen is the first onboarding step. It excludes the
+      // re-entry path in routes/+layout.ts that whitelists /onboard/store for
+      // step === "ready" clients reconnecting Shopify from /connectors, which
+      // would otherwise emit this event years after onboarding on any browser
+      // that never had the localStorage guard written.
+      if (me?.client_id && me.step === "created") {
+        trackOnce(`onboarding_started_${me.client_id}`, "onboarding_started");
+      }
+
       const locked = (me?.stack_selections as Record<string, unknown> | undefined)?.[
         "locked_store_platform"
       ];
