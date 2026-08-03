@@ -227,7 +227,7 @@ a real person reads every email.
 
 ---
 
-**That's the tour.** Recent data lands within minutes of connecting; your full
+**That's the tour.** Recent data lands within minutes of connecting; your
 history backfills in the background over the first hours-to-days (progress on
 the Connectors page). Tomorrow morning: open Store Performance, check the
 health line, and ask one question you'd normally export a spreadsheet for.
