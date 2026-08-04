@@ -87,7 +87,10 @@
           on:click={() => pick(r)}
           class="flex items-start justify-between gap-4 border border-bratrax-border bg-bratrax-bg p-4 text-left transition hover:border-bratrax-acid"
         >
-          <div class="flex flex-col">
+          <!-- min-w-0 lets the note column absorb the width instead of pushing
+               the CTA; shrink-0 + whitespace-nowrap keep "Connect →" on one
+               line however many countries a region lists. -->
+          <div class="flex min-w-0 flex-col">
             <span class="font-bold text-bratrax-text-headline">{r.name}</span>
             <span
               class="mt-1 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted"
@@ -96,7 +99,7 @@
             </span>
           </div>
           <span
-            class="self-center font-mono text-[10px] uppercase tracking-[2px] text-bratrax-acid"
+            class="shrink-0 self-center whitespace-nowrap font-mono text-[10px] uppercase tracking-[2px] text-bratrax-acid"
           >
             Connect →
           </span>
