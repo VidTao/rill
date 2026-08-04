@@ -17,6 +17,7 @@
   import TaboolaCredentialModal from "./TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "./OutbrainLoginModal.svelte";
   import BloomreachCredentialModal from "./BloomreachCredentialModal.svelte";
+  import AmazonRegionModal from "$lib/bratrax/onboarding/AmazonRegionModal.svelte";
   import TrackingTemplateGuide from "$lib/bratrax/TrackingTemplateGuide.svelte";
   import { getAuthConfig } from "$lib/bratrax/auth";
   import ConnectorPill from "$lib/bratrax/connectors/ConnectorPill.svelte";
@@ -40,10 +41,10 @@
   // ---------------------------------------------------------------------------
   // Platform registry
   //
-  // Only the 4 platforms migrated to the new rill_onboarding_state surface are
-  // active. Pinterest / Amazon / Shopify / Outbrain remain commented out for
-  // re-enablement one-by-one as their backends migrate off the legacy
-  // bratrax_advertising_connections + bratrax_user_platform_credentials path.
+  // Every entry here is migrated to the new rill_onboarding_state surface
+  // (stack_selections.{id}_credentials + connected_platforms). Nothing in this
+  // registry still touches the legacy bratrax_advertising_connections /
+  // bratrax_user_platform_credentials path.
   // ---------------------------------------------------------------------------
   interface Platform {
     id: string; // matches connected_platforms[].platform + stack_selections key prefix
@@ -53,8 +54,11 @@
     // "I've installed it" in the snippet modal. "credential_modal" opens a
     // username/password (or client_id/secret) form whose submit triggers a
     // direct credential→token exchange on the backend (Taboola, Outbrain).
+    // "oauth_region" is "oauth" plus a region picker shown first, because
+    // Amazon SP-API's consent host differs per region and can't be discovered.
     type:
       | "oauth"
+      | "oauth_region"
       | "client_sdk"
       | "shopify"
       | "snippet_install"
@@ -132,6 +136,20 @@
       color: "#EE6E33",
     },
     {
+      id: "amazon_ads",
+      name: "Amazon Ads",
+      type: "oauth",
+      authUrlPath: "/bratrax/onboard/amazon-ads/auth-url",
+      color: "#FF9900",
+    },
+    {
+      id: "amazon_sp",
+      name: "Amazon Seller Central",
+      type: "oauth_region",
+      authUrlPath: "/bratrax/onboard/amazon-sp/auth-url",
+      color: "#FF9900",
+    },
+    {
       id: "external_pages",
       name: "External Landing Pages",
       type: "snippet_install",
@@ -139,7 +157,7 @@
     },
 
     // --- Re-enable as each platform is migrated to rill_onboarding_state ---
-    // { id: "amazon_ads",    name: "Amazon Ads",  type: "oauth", authUrlPath: "/bratrax/connectors/amazon-ads/auth-url",  color: "#FF9900" },
+    // (Amazon Ads + Amazon Seller Central migrated 2026-08-04.)
   ];
 
   // WooCommerce is gated behind the ALLOW_WOOCOMMERCE env flag (Go proxy,
@@ -290,6 +308,8 @@
   // connected_platforms (e.g. "funnelish"); the umbrella card is "connected"
   // when any underlying builder is connected.
   let showBuilderPickerModal = false;
+  // Amazon SP-API needs its region chosen before the redirect.
+  let showAmazonRegionModal = false;
   let showFunnelishModal = false;
 
   // Credential-modal state for Taboola / Outbrain. Each modal owns its
@@ -465,7 +485,7 @@
   // is set to /connectors so the dispatcher in /onboard/stack bounces here
   // after Klaviyo / TikTok complete).
   // ---------------------------------------------------------------------------
-  async function handleOAuthConnect(platform: Platform) {
+  async function handleOAuthConnect(platform: Platform, extraQuery = "") {
     if (isConnected(platform.id)) return;
     if (!platform.authUrlPath) return;
     error = "";
@@ -473,7 +493,7 @@
 
     try {
       const host = get(runtime).host;
-      const res = await fetch(`${host}${platform.authUrlPath}`, {
+      const res = await fetch(`${host}${platform.authUrlPath}${extraQuery}`, {
         credentials: "include",
       });
       if (!res.ok)
@@ -1127,6 +1147,10 @@
       handleShopifyConnect();
     } else if (platform.type === "snippet_install") {
       openBuilderPickerModal();
+    } else if (platform.type === "oauth_region") {
+      if (isConnected(platform.id)) return;
+      error = "";
+      showAmazonRegionModal = true;
     } else if (platform.type === "credential_modal") {
       error = "";
       if (platform.id === "taboola") {
@@ -1142,6 +1166,15 @@
     } else {
       handleOAuthConnect(platform);
     }
+  }
+
+  function handleAmazonRegionPicked(
+    e: CustomEvent<{ region: "na" | "eu" | "fe" }>,
+  ) {
+    showAmazonRegionModal = false;
+    const amazonSp = platforms.find((p) => p.id === "amazon_sp");
+    if (!amazonSp) return;
+    handleOAuthConnect(amazonSp, `?region=${e.detail.region}`);
   }
 
   function openBuilderPickerModal() {
@@ -1600,6 +1633,13 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if showAmazonRegionModal}
+  <AmazonRegionModal
+    on:select={handleAmazonRegionPicked}
+    on:close={() => (showAmazonRegionModal = false)}
+  />
 {/if}
 
 {#if showBuilderPickerModal}

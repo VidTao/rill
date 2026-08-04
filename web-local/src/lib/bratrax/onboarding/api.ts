@@ -108,6 +108,8 @@ const CRED_KEY_TO_PLATFORM: Record<string, string> = {
   bloomreach_credentials: "bloomreach",
   bing_ads_credentials: "bing_ads",
   pinterest_ads_credentials: "pinterest_ads",
+  amazon_ads_credentials: "amazon_ads",
+  amazon_sp_credentials: "amazon_sp",
   taboola_credentials: "taboola",
   outbrain_credentials: "outbrain",
   funnelish_credentials: "funnelish",

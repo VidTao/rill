@@ -19,6 +19,7 @@
   import TaboolaCredentialModal from "../../connectors/TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "../../connectors/OutbrainLoginModal.svelte";
   import BloomreachCredentialModal from "../../connectors/BloomreachCredentialModal.svelte";
+  import AmazonRegionModal from "$lib/bratrax/onboarding/AmazonRegionModal.svelte";
   import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
   import { trackConnectedSources } from "$lib/bratrax/analytics";
 
@@ -52,9 +53,12 @@
     // "credential_modal" opens an in-page form (Taboola, Outbrain) whose
     // submit triggers a direct credential→token exchange on the backend,
     // bypassing the OAuth redirect dance entirely.
+    // "oauth_region" is "oauth" plus a region picker shown first, because
+    // Amazon SP-API's consent host differs per region and can't be discovered.
     type:
       | "oauth"
       | "oauth_direct"
+      | "oauth_region"
       | "client_sdk"
       | "selection"
       | "coming_soon"
@@ -136,7 +140,27 @@
         {
           id: "amazon_ads",
           name: "Amazon Ads",
-          type: "coming_soon",
+          type: "oauth",
+          authUrlPath: "/bratrax/onboard/amazon-ads/auth-url",
+          color: "#FF9900",
+        },
+      ],
+    },
+    {
+      // Amazon Seller Central is a COMMERCE source, not an ad platform: per
+      // docs/lite/MVP_SPRINT.md Shopify stays revenue truth. It deliberately
+      // lives in its own category and is NOT in adPlatformIds, so connecting it
+      // alone can't satisfy the "≥1 ad platform" activation gate. It is also not
+      // in YOUR STORE — that section's suppressedStore/lockedStore state machine
+      // is hardcoded to the shopify↔woocommerce pair.
+      title: "MARKETPLACES",
+      subtitle: "Optional",
+      platforms: [
+        {
+          id: "amazon_sp",
+          name: "Amazon Seller Central",
+          type: "oauth_region",
+          authUrlPath: "/bratrax/onboard/amazon-sp/auth-url",
           color: "#FF9900",
         },
       ],
@@ -323,14 +347,14 @@
   // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------
-  async function handleOAuthConnect(platform: Platform) {
+  async function handleOAuthConnect(platform: Platform, extraQuery = "") {
     if (isConnected(platform.id)) return;
     error = "";
     loading = platform.id;
 
     try {
       const host = get(runtime).host;
-      const res = await fetch(`${host}${platform.authUrlPath}`, {
+      const res = await fetch(`${host}${platform.authUrlPath}${extraQuery}`, {
         credentials: "include",
       });
       if (!res.ok)
@@ -410,9 +434,15 @@
   let klaviyoState = "";
   let bingAdsState = "";
   let pinterestAdsState = "";
+  let amazonAdsState = "";
+  let amazonSpState = "";
   let taboolaState = "";
   let outbrainState = "";
   let bloomreachState = "";
+
+  // Amazon SP-API is the one connector whose /auth-url needs a region up front
+  // (the Seller Central consent host differs per region and isn't discoverable).
+  let showAmazonRegionModal = false;
 
   // Credential-modal state (Taboola / Outbrain). Mirrors the pattern on
   // /connectors — modal stays open on error so the user can retry without
@@ -573,9 +603,13 @@
     //    awaits. If the URL has an OAuth-callback param AND the originating
     //    page wants us to bounce somewhere else, hide the build-your-stack UI
     //    so the user only sees the AccountSelectionModal during the flash.
+    // Amazon SP-API names its callback param `spapi_oauth_code`, not `code` —
+    // without it here, an SP-API return renders the whole build-your-stack UI
+    // mid-flow instead of the "Completing connection…" spinner.
     const hasCallback =
       $page.url.searchParams.has("code") ||
-      $page.url.searchParams.has("auth_code");
+      $page.url.searchParams.has("auth_code") ||
+      $page.url.searchParams.has("spapi_oauth_code");
     const returnTo = sessionStorage.getItem("onboard_oauth_return");
     isOAuthBounce =
       hasCallback && returnTo !== null && returnTo !== "/onboard/stack";
@@ -633,6 +667,8 @@
       sessionStorage.removeItem("bing_ads_oauth_state");
       sessionStorage.removeItem("klaviyo_oauth_state");
       sessionStorage.removeItem("tiktok_ads_oauth_state");
+      sessionStorage.removeItem("amazon_ads_oauth_state");
+      sessionStorage.removeItem("amazon_sp_oauth_state");
       sessionStorage.removeItem("onboard_oauth_return");
       sessionStorage.removeItem("onboard_oauth_platform");
       isOAuthBounce = false;
@@ -715,6 +751,41 @@
       expectedPinterestState === pinterestStateParam
     ) {
       await handlePinterestReturn(pinterestCode, pinterestStateParam);
+    }
+
+    // 3e. Amazon Ads redirects back with ?code=…&state=… (same param names as
+    //     Klaviyo/Bing/Pinterest). Disambiguated by the state-key match.
+    const amazonAdsCode = $page.url.searchParams.get("code");
+    const amazonAdsStateParam = $page.url.searchParams.get("state");
+    const expectedAmazonAdsState = sessionStorage.getItem(
+      "amazon_ads_oauth_state",
+    );
+    if (
+      amazonAdsCode &&
+      amazonAdsStateParam &&
+      expectedAmazonAdsState === amazonAdsStateParam
+    ) {
+      await handleAmazonAdsReturn(amazonAdsCode, amazonAdsStateParam);
+    }
+
+    // 3f. Amazon SP-API redirects back with ?spapi_oauth_code=…&state=…
+    //     &selling_partner_id=…. The distinct param name means it can't collide
+    //     with the ?code= handlers, but verify the state key anyway.
+    const amazonSpCode = $page.url.searchParams.get("spapi_oauth_code");
+    const amazonSpStateParam = $page.url.searchParams.get("state");
+    const expectedAmazonSpState = sessionStorage.getItem(
+      "amazon_sp_oauth_state",
+    );
+    if (
+      amazonSpCode &&
+      amazonSpStateParam &&
+      expectedAmazonSpState === amazonSpStateParam
+    ) {
+      await handleAmazonSpReturn(
+        amazonSpCode,
+        amazonSpStateParam,
+        $page.url.searchParams.get("selling_partner_id"),
+      );
     }
 
     // 4. Load Google Identity Services SDK (Google Ads popup OAuth).
@@ -872,10 +943,14 @@
     url.searchParams.delete("code");
     url.searchParams.delete("state");
     window.history.replaceState({}, "", url.toString());
+    url.searchParams.delete("spapi_oauth_code");
+    url.searchParams.delete("selling_partner_id");
     sessionStorage.removeItem("pinterest_ads_oauth_state");
     sessionStorage.removeItem("bing_ads_oauth_state");
     sessionStorage.removeItem("klaviyo_oauth_state");
     sessionStorage.removeItem("tiktok_ads_oauth_state");
+    sessionStorage.removeItem("amazon_ads_oauth_state");
+    sessionStorage.removeItem("amazon_sp_oauth_state");
     sessionStorage.removeItem("onboard_oauth_platform");
     const where = sessionStorage.getItem("onboard_oauth_return");
     sessionStorage.removeItem("onboard_oauth_return");
@@ -933,6 +1008,112 @@
     } catch (e) {
       // No ad accounts / token failure / etc. — surface it and leave the
       // spinner instead of hanging on "Completing connection…".
+      bounceOutOfOAuth(e instanceof Error ? e.message : String(e));
+    } finally {
+      loading = "";
+    }
+  }
+
+  async function handleAmazonAdsReturn(code: string, state: string) {
+    error = "";
+    loading = "amazon_ads";
+    try {
+      const host = get(runtime).host;
+      const res = await fetch(
+        `${host}/bratrax/onboard/amazon-ads/accounts?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          (body as { error?: string }).error ??
+            "Failed to list Amazon Ads accounts",
+        );
+      }
+      const body = (await res.json()) as {
+        state: string;
+        accounts: Array<{ id: string; name: string; group?: string }>;
+      };
+      amazonAdsState = body.state;
+      accountModalPlatform = "Amazon Ads";
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete("code");
+      url.searchParams.delete("state");
+      window.history.replaceState({}, "", url.toString());
+
+      const amzAccounts = body.accounts || [];
+      if (amzAccounts.length === 0) {
+        // No advertising profiles in any region — persist the token anyway so
+        // the card shows connected (same as Pinterest).
+        await handleAccountSelection([]);
+        return;
+      }
+
+      // `group` is the region label; AccountSelectionModal sections on it, so a
+      // seller advertising in several regions sees them grouped.
+      accountModalAccounts = amzAccounts.map((a) => ({
+        id: a.id,
+        name: a.name || a.id,
+        group: a.group,
+      }));
+      showAccountModal = true;
+    } catch (e) {
+      bounceOutOfOAuth(e instanceof Error ? e.message : String(e));
+    } finally {
+      loading = "";
+    }
+  }
+
+  async function handleAmazonSpReturn(
+    code: string,
+    state: string,
+    sellingPartnerId: string | null,
+  ) {
+    error = "";
+    loading = "amazon_sp";
+    try {
+      const host = get(runtime).host;
+      const sp = sellingPartnerId
+        ? `&selling_partner_id=${encodeURIComponent(sellingPartnerId)}`
+        : "";
+      const res = await fetch(
+        `${host}/bratrax/onboard/amazon-sp/accounts?spapi_oauth_code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}${sp}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          (body as { error?: string }).error ??
+            "Failed to list Amazon marketplaces",
+        );
+      }
+      const body = (await res.json()) as {
+        state: string;
+        accounts: Array<{ id: string; name: string; group?: string }>;
+      };
+      amazonSpState = body.state;
+      accountModalPlatform = "Amazon Seller";
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete("spapi_oauth_code");
+      url.searchParams.delete("selling_partner_id");
+      url.searchParams.delete("state");
+      window.history.replaceState({}, "", url.toString());
+
+      const mkts = body.accounts || [];
+      if (mkts.length === 0) {
+        await handleAccountSelection([]);
+        return;
+      }
+
+      accountModalAccounts = mkts.map((a) => ({
+        id: a.id,
+        name: a.name || a.id,
+        group: a.group,
+      }));
+      showAccountModal = true;
+    } catch (e) {
       bounceOutOfOAuth(e instanceof Error ? e.message : String(e));
     } finally {
       loading = "";
@@ -1520,6 +1701,8 @@
       const isOutbrain = accountModalPlatform === "Outbrain";
       const isPinterest = accountModalPlatform === "Pinterest";
       const isBloomreach = accountModalPlatform === "Bloomreach";
+      const isAmazonAds = accountModalPlatform === "Amazon Ads";
+      const isAmazonSp = accountModalPlatform === "Amazon Seller";
 
       let endpoint: string;
       let body: Record<string, unknown>;
@@ -1565,6 +1748,22 @@
           selectedAccounts: selected,
         };
         connectedKey = "pinterest_ads";
+      } else if (isAmazonAds) {
+        endpoint = `${host}/bratrax/onboard/amazon-ads/connect`;
+        body = {
+          state: amazonAdsState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "amazon_ads";
+      } else if (isAmazonSp) {
+        endpoint = `${host}/bratrax/onboard/amazon-sp/connect`;
+        body = {
+          state: amazonSpState,
+          client_id: clientId,
+          selectedAccounts: selected,
+        };
+        connectedKey = "amazon_sp";
       } else if (isKlaviyo) {
         endpoint = `${host}/bratrax/onboard/klaviyo/connect`;
         body = {
@@ -1798,9 +1997,24 @@
     }
   }
 
+  function handleAmazonRegionPicked(
+    e: CustomEvent<{ region: "na" | "eu" | "fe" }>,
+  ) {
+    showAmazonRegionModal = false;
+    const amazonSp = categories
+      .flatMap((c) => c.platforms)
+      .find((p) => p.id === "amazon_sp");
+    if (!amazonSp) return;
+    handleOAuthConnect(amazonSp, `?region=${e.detail.region}`);
+  }
+
   function handleCardClick(platform: Platform) {
     if (platform.type === "oauth") {
       handleOAuthConnect(platform);
+    } else if (platform.type === "oauth_region") {
+      if (isConnected(platform.id)) return;
+      error = "";
+      showAmazonRegionModal = true;
     } else if (platform.type === "oauth_direct") {
       handleDirectOAuth(platform);
     } else if (platform.type === "client_sdk") {
@@ -2063,6 +2277,13 @@
   <ExternalPagesBuilderPickerModal
     on:select={handleBuilderPicked}
     on:close={() => (showBuilderPickerModal = false)}
+  />
+{/if}
+
+{#if showAmazonRegionModal}
+  <AmazonRegionModal
+    on:select={handleAmazonRegionPicked}
+    on:close={() => (showAmazonRegionModal = false)}
   />
 {/if}
 
