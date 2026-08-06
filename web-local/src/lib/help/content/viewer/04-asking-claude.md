@@ -1,7 +1,8 @@
 ---
 title: Asking Claude
 audience: viewer
-order: 10
+order: 1
+group: going-deeper
 status: ready
 ---
 

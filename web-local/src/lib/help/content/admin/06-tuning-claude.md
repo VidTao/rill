@@ -1,7 +1,8 @@
 ---
 title: Tuning Claude
 audience: admin
-order: 6
+order: 4
+group: building
 status: ready
 ---
 

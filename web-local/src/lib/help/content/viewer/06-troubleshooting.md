@@ -1,7 +1,8 @@
 ---
 title: Troubleshooting
 audience: viewer
-order: 12
+order: 2
+group: going-deeper
 status: ready
 ---
 
@@ -71,7 +72,7 @@ If store data is more than about two hours stale — or other integrations more 
 
 One WooCommerce-specific cause: your site's firewall can silently block the
 order sync — an admin can fix it in a few minutes with
-[the firewall allowlist](/help/admin/connecting-accounts).
+[the firewall allowlist](/help/admin/connecting-platforms).
 
 ## The page won't load or is blank
 

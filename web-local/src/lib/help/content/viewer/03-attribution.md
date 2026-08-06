@@ -1,7 +1,8 @@
 ---
 title: Attribution
 audience: viewer
-order: 3
+order: 2
+group: dashboards
 status: ready
 ---
 

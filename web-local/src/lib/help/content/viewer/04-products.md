@@ -1,7 +1,8 @@
 ---
 title: Products
 audience: viewer
-order: 4
+order: 3
+group: dashboards
 status: ready
 ---
 

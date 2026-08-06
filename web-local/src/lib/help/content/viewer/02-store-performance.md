@@ -1,7 +1,8 @@
 ---
 title: Store Performance
 audience: viewer
-order: 2
+order: 1
+group: dashboards
 status: ready
 ---
 

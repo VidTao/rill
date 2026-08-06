@@ -2,6 +2,7 @@
 title: Welcome to Bratrax
 audience: viewer
 order: 1
+group: start-here
 status: ready
 ---
 

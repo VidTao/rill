@@ -2,6 +2,7 @@
 title: Admin overview
 audience: admin
 order: 1
+group: workspace
 status: ready
 ---
 

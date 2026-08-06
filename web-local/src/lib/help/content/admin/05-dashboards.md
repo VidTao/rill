@@ -1,7 +1,8 @@
 ---
 title: Canvas dashboards
 audience: admin
-order: 5
+order: 3
+group: building
 status: ready
 ---
 

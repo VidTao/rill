@@ -1,7 +1,8 @@
 ---
 title: Reading dashboards
 audience: viewer
-order: 8
+order: 3
+group: start-here
 status: ready
 ---
 

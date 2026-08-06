@@ -9,9 +9,46 @@
 export type Audience = "viewer" | "admin" | "shared";
 export type Status = "stub" | "draft" | "ready";
 
+/**
+ * Sidebar grouping, deliberately decoupled from `audience`.
+ *
+ * `audience` answers "who is allowed to read this"; `group` answers "where does
+ * it sit in the nav". Keeping them separate is what lets the guided tour
+ * (audience: shared, so it keeps its /help/start-here slug — see
+ * GETTING_STARTED_URL in lib/bratrax/constants.ts) open the "Start here" group
+ * instead of being exiled to Reference.
+ */
+export type HelpGroup =
+  | "start-here"
+  | "dashboards"
+  | "going-deeper"
+  | "workspace"
+  | "building"
+  | "reference";
+
+/** Render order + sidebar headings. */
+export const HELP_GROUPS: { id: HelpGroup; label: string }[] = [
+  { id: "start-here", label: "Start here" },
+  { id: "dashboards", label: "Your dashboards" },
+  { id: "going-deeper", label: "Going deeper" },
+  { id: "workspace", label: "Your workspace" },
+  { id: "building", label: "Building dashboards" },
+  { id: "reference", label: "Reference" },
+];
+
+const GROUP_IDS = new Set<string>(HELP_GROUPS.map((g) => g.id));
+
+/** Fallback for an entry with no (or an unknown) `group`, by audience. */
+function defaultGroup(audience: Audience): HelpGroup {
+  if (audience === "admin") return "workspace";
+  if (audience === "shared") return "reference";
+  return "going-deeper";
+}
+
 export interface HelpFrontmatter {
   title: string;
   audience: Audience;
+  group: HelpGroup;
   order: number;
   status: Status;
 }
@@ -54,22 +91,47 @@ function pathToSlug(path: string): string {
     .replace(/(^|\/)\d+-/, "$1");
 }
 
+const GROUP_RANK = new Map(HELP_GROUPS.map((g, i) => [g.id, i]));
+
 export const HELP_PAGES: HelpPage[] = Object.entries(RAW_MODULES)
   .map(([path, raw]) => {
     const { fm, body } = parseFrontmatter(raw);
+    const audience = (fm.audience ?? "shared") as Audience;
+    const group =
+      fm.group && GROUP_IDS.has(fm.group)
+        ? (fm.group as HelpGroup)
+        : defaultGroup(audience);
     return {
       slug: pathToSlug(path),
       title: fm.title ?? "Untitled",
-      audience: (fm.audience ?? "shared") as Audience,
+      audience,
+      group,
       order: fm.order ?? 999,
       status: (fm.status ?? "stub") as Status,
       body,
     };
   })
   .sort((a, b) => {
-    if (a.audience !== b.audience) return a.audience.localeCompare(b.audience);
-    return a.order - b.order;
+    const ga = GROUP_RANK.get(a.group) ?? 99;
+    const gb = GROUP_RANK.get(b.group) ?? 99;
+    if (ga !== gb) return ga - gb;
+    if (a.order !== b.order) return a.order - b.order;
+    // Stable tie-break so a duplicated `order` can never reorder the sidebar
+    // between builds (the old sort left ties to glob iteration order).
+    return a.title.localeCompare(b.title);
   });
+
+/** Pages the given role may see, bucketed into sidebar groups (empty groups dropped). */
+export function groupedPagesFor(
+  role: "viewer" | "admin" | "super_admin" | null,
+): { id: HelpGroup; label: string; pages: HelpPage[] }[] {
+  const visible = pagesFor(role);
+  return HELP_GROUPS.map(({ id, label }) => ({
+    id,
+    label,
+    pages: visible.filter((p) => p.group === id),
+  })).filter((g) => g.pages.length > 0);
+}
 
 const BY_SLUG = new Map(HELP_PAGES.map((p) => [p.slug, p]));
 

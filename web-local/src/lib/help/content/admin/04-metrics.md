@@ -1,7 +1,8 @@
 ---
 title: Metrics views
 audience: admin
-order: 4
+order: 2
+group: building
 status: ready
 ---
 

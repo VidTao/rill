@@ -1,7 +1,8 @@
 ---
 title: Settings
 audience: admin
-order: 14
+order: 5
+group: workspace
 status: ready
 ---
 

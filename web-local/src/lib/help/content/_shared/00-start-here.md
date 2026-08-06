@@ -1,11 +1,12 @@
 ---
-title: Start here: your first hour with Bratrax
+title: "Your first hour: guided video tour"
 audience: shared
-order: 0
+order: 2
+group: start-here
 status: ready
 ---
 
-# Start here: your first hour with Bratrax
+# Your first hour: guided video tour
 
 New to Bratrax? This guided path takes you around the whole app in about
 20 minutes of short videos. Each step has three parts: **watch** a 1–2 minute

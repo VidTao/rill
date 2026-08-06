@@ -2,15 +2,15 @@
   import { page } from "$app/stores";
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import HelpSearch from "$lib/help/HelpSearch.svelte";
-  import { pagesFor, type HelpPage } from "$lib/help";
+  import { groupedPagesFor, pagesFor, type HelpPage } from "$lib/help";
   import { supportChatActions } from "@rilldata/web-common/features/chat/layouts/sidebar/support-chat-store";
 
   $: role = $bratraxUser?.role ?? null;
   $: visiblePages = pagesFor(role);
 
-  $: viewerPages = visiblePages.filter((p) => p.audience === "viewer");
-  $: adminPages = visiblePages.filter((p) => p.audience === "admin");
-  $: sharedPages = visiblePages.filter((p) => p.audience === "shared");
+  // Sidebar sections come from each page's `group`, not its `audience` — see
+  // the HelpGroup docs in $lib/help.
+  $: navGroups = groupedPagesFor(role);
 
   $: currentSlug = $page.url.pathname.replace(/^\/help\/?/, "");
 
@@ -53,70 +53,28 @@
       </div>
     {/if}
 
-    {#if !searching && viewerPages.length > 0}
-      <div class="nav-section">
-        <div class="nav-header">For everyone</div>
-        <ul class="nav-list">
-          {#each viewerPages as p (p.slug)}
-            <li>
-              <a
-                class="nav-link"
-                class:active={isActive(p)}
-                href="/help/{p.slug}"
-              >
-                {p.title}
-                {#if p.status === "stub"}
-                  <span class="status-tag">stub</span>
-                {/if}
-              </a>
-            </li>
-          {/each}
-        </ul>
-      </div>
-    {/if}
-
-    {#if !searching && adminPages.length > 0}
-      <div class="nav-section">
-        <div class="nav-header">For admins</div>
-        <ul class="nav-list">
-          {#each adminPages as p (p.slug)}
-            <li>
-              <a
-                class="nav-link"
-                class:active={isActive(p)}
-                href="/help/{p.slug}"
-              >
-                {p.title}
-                {#if p.status === "stub"}
-                  <span class="status-tag">stub</span>
-                {/if}
-              </a>
-            </li>
-          {/each}
-        </ul>
-      </div>
-    {/if}
-
-    {#if !searching && sharedPages.length > 0}
-      <div class="nav-section">
-        <div class="nav-header">Reference</div>
-        <ul class="nav-list">
-          {#each sharedPages as p (p.slug)}
-            <li>
-              <a
-                class="nav-link"
-                class:active={isActive(p)}
-                href="/help/{p.slug}"
-              >
-                {p.title}
-                {#if p.status === "stub"}
-                  <span class="status-tag">stub</span>
-                {/if}
-              </a>
-            </li>
-          {/each}
-        </ul>
-      </div>
+    {#if !searching}
+      {#each navGroups as g (g.id)}
+        <div class="nav-section">
+          <div class="nav-header">{g.label}</div>
+          <ul class="nav-list">
+            {#each g.pages as p (p.slug)}
+              <li>
+                <a
+                  class="nav-link"
+                  class:active={isActive(p)}
+                  href="/help/{p.slug}"
+                >
+                  {p.title}
+                  {#if p.status === "stub"}
+                    <span class="status-tag">stub</span>
+                  {/if}
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/each}
     {/if}
   </nav>
 
