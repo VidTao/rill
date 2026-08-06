@@ -268,3 +268,40 @@ func TestMiddleware_ShopifySession_DoesNotAffectBadBearer(t *testing.T) {
 	require.False(t, capture.called)
 	require.Contains(t, rec.Body.String(), "invalid or expired token")
 }
+
+// ResolveClientFromCookie is what InstanceRouterMiddleware uses to pick which
+// Rill instance a request reads from. If it can't resolve an embedded session,
+// the request silently falls through to the empty "default" instance and the
+// embedded dashboard renders with no data — authenticated, but blank.
+func TestResolveClientFromCookie_ShopifySession(t *testing.T) {
+	mapper, userStore, clientStore, _ := setupShopifyMapper(t)
+
+	clientID := "cod"
+	clientStore.shopMap = map[string]*Client{
+		testShop: {ClientID: clientID, ClickhouseDB: "cod_db"},
+	}
+	userStore.users[0].ClientID = &clientID
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/instances/default/resources", nil)
+	req.Header.Set("Authorization", "Bearer "+mintSessionToken(t, nil, testShopifySecret))
+
+	user, client, err := mapper.ResolveClientFromCookie(req)
+	require.NoError(t, err)
+	require.NotNil(t, user, "embedded session must resolve a user")
+	require.NotNil(t, client, "embedded session must resolve a client")
+	require.Equal(t, clientID, client.ClientID)
+	require.Equal(t, "cod_db", client.ClickhouseDB)
+}
+
+func TestResolveClientFromCookie_ShopifySessionUnlinkedShop(t *testing.T) {
+	mapper, _, clientStore, _ := setupShopifyMapper(t)
+	clientStore.shopMap = map[string]*Client{}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/instances/default/resources", nil)
+	req.Header.Set("Authorization", "Bearer "+mintSessionToken(t, nil, testShopifySecret))
+
+	user, client, err := mapper.ResolveClientFromCookie(req)
+	require.NoError(t, err)
+	require.Nil(t, user)
+	require.Nil(t, client)
+}
