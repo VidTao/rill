@@ -155,8 +155,17 @@ export async function load({ url, depends, untrack, fetch }) {
   // must be able to reach their account settings and help. The minimal nav in
   // the root layout surfaces them; this exemption stops the resume-redirect
   // below from bouncing the user straight back into /onboard/*.
+  // /embed/* is the Shopify-admin surface. A `ready` merchant landing there
+  // must not be bounced by the resume guard, and — more subtly — must not be
+  // bounced by the "fully-onboarded users typing /onboard/* get sent to
+  // /developer" rule either, since /developer is the full app shell and
+  // useless in an iframe. Treated like /settings and /help: reachable at any
+  // onboarding step, because the embedded dashboard is where an embedded
+  // merchant belongs regardless of where the funnel thinks they are.
   const isAlwaysAllowed =
-    url.pathname.startsWith("/settings") || url.pathname.startsWith("/help");
+    url.pathname.startsWith("/settings") ||
+    url.pathname.startsWith("/help") ||
+    url.pathname.startsWith("/embed");
 
   try {
     const me = await onboardMe();

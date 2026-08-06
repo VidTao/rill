@@ -1,5 +1,6 @@
 import { get } from "svelte/store";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+import { shopifyAuthHeader } from "../shopify-app-bridge";
 
 function getBaseUrl(): string {
   return get(runtime).host;
@@ -9,9 +10,18 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  // Inside the Shopify admin iframe, bratrax_auth is a third-party cookie and
+  // Safari blocks it outright — so embedded requests authenticate with a
+  // Shopify App Bridge session token instead. The Go proxy accepts either and
+  // injects identical identity headers downstream (bratrax/auth.go).
+  //
+  // Returns {} when not embedded, so every existing caller is byte-identical.
+  const authHeader = await shopifyAuthHeader();
+
   const res = await fetch(`${getBaseUrl()}${path}`, {
     credentials: "include",
     ...init,
+    headers: { ...(init?.headers ?? {}), ...authHeader },
   });
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
@@ -192,6 +202,13 @@ export async function onboardStart(
     requiresPayment?: boolean;
     isMultiStore?: boolean;
     lockedStore?: "shopify" | "woocommerce";
+    /**
+     * Token for a Shopify App Store install already parked in
+     * rill_shopify_pending_installs. When present the backend adopts that
+     * connection onto the new client, so the merchant skips /onboard/store —
+     * they connected their store before they had an account.
+     */
+    shopifyInstallToken?: string;
   } = {},
 ): Promise<OnboardStartResult> {
   // requires_payment defaults true on the backend, so we only send the field
@@ -211,6 +228,9 @@ export async function onboardStart(
   // + disables the other option (persisted in stack_selections.locked_store_platform).
   if (options.lockedStore) {
     body.locked_store_platform = options.lockedStore;
+  }
+  if (options.shopifyInstallToken) {
+    body.shopify_install_token = options.shopifyInstallToken;
   }
   return apiFetch<OnboardStartResult>("/bratrax/onboard/start", {
     method: "POST",
@@ -444,4 +464,24 @@ export interface PaymentStatusResult {
 
 export async function getPaymentStatus(): Promise<PaymentStatusResult> {
   return apiFetch<PaymentStatusResult>("/bratrax/onboard/payment/status");
+}
+
+// -------------------------------------------------------------------------
+// Embedded session hand-off ("Open in Bratrax")
+// -------------------------------------------------------------------------
+// Inside the Shopify admin iframe the merchant is authenticated by a Shopify
+// App Bridge session token, so there is no bratrax_auth cookie on this origin
+// — opening the full app in a new tab would land on /login. This mints a
+// single-use token; GET /auth/handoff (Go proxy) exchanges it for the real
+// cookie and redirects. 60-second TTL, so call it at click time, not ahead.
+
+export interface EmbedHandoffResult {
+  url: string;
+  expires_in: number;
+}
+
+export async function createEmbedHandoff(): Promise<EmbedHandoffResult> {
+  return apiFetch<EmbedHandoffResult>("/bratrax/auth/embed-handoff", {
+    method: "POST",
+  });
 }
