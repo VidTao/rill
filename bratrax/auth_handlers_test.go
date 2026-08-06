@@ -57,6 +57,16 @@ func (m *mockUserStore) GetByID(_ context.Context, id int) (*User, error) {
 	return nil, nil
 }
 
+func (m *mockUserStore) GetPrimaryUserForClient(_ context.Context, clientID string) (*User, error) {
+	for i := range m.users {
+		u := &m.users[i]
+		if u.Role == "admin" && u.ClientID != nil && *u.ClientID == clientID {
+			return u, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *mockUserStore) CreateUser(_ context.Context, email, password, name, role string, projectID *string) (*User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 	if err != nil {

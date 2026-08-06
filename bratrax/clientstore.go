@@ -40,6 +40,7 @@ type ClientStoreInterface interface {
 	GetAnthropicKey(ctx context.Context, clientDB string) (string, error)
 	GetByMCPToken(ctx context.Context, token string) (*Client, error)
 	GetByClientID(ctx context.Context, clientID string) (*Client, error)
+	GetByShopifyShop(ctx context.Context, shop string) (*Client, error)
 	ListAll(ctx context.Context) ([]Client, error)
 	ListAllWithAdminEmail(ctx context.Context) ([]ClientWithAdmin, error)
 	ListByMultiClientID(ctx context.Context, multiClientID string) ([]Client, error)
@@ -181,6 +182,42 @@ func (s *ClientStore) GetByClientID(ctx context.Context, clientID string) (*Clie
 			return nil, nil
 		}
 		return nil, fmt.Errorf("bratrax clientstore: query failed: %w", err)
+	}
+	return &c, nil
+}
+
+// GetByShopifyShop resolves the client that owns a myshopify domain. This is
+// the identity basis for Shopify App Bridge session tokens: the token proves
+// which shop the request came from, and this maps that shop to a tenant.
+//
+// The connection lives in rill_onboarding_state.stack_selections rather than a
+// column on rill_clients, because that is where both the Bratrax-first OAuth
+// callback and the App Store adoption path write it.
+//
+// A partial unique index (idx_onboarding_shopify_shop_unique) guarantees at
+// most one row per shop, so this cannot silently pick between tenants — a
+// duplicate would have to be introduced by bypassing both the index and the
+// move-semantics guard in onboarding._release_shop_from_other_clients.
+// Returns (nil, nil) when the shop has no client yet, which is the normal
+// state for an App Store install that has not been claimed.
+func (s *ClientStore) GetByShopifyShop(ctx context.Context, shop string) (*Client, error) {
+	if shop == "" {
+		return nil, nil
+	}
+	var c Client
+	err := s.db.GetContext(ctx, &c,
+		`SELECT c.client_id, c.company_name, c.clickhouse_db, c.rill_project_id,
+		        c.multi_client_id, c.created_at
+		   FROM rill_onboarding_state s
+		   JOIN rill_clients c ON c.client_id = s.client_id
+		  WHERE s.stack_selections->'shopify_credentials'->>'shop' = $1`,
+		shop,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("bratrax clientstore: shopify shop query failed: %w", err)
 	}
 	return &c, nil
 }

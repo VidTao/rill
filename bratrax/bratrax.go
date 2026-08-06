@@ -61,7 +61,8 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	clientStore := NewClientStore(store.DB())
 
 	proxy := NewProxy(cfg.TargetURL, logger)
-	authMapper := NewAuthMapper(store, clientStore, authSvc.JWKS(), logger, cfg.IssuerURL, cfg.AudienceURL)
+	authMapper := NewAuthMapper(store, clientStore, authSvc.JWKS(), logger, cfg.IssuerURL, cfg.AudienceURL).
+		WithShopifySessionAuth(cfg.ShopifyClientID, cfg.ShopifyClientSecret)
 
 	// Local health endpoint — confirms the proxy layer is alive.
 	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +121,16 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 		observability.Middleware("bratrax", logger, proxy))
 	observability.MuxHandle(mux, "GET /shopify/install/callback",
 		observability.Middleware("bratrax", logger, proxy))
+
+	// "Open in Bratrax" hand-off. A merchant inside the Shopify admin iframe is
+	// authenticated by an App Bridge session token and therefore has no
+	// bratrax_auth cookie on this origin, so a new tab would land on /login.
+	// Flask mints a single-use token; this exchanges it for the normal cookie.
+	// Unauthenticated by necessity — the token in `?t=` IS the credential — and
+	// outside the /bratrax/ prefix so the auth catch-all can't swallow it.
+	handoffSvc := NewEmbedHandoffService(store.DB(), authSvc, logger, cfg.SecureCookie)
+	observability.MuxHandle(mux, "GET /auth/handoff",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(handoffSvc.HandleHandoff)))
 
 	// WooCommerce wc-auth callback. The merchant's store POSTs the generated
 	// REST API key pair here server-to-server (no login cookie), so it must
