@@ -109,6 +109,18 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	observability.MuxHandle(mux, "GET /email/pause",
 		observability.Middleware("bratrax", logger, proxy))
 
+	// Shopify App Store install entry. A merchant clicking "Install" on the
+	// listing has no Bratrax session, so both routes bypass the auth mapper —
+	// the `hmac` query param Shopify signs is the auth, verified in Flask.
+	// Outside the /bratrax/ prefix so the redirect URI registered in the Partner
+	// dashboard stays clean; the prefix-stripper leaves non-/bratrax paths
+	// unchanged, so these reach shopify_install_routes verbatim. Registered
+	// before the /bratrax/ catch-all for the same reason /email/pause is.
+	observability.MuxHandle(mux, "GET /shopify/install",
+		observability.Middleware("bratrax", logger, proxy))
+	observability.MuxHandle(mux, "GET /shopify/install/callback",
+		observability.Middleware("bratrax", logger, proxy))
+
 	// WooCommerce wc-auth callback. The merchant's store POSTs the generated
 	// REST API key pair here server-to-server (no login cookie), so it must
 	// bypass the auth mapper. Public by design — the signed `user_id` state
