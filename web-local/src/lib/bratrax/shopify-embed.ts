@@ -1,0 +1,96 @@
+/**
+ * Shopify embedded-context detection and the break-out helper.
+ *
+ * When Bratrax is opened from inside the Shopify admin, the whole app runs in
+ * an iframe on admin.shopify.com. Two things behave differently there:
+ *
+ *   1. Anything that must be top-level — Lemon Squeezy checkout, "Open in
+ *      Bratrax" — has to open a NEW tab. LS cannot render in a nested iframe
+ *      (payment providers set frame-ancestors against exactly that), and 3-D
+ *      Secure breaks in frames even where framing is allowed.
+ *   2. Onboarding finishes on /embed/canvas/campaign_deep_dive rather than the
+ *      full app shell.
+ *
+ * Detection is sticky: the flag is written to sessionStorage on first
+ * observation so it survives the OAuth and checkout round-trips, which can
+ * momentarily land in a context where the frame check alone would say "no".
+ */
+
+const EMBED_FLAG = "bratrax_shopify_embedded";
+
+/** True when this document is running inside a frame we didn't create. */
+function inIframe(): boolean {
+  try {
+    return window.top !== window.self;
+  } catch {
+    // Cross-origin parent throws on access — which itself means we're framed.
+    return true;
+  }
+}
+
+/**
+ * Record that this session is running embedded. Called from the entry points
+ * Shopify sends merchants to (they carry `host` / `embedded=1`).
+ */
+export function markShopifyEmbedded(): void {
+  try {
+    sessionStorage.setItem(EMBED_FLAG, "1");
+  } catch {
+    // Private mode / storage disabled — fall back to the live frame check.
+  }
+}
+
+/**
+ * True when the app should behave as an embedded Shopify app.
+ *
+ * Checks the sticky flag first, then Shopify's own URL params, then the frame
+ * position. The param check also sets the flag, so a single embedded entry is
+ * enough for the rest of the session.
+ */
+export function isShopifyEmbedded(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (sessionStorage.getItem(EMBED_FLAG) === "1") return true;
+  } catch {
+    /* ignore */
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("embedded") === "1" || params.has("host")) {
+    markShopifyEmbedded();
+    return true;
+  }
+
+  // Bare frame check last: it's true for any framing, so on its own it would
+  // also fire for unrelated embeds of our dashboards.
+  return inIframe() && params.has("shop");
+}
+
+/**
+ * Open a URL in a new top-level tab, breaking out of the Shopify iframe.
+ *
+ * Returns false when the popup was blocked, so the caller can render a plain
+ * clickable link instead of failing silently — losing a merchant at the
+ * checkout step because a popup blocker ate the window is not acceptable.
+ */
+export function openTopLevel(url: string): boolean {
+  try {
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (win) return true;
+  } catch {
+    /* fall through */
+  }
+  return false;
+}
+
+/**
+ * Deep link back into this app inside the Shopify admin, e.g. from the tab
+ * that Lemon Squeezy redirected to after checkout.
+ *
+ * `shop` is the myshopify domain; the admin path uses the store handle (the
+ * part before .myshopify.com).
+ */
+export function shopifyAdminAppUrl(shop: string, appHandle: string): string {
+  const handle = shop.replace(/\.myshopify\.com$/i, "");
+  return `https://admin.shopify.com/store/${encodeURIComponent(handle)}/apps/${encodeURIComponent(appHandle)}`;
+}

@@ -132,6 +132,14 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	observability.MuxHandle(mux, "GET /auth/handoff",
 		observability.Middleware("bratrax", logger, http.HandlerFunc(handoffSvc.HandleHandoff)))
 
+	// NOTE: /payment-complete (the landing tab for an embedded Lemon Squeezy
+	// checkout) is deliberately NOT registered here. It is a SvelteKit page,
+	// not a Flask route, so it falls through to Rill's static handler like
+	// /login and /forgot-password do. It only needs the isPublicRoute
+	// allowlist entry in web-local/src/routes/+layout.ts. The three-place
+	// public-route checklist in CLAUDE.md applies to FLASK routes outside the
+	// /bratrax/ prefix — /email/pause and /auth/handoff above.
+
 	// WooCommerce wc-auth callback. The merchant's store POSTs the generated
 	// REST API key pair here server-to-server (no login cookie), so it must
 	// bypass the auth mapper. Public by design — the signed `user_id` state

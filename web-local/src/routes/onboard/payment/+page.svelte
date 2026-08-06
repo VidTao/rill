@@ -6,7 +6,9 @@
     onboardMe,
     getPaymentCheckoutUrl,
     getPaymentStatus,
+    getOnboardResumeRoute,
   } from "$lib/bratrax/onboarding/api";
+  import { isShopifyEmbedded, openTopLevel } from "$lib/bratrax/shopify-embed";
 
   type Mode = "loading" | "intro" | "confirming" | "timeout" | "error";
 
@@ -15,9 +17,21 @@
   let companyName = "";
   let busy = false;
 
+  // Embedded (Shopify admin iframe) callers can't navigate to Lemon Squeezy in
+  // place — LS won't render in a nested iframe. Checkout opens in a new tab and
+  // this window stays put, polling, until the webhook flips is_paid.
+  const embedded = isShopifyEmbedded();
+  // Set when the popup was blocked, so we can offer a plain link instead of
+  // stranding the merchant at the payment step.
+  let manualCheckoutUrl = "";
+
   // Polling state for the post-checkout return.
   const POLL_INTERVAL_MS = 2000;
-  const POLL_MAX_ATTEMPTS = 15; // ~30s
+  // Non-embedded: LS has already bounced the browser back, so we're only
+  // waiting on the webhook — ~30s is plenty. Embedded: this window starts
+  // polling the moment checkout opens in the other tab, so the clock covers
+  // the merchant actually typing in their card details.
+  $: POLL_MAX_ATTEMPTS = embedded ? 150 : 15; // ~5min vs ~30s
   let pollHandle: ReturnType<typeof setInterval> | null = null;
   let pollAttempts = 0;
 
@@ -33,7 +47,13 @@
       const s = await getPaymentStatus();
       if (s.is_paid) {
         clearPoll();
-        await goto("/onboard/store");
+        // Route off the server's step, not a hardcoded path. Payment used to
+        // always precede the store connection, so /onboard/store was right by
+        // construction. A merchant who arrived from the Shopify App Store
+        // already has their store attached and the webhook resolves them to
+        // embed_pending (see onboarding._next_step_after_payment) — sending
+        // them to /onboard/store would ask them to connect a store twice.
+        await goto(getOnboardResumeRoute(s.step) ?? "/onboard/store");
         return true;
       }
     } catch (e) {
@@ -62,19 +82,34 @@
   async function startCheckout() {
     busy = true;
     error = "";
+    manualCheckoutUrl = "";
     try {
-      const result = await getPaymentCheckoutUrl();
+      const result = await getPaymentCheckoutUrl(embedded);
       if (result.already_paid) {
-        await goto("/onboard/store");
+        const me = await onboardMe().catch(() => null);
+        await goto(getOnboardResumeRoute(me?.step) ?? "/onboard/store");
         return;
       }
       if (!result.checkout_url) {
         error = result.error || "Could not start checkout. Please try again.";
         return;
       }
-      // Hard navigation to LS hosted checkout. They'll redirect us back to
-      // /onboard/payment?return=1 on successful payment.
-      window.location.href = result.checkout_url;
+
+      if (!embedded) {
+        // Hard navigation to LS hosted checkout. They'll redirect us back to
+        // /onboard/payment?return=1 on successful payment.
+        window.location.href = result.checkout_url;
+        return;
+      }
+
+      // Embedded: break out to a new top-level tab and keep polling here. The
+      // popped tab lands on /payment-complete; this window advances as soon as
+      // the LS webhook flips is_paid, so the merchant never has to come back
+      // to it manually.
+      if (!openTopLevel(result.checkout_url)) {
+        manualCheckoutUrl = result.checkout_url;
+      }
+      startPolling();
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -98,9 +133,11 @@
 
     companyName = me.company_name || "";
 
-    // Already a paying subscriber → skip directly to onboarding.
+    // Already a paying subscriber → skip directly to wherever they actually
+    // are. Not /onboard/store unconditionally: an App Store merchant arrives
+    // with Shopify already attached and belongs on the embed step.
     if (me.is_paid_subscriber) {
-      await goto("/onboard/store");
+      await goto(getOnboardResumeRoute(me.step) ?? "/onboard/store");
       return;
     }
 
@@ -122,10 +159,14 @@
   onDestroy(() => clearPoll());
 </script>
 
-<div class="flex h-full items-start justify-center overflow-y-auto bg-bratrax-bg pt-16 pb-16">
+<div
+  class="flex h-full items-start justify-center overflow-y-auto bg-bratrax-bg pt-16 pb-16"
+>
   <div class="w-full max-w-2xl px-6">
     <div class="mb-8">
-      <p class="mb-2 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-acid">
+      <p
+        class="mb-2 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-acid"
+      >
         Subscription
       </p>
       <h1 class="text-3xl font-black tracking-tight text-bratrax-text-headline">
@@ -139,9 +180,12 @@
       </h1>
       <p class="mt-2 text-sm text-bratrax-text-muted">
         {#if mode === "confirming"}
-          Hang tight — we're checking with our payment provider. This usually takes a few seconds.
+          Hang tight — we're checking with our payment provider. This usually
+          takes a few seconds.
         {:else if mode === "timeout"}
-          The payment may still come through. You can wait a bit and refresh, or try the checkout again. If you've already paid, your dashboard will unlock as soon as we hear back.
+          The payment may still come through. You can wait a bit and refresh, or
+          try the checkout again. If you've already paid, your dashboard will
+          unlock as soon as we hear back.
         {:else}
           {#if companyName}
             <span class="text-bratrax-text-body">{companyName}</span> is set up.
@@ -152,28 +196,63 @@
     </div>
 
     {#if error}
-      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-4 py-3 font-mono text-xs text-bratrax-tomato">
+      <div
+        class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-4 py-3 font-mono text-xs text-bratrax-tomato"
+      >
         {error}
       </div>
     {/if}
 
     <div class="border border-bratrax-border bg-bratrax-surface px-6 py-6">
       {#if mode === "loading"}
-        <p class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted">
+        <p
+          class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted"
+        >
           Loading…
         </p>
       {:else if mode === "confirming"}
-        <div class="flex items-center gap-3">
-          <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-bratrax-acid"></span>
-          <p class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted">
-            Waiting for confirmation… ({pollAttempts}/{POLL_MAX_ATTEMPTS})
-          </p>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-3">
+            <span
+              class="inline-block h-2 w-2 animate-pulse rounded-full bg-bratrax-acid"
+            ></span>
+            <p
+              class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted"
+            >
+              {#if embedded}
+                Complete payment in the new tab — we'll continue automatically
+              {:else}
+                Waiting for confirmation…
+              {/if}
+              ({pollAttempts}/{POLL_MAX_ATTEMPTS})
+            </p>
+          </div>
+          {#if manualCheckoutUrl}
+            <!-- Popup blocked. Never leave the merchant stuck at the payment
+                 step because a blocker ate the window — give them the link. -->
+            <div class="border border-bratrax-border bg-bratrax-bg px-4 py-3">
+              <p class="mb-2 text-xs text-bratrax-text-muted">
+                Your browser blocked the checkout window.
+              </p>
+              <a
+                href={manualCheckoutUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-block bg-bratrax-acid px-5 py-2 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-bg transition-opacity hover:opacity-90"
+              >
+                Open checkout →
+              </a>
+            </div>
+          {/if}
         </div>
       {:else if mode === "timeout"}
         <div class="flex flex-col gap-3">
           <button
             type="button"
-            on:click={() => { mode = "confirming"; startPolling(); }}
+            on:click={() => {
+              mode = "confirming";
+              startPolling();
+            }}
             class="bg-bratrax-acid px-6 py-3 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-bg transition-opacity hover:opacity-90"
           >
             Check again
@@ -190,7 +269,9 @@
       {:else if mode === "intro"}
         <div class="flex flex-col gap-3">
           <p class="text-sm text-bratrax-text-body">
-            You'll complete payment on Lemon Squeezy's secure checkout page. After paying, we'll bring you back here automatically and unlock the rest of onboarding.
+            You'll complete payment on Lemon Squeezy's secure checkout page.
+            After paying, we'll bring you back here automatically and unlock the
+            rest of onboarding.
           </p>
           <button
             type="button"
@@ -206,7 +287,10 @@
 
     <p class="mt-6 text-xs text-bratrax-text-muted/60">
       Questions about pricing or your subscription? Email
-      <a href="mailto:support@bratrax.com" class="text-bratrax-acid hover:underline">support@bratrax.com</a>.
+      <a
+        href="mailto:support@bratrax.com"
+        class="text-bratrax-acid hover:underline">support@bratrax.com</a
+      >.
     </p>
   </div>
 </div>

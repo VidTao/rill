@@ -414,15 +414,32 @@ export interface PaymentCheckoutResult {
   error?: string;
 }
 
-export async function getPaymentCheckoutUrl(): Promise<PaymentCheckoutResult> {
+/**
+ * `embedded` tells the backend to point Lemon Squeezy's post-payment redirect
+ * at /payment-complete instead of /onboard/payment?return=1. Checkout has to
+ * run in a new top-level tab when we're inside the Shopify admin iframe, and
+ * that tab must not land on an onboarding screen the merchant is already
+ * looking at behind it.
+ */
+export async function getPaymentCheckoutUrl(
+  embedded = false,
+): Promise<PaymentCheckoutResult> {
   return apiFetch<PaymentCheckoutResult>("/bratrax/onboard/payment/checkout", {
     method: "POST",
+    body: JSON.stringify({ embedded }),
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 export interface PaymentStatusResult {
   is_paid: boolean;
   subscription_status: string | null;
+  /**
+   * Onboarding step as of this read. Lets the payment page route off the
+   * resume map rather than assuming /onboard/store — an App Store merchant
+   * already has their store connected and resolves to embed_pending.
+   */
+  step?: string | null;
 }
 
 export async function getPaymentStatus(): Promise<PaymentStatusResult> {
