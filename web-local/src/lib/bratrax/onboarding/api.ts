@@ -485,3 +485,42 @@ export async function createEmbedHandoff(): Promise<EmbedHandoffResult> {
     method: "POST",
   });
 }
+
+// -------------------------------------------------------------------------
+// Shopify App Store account creation
+// -------------------------------------------------------------------------
+// The parked install token is the authorisation — see the note on
+// routes/shopify_install.py::shopify_install_account for why this exists
+// separately from /signup (waitlist-gated) and /bratrax/auth/signup (gated by
+// ONLY_INVITATION_LINK).
+
+export interface ShopifyAccountResult {
+  status: "ok" | "already_user" | "already_claimed";
+  shop?: string;
+}
+
+export async function createShopifyAccount(opts: {
+  shopifyInstallToken: string;
+  email: string;
+  password: string;
+  name?: string;
+}): Promise<ShopifyAccountResult> {
+  const res = await fetch(`${getBaseUrl()}/shopify/install/account`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      shopify_install_token: opts.shopifyInstallToken,
+      email: opts.email,
+      password: opts.password,
+      name: opts.name,
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  // 409 is a routing signal, not a failure: the caller switches to the log-in
+  // tab. Anything else non-2xx is a real error.
+  if (!res.ok && res.status !== 409) {
+    throw new Error(body.error ?? `Request failed (${res.status})`);
+  }
+  return body as ShopifyAccountResult;
+}

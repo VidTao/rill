@@ -102,6 +102,9 @@ export async function load({ url, depends, untrack, fetch }) {
     // Shopify iframe with a session token, which sets nothing on this origin.
     // Gating it would bounce them to /login the instant after they paid.
     url.pathname.startsWith("/payment-complete") ||
+    // Shopify App Store account-creation entry. The merchant has no Bratrax
+    // session yet — the parked install token in the URL is their credential.
+    url.pathname.startsWith("/shopify/connect") ||
     url.pathname.startsWith("/join");
 
   if (isPublicRoute) {

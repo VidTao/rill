@@ -121,6 +121,14 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 		observability.Middleware("bratrax", logger, proxy))
 	observability.MuxHandle(mux, "GET /shopify/install/callback",
 		observability.Middleware("bratrax", logger, proxy))
+	// Account creation against a parked install. Public for the same reason:
+	// the merchant has no Bratrax session yet, and the install token they hold
+	// (minted only after a verified OAuth round-trip with Shopify) is the
+	// authorisation. /signup is waitlist-gated and /bratrax/auth/signup is
+	// gated by ONLY_INVITATION_LINK — neither is appropriate for someone who
+	// already found us on the App Store and granted scopes.
+	observability.MuxHandle(mux, "POST /shopify/install/account",
+		observability.Middleware("bratrax", logger, proxy))
 
 	// "Open in Bratrax" hand-off. A merchant inside the Shopify admin iframe is
 	// authenticated by an App Bridge session token and therefore has no
