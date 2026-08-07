@@ -16,10 +16,10 @@ portfolio questions: how big is the reachable audience, which segments exist,
 which acquisition sources produce valuable customers, and where attribution
 evidence is weak.
 
-**Video walkthrough**
-
 ```loom
-f67431e8682f41a389b7e0e9ef3e3505
+id: f67431e8682f41a389b7e0e9ef3e3505
+label: Commerce Profile Graph
+duration: 2:13
 ```
 
 ## The five sections

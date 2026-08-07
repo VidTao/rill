@@ -20,11 +20,13 @@ The editor shows a line and column. The most common causes:
 
 ## "Metrics view references unknown column"
 
-The metrics view points to a column that doesn't exist on its model.
+The metrics view names a column that isn't on the table it reads from.
 
 1. Check the spelling exactly — ClickHouse is case-sensitive.
-2. Open the model and confirm the column is in the SELECT list.
-3. If you just changed the model, save it first, then the metrics view.
+2. Confirm the column exists on that table. If you're unsure which columns are
+   available, ask Claude or contact support.
+3. If the column should exist and doesn't, the prepared table may not have
+   refreshed yet — see "A dashboard shows no data" below.
 
 ## "Canvas references unknown metrics view"
 
@@ -39,7 +41,7 @@ Three usual suspects:
 
 1. **The time range excludes all data.** Try *Year to date*.
 2. **A filter is too restrictive.** Click *Clear filters*.
-3. **The underlying model returned no rows.** Open the model and run the preview — if it's empty, fix the model first.
+3. **The prepared table is empty.** Check another dashboard reading the same data — if it's also empty, the table hasn't refreshed and support can confirm.
 
 ## "Connector token expired"
 
@@ -64,9 +66,12 @@ If the message doesn't make sense, contact support with the connector name and t
 
 ## A dashboard is slow
 
-- **Add `-- @materialize: true`** to the heaviest model upstream of the dashboard.
-- **Reduce the date range** the model covers.
-- **Avoid wide joins** — join only the columns you need.
+- **Narrow the default time range** on the dashboard — a year of daily data is
+  slower to draw than a month.
+- **Reduce tiles per dashboard** — each one is its own query. Split a crowded
+  dashboard in two.
+- **Prefer fewer, coarser dimensions** in a table tile; high-cardinality
+  breakdowns are the usual cause.
 
 If a dashboard takes more than ~5 seconds and you've tried the above, contact support.
 

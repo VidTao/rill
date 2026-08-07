@@ -1,12 +1,12 @@
 ---
-title: Reading dashboards
+title: Reading the dashboards
 audience: viewer
 order: 3
 group: start-here
 status: ready
 ---
 
-# Reading dashboards
+# Reading the dashboards
 
 Most Bratrax dashboards follow the same pattern: KPI tiles first, then charts, then a table or pivot you can drill into.
 

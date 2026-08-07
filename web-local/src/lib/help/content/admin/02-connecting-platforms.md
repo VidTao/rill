@@ -10,10 +10,10 @@ status: ready
 
 Connect ad platforms, your store, and other data sources from the **Connectors** tab in the top nav.
 
-**Video walkthrough**
-
 ```loom
-d3631b9edef54f58abed0cef24de3dfb
+id: d3631b9edef54f58abed0cef24de3dfb
+label: Tab — Connectors
+duration: 0:49
 ```
 
 ## Adding a platform

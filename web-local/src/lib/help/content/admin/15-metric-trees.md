@@ -15,10 +15,10 @@ and the concrete **experiments** you're running at the leaves. Each node pulls
 its live value from your dashboards' metrics, so the tree shows not just how
 revenue decomposes, but which branch actually moved.
 
-**Video walkthrough**
-
 ```loom
-f7aad7273a09467fbb60b17e916a1ee0
+id: f7aad7273a09467fbb60b17e916a1ee0
+label: Metric Trees
+duration: 1:56
 ```
 
 ## The anatomy of a tree

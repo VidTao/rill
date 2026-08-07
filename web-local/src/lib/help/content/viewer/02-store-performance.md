@@ -10,10 +10,10 @@ status: ready
 
 Use [**Store Performance**](https://bratrax.com/canvas/performance_overview) as the daily health check. It answers: "Is the business up or down, and is marketing spend producing enough sales?"
 
-**Video walkthrough**
-
 ```loom
-a8f9b4964a8e4c6baf6df6c71cd65a96
+id: a8f9b4964a8e4c6baf6df6c71cd65a96
+label: Store Performance
+duration: 1:46
 ```
 
 ## Look first at

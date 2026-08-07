@@ -14,7 +14,7 @@ The file lives at `/knowledge/claude_system_prompt.txt`.
 
 ## What's in there by default
 
-The auto-generated section lists every metric, dimension, and dashboard available, plus how they relate. This section is regenerated automatically whenever you change the data model — **don't edit it directly**, your edits will get overwritten.
+The auto-generated section lists every metric, dimension, and dashboard available, plus how they relate. This section is regenerated automatically whenever your metrics or dashboards change — **don't edit it directly**, your edits will get overwritten.
 
 Below the auto-generated section is space for your own additions.
 

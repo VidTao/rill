@@ -10,10 +10,10 @@ status: ready
 
 Use [**Products**](https://bratrax.com/canvas/product_performance) to understand what actually sold: products, variants, SKUs, units, discounts, and net sales.
 
-**Video walkthrough**
-
 ```loom
-9e8e37c1a3ec4c7a8966a2ac82e1e47c
+id: 9e8e37c1a3ec4c7a8966a2ac82e1e47c
+label: Products
+duration: 1:17
 ```
 
 ## Look first at

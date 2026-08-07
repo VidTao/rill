@@ -29,10 +29,10 @@ in dashboards that reconcile with your store, not with a pixel's opinion.
 
 ## 2. Connect your data (admins)
 
-▶ **Watch — Tab — Connectors** (0:49)
-
 ```loom
-d3631b9edef54f58abed0cef24de3dfb
+id: d3631b9edef54f58abed0cef24de3dfb
+label: Tab — Connectors
+duration: 0:49
 ```
 
 Every platform you don't connect is data Bratrax can't show. The Connectors
@@ -46,10 +46,10 @@ ad platforms.
 
 ## 3. Set up your costs (admins)
 
-▶ **Watch — Tab — Cost Settings** (1:21)
-
 ```loom
-a0040b60800e4b66b4bc6df0d503afbe
+id: a0040b60800e4b66b4bc6df0d503afbe
+label: Tab — Cost Settings
+duration: 1:21
 ```
 
 Profit metrics are only as good as the costs you feed them: COGS (pulled from
@@ -63,10 +63,10 @@ if several stores share one ad account — your media-spend split.
 
 ## 4. Your daily health check
 
-▶ **Watch — Store Performance** (1:46)
-
 ```loom
-a8f9b4964a8e4c6baf6df6c71cd65a96
+id: a8f9b4964a8e4c6baf6df6c71cd65a96
+label: Store Performance
+duration: 1:46
 ```
 
 The one dashboard to open every morning. Is the business up or down? Revenue,
@@ -77,10 +77,10 @@ returns, spend, MER, blended ROAS, new-vs-returning mix, subscription health.
 
 ## 5. Where your sales come from
 
-▶ **Watch — Attribution** (1:34)
-
 ```loom
-c3a62d5c20d245aab5f86f578a5a851e
+id: c3a62d5c20d245aab5f86f578a5a851e
+label: Attribution
+duration: 1:34
 ```
 
 The attribution dashboard drills from channel → source → campaign → ad set →
@@ -96,10 +96,10 @@ purchase.
 
 ## 6. What's selling
 
-▶ **Watch — Products** (1:17)
-
 ```loom
-9e8e37c1a3ec4c7a8966a2ac82e1e47c
+id: 9e8e37c1a3ec4c7a8966a2ac82e1e47c
+label: Products
+duration: 1:17
 ```
 
 Product and SKU-level truth: net sales, units, discounts, top products, and a
@@ -110,10 +110,10 @@ full product/variant/SKU breakdown.
 
 ## 7. Your customers and subscriptions
 
-▶ **Watch — Customer Analytics** (1:42)
-
 ```loom
-ccd23ffea3b34320b2637286045f4821
+id: ccd23ffea3b34320b2637286045f4821
+label: Customer Analytics
+duration: 1:42
 ```
 
 Customer base, LTV, cohorts, retention, MRR, and where your subscribers
@@ -125,10 +125,10 @@ actually come from — down to the campaign and ad set.
 
 ## 8. Email & SMS
 
-▶ **Watch — Email & SMS** (1:29)
-
 ```loom
-5094aa525d134bf4b3056f9cfd87edf2
+id: 5094aa525d134bf4b3056f9cfd87edf2
+label: Email & SMS
+duration: 1:29
 ```
 
 Klaviyo campaigns and flows: sends, opens, clicks, unsubscribes, list health,
@@ -140,15 +140,15 @@ and the lifetime revenue impact of your email/SMS program.
 
 ## 9. Meet your whole audience — not just buyers
 
-▶ **Watch — Profile Explorer** (1:37)
-
 ```loom
-05bc62dcba1f4cce8e6e08d2b2ca5bf1
+id: 05bc62dcba1f4cce8e6e08d2b2ca5bf1
+label: Profile Explorer
+duration: 1:37
 ```
-▶ **Watch — Commerce Profile Graph** (2:13)
-
 ```loom
-f67431e8682f41a389b7e0e9ef3e3505
+id: f67431e8682f41a389b7e0e9ef3e3505
+label: Commerce Profile Graph
+duration: 2:13
 ```
 
 Bratrax builds a profile for everyone it can see — customers, known leads,
@@ -163,10 +163,10 @@ anonymous, winback, ...), and recommends what to do with each group.
 
 ## 10. Ask the AI
 
-▶ **Watch — How to use AI inside Bratrax** (0:48)
-
 ```loom
-846726e08bd6449382a2520807cbeaec
+id: 846726e08bd6449382a2520807cbeaec
+label: How to use AI inside Bratrax
+duration: 0:48
 ```
 
 The dashboards answer the common questions; the AI answers the custom ones —
@@ -181,10 +181,10 @@ same data at no extra cost.
 
 ## 11. Make it yours
 
-▶ **Watch — Customizing charts** (1:28)
-
 ```loom
-58f3efa9a75e483892ebe484a6c59afa
+id: 58f3efa9a75e483892ebe484a6c59afa
+label: Customizing charts
+duration: 1:28
 ```
 
 Every dashboard is editable: change filters, date ranges, and attribution
@@ -195,10 +195,10 @@ models; add or modify charts; pick dimensions and metrics.
 
 ## 12. Level up: Metric Trees
 
-▶ **Watch — Metric Trees** (1:56)
-
 ```loom
-f7aad7273a09467fbb60b17e916a1ee0
+id: f7aad7273a09467fbb60b17e916a1ee0
+label: Metric Trees
+duration: 1:56
 ```
 
 Turn your top-line KPI into a living decision tree — drivers, owned levers,
@@ -210,10 +210,10 @@ and experiments, all wired to live data. Best once your data has settled in.
 
 ## 13. When you're stuck
 
-▶ **Watch — Tab — Help** (1:48)
-
 ```loom
-fa947b32df364ecbbfb2d72208162d9e
+id: fa947b32df364ecbbfb2d72208162d9e
+label: Tab — Help
+duration: 1:48
 ```
 
 The help section covers every dashboard, metric, and setup step — searchable.
