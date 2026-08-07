@@ -178,7 +178,7 @@ the ones you'd get, filled with your data. **$1 for your first month, then $99/m
 flat at any GMV** — run it beside whatever you use today and compare the two
 before you decide anything.
 
-**[Sign out and start your own workspace →](/signup?logout=1)**
+**[Sign out and start your own workspace →](https://bratrax.com/signup?logout=1)**
 
 That link signs you out of the demo — this shared account is the only thing you
 lose, and the tour is here whenever you want it back.
