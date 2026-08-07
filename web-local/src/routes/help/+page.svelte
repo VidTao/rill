@@ -4,9 +4,9 @@
   import { pagesFor } from "$lib/help";
 
   $: role = $bratraxUser?.role ?? null;
+  // Search reads this list too, so demo-only pages stay out of a paying
+  // customer's results, not just their sidebar.
   $: visiblePages = pagesFor(role, $bratraxIsDemo);
-  $: viewerCount = visiblePages.filter((p) => p.audience === "viewer").length;
-  $: adminCount = visiblePages.filter((p) => p.audience === "admin").length;
   $: isAdmin = role === "admin" || role === "super_admin";
 
   let searchQuery = "";
@@ -33,6 +33,28 @@
   </div>
 
   {#if !searching}
+  <section class="help-cards">
+    <a class="help-card" href="/help/viewer/welcome">
+      <div class="card-tag">New here</div>
+      <h2>Learn the basics</h2>
+      <p>
+        Reading a dashboard, picking a time range, filtering, and what each
+        metric means.
+      </p>
+    </a>
+
+    {#if isAdmin}
+      <a class="help-card" href="/help/admin/connecting-platforms">
+        <div class="card-tag">For admins</div>
+        <h2>Managing your workspace</h2>
+        <p>
+          Connecting platforms, cost settings, your team, billing, and metric
+          trees.
+        </p>
+      </a>
+    {/if}
+  </section>
+
   <section class="question-grid" aria-label="Dashboard help">
     <a class="question-card primary" href="/help/viewer/store-performance">
       <div class="card-tag">Daily health</div>
@@ -64,38 +86,17 @@
       <p>Use Email &amp; SMS for sends, opens, clicks, unsubs, flows, campaigns, and attributed sales.</p>
     </a>
 
-    <a class="question-card" href="/help/viewer/new-customer-source-report">
+    <a class="question-card" href="/help/viewer/attribution">
       <div class="card-tag">Acquisition</div>
       <h2>Which sources bring new customers?</h2>
-      <p>Use New Customer Source Report for NCV, NCP, NC ROAS, NC CPA, and source-level acquisition quality.</p>
+      <p>Use Attribution's new-customer metrics — NC ROAS, NC CPA, and new-customer orders by source.</p>
     </a>
-  </section>
-
-  <section class="help-cards">
-    <a class="help-card" href="/help/viewer/welcome">
-      <div class="card-tag">For everyone</div>
-      <h2>Learn the basics</h2>
-      <p>
-        Reading dashboards, picking time ranges, filtering, asking Claude, and
-        understanding the glossary. {viewerCount} pages.
-      </p>
-    </a>
-
-    {#if isAdmin}
-      <a class="help-card" href="/help/admin/overview">
-        <div class="card-tag">For admins</div>
-        <h2>Building metrics &amp; dashboards</h2>
-        <p>
-          Connect platforms, write SQL models, define metrics views, and lay
-          out canvas dashboards. {adminCount} pages.
-        </p>
-      </a>
-    {/if}
   </section>
 
   <footer>
     <p class="hint">
-      Looking for a specific metric? Open the Glossary under Reference.
+      Looking for a specific metric? Open the
+      <a href="/help/glossary">Glossary</a>.
     </p>
   </footer>
   {/if}
