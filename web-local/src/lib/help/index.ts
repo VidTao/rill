@@ -55,6 +55,15 @@ export interface HelpFrontmatter {
   group: HelpGroup;
   order: number;
   status: Status;
+  /**
+   * Keep this page out of the sidebar for demo-workspace visitors.
+   *
+   * The inverse of `audience: demo`, and deliberately weaker: the page stays
+   * openable, so a link to it from demo-facing copy still resolves. It exists
+   * because Start here otherwise offers a demo user three competing starting
+   * points, two of which describe a workspace they do not have.
+   */
+  hideForDemo?: boolean;
 }
 
 export interface HelpPage extends HelpFrontmatter {
@@ -74,13 +83,22 @@ function parseFrontmatter(raw: string): { fm: Partial<HelpFrontmatter>; body: st
   const match = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
   if (!match) return { fm: {}, body: raw };
   const [, header, body] = match;
-  const fm: Record<string, string | number> = {};
+  const fm: Record<string, string | number | boolean> = {};
   for (const line of header.split("\n")) {
     const m = line.match(/^([a-zA-Z_][\w-]*)\s*:\s*(.*?)(?:\s*#.*)?$/);
     if (!m) continue;
     const [, key, valRaw] = m;
     const val = valRaw.replace(/^["']|["']$/g, "");
-    fm[key] = key === "order" ? Number(val) : val;
+    // The scanner is typed per key rather than by sniffing the value, so
+    // `title: true` stays a string. snake_case in the file, camelCase in the
+    // type, matching how the frontmatter reads in markdown.
+    if (key === "order") {
+      fm.order = Number(val);
+    } else if (key === "hide_for_demo") {
+      fm.hideForDemo = val === "true";
+    } else {
+      fm[key] = val;
+    }
   }
   return { fm: fm as Partial<HelpFrontmatter>, body };
 }
@@ -112,6 +130,10 @@ export const HELP_PAGES: HelpPage[] = Object.entries(RAW_MODULES)
       group,
       order: fm.order ?? 999,
       status: (fm.status ?? "stub") as Status,
+      // Listed explicitly like every field above — this builder enumerates
+      // rather than spreading `fm`, so a new frontmatter key is silently
+      // dropped until it is named here.
+      hideForDemo: fm.hideForDemo ?? false,
       body,
     };
   })
@@ -160,7 +182,11 @@ export function pagesFor(
   role: "viewer" | "admin" | "super_admin" | null,
   isDemo = false,
 ): HelpPage[] {
-  return HELP_PAGES.filter((p) => canAccess(p, role, isDemo));
+  // `hideForDemo` narrows the listing only, never access — so the sidebar stays
+  // a subset of what canAccess allows and the invariant above still holds.
+  return HELP_PAGES.filter(
+    (p) => canAccess(p, role, isDemo) && !(isDemo && p.hideForDemo),
+  );
 }
 
 export function canAccess(

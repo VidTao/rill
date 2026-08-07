@@ -114,18 +114,16 @@
 <div class="flex h-full flex-col">
   <div bind:this={scrollBox} class="flex-1 overflow-y-auto px-4 py-4">
     {#if !hasConversation}
-      <div class="mx-auto max-w-xl pt-8 text-center">
-        <p
-          class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
-        >
-          Ask support
-        </p>
-        <p class="mt-3 text-sm text-bratrax-text-muted">
-          Ask anything about Bratrax — connecting platforms, attribution,
-          billing, dashboards. Answers come from our verified knowledge base;
-          the assistant can't see your account data. For account-specific
-          issues, we'll help you reach a human.
-        </p>
+      <!-- Same shape as the AI sidebar's empty state (`.chat-empty` in
+           web-common/features/chat/core/messages/Messages.svelte): a short
+           semibold line with one muted line under it, centred in the space. The
+           four-sentence paragraph that was here restated the panel header and
+           carried the no-access caveat that now lives in the footer. -->
+      <div class="support-empty">
+        <div class="support-empty-title">How can I help?</div>
+        <div class="support-empty-subtitle">
+          Connecting platforms, attribution, billing, dashboards.
+        </div>
       </div>
     {/if}
 
@@ -233,25 +231,12 @@
         on:keydown={onKeydown}
         rows="2"
         placeholder="Ask a question about Bratrax…"
-        class="max-h-32 w-full resize-none overflow-auto border-0 bg-transparent p-0 text-sm leading-relaxed text-bratrax-text-body outline-none placeholder:text-bratrax-text-muted focus:outline-none focus:ring-0"
+        class="support-input max-h-32 w-full resize-none overflow-auto p-0 text-sm leading-relaxed"
       />
-      <div class="flex flex-row items-center gap-3">
-        <!-- Escalation lives where ChatInput puts its @ affordance: a quiet
-             text control on the left of the same row as Send. -->
-        <a
-          class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted underline hover:text-bratrax-text-primary"
-          href={`mailto:${SUPPORT_EMAIL}`}
-        >
-          Email support
-        </a>
-        {#if hasConversation && !lastNeedsEscalation}
-          <button
-            class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted underline hover:text-bratrax-text-primary"
-            on:click={escalate}
-          >
-            Draft an email
-          </button>
-        {/if}
+      <!-- Send alone on the row, right-aligned. ChatInput keeps its @ affordance
+           on the left here; there is no equivalent for support, and the escalation
+           links read as shouting inside the box, so they sit in the footer. -->
+      <div class="flex flex-row items-center">
         <div class="grow"></div>
         <Button
           type="primary"
@@ -265,12 +250,11 @@
       </div>
     </div>
 
-    <!-- On its own line below the box, so it can wrap without stranding a
-         separator dot at the start of a line the way the inline version did. -->
-    <p
-      class="mx-auto mt-2 max-w-xl font-mono text-[10px] leading-tight text-bratrax-text-muted"
-    >
-      Help-center answers · no access to your data
+    <p class="support-footer">
+      No access to your data ·
+      <a href={`mailto:${SUPPORT_EMAIL}`}>Email support</a>{#if hasConversation && !lastNeedsEscalation}
+        ·
+        <button on:click={escalate}>Draft an email</button>{/if}
     </p>
   </div>
 </div>
@@ -292,5 +276,56 @@
      read as one control rather than a field with a button parked beside it. */
   .support-composer:focus-within {
     @apply border-ring-focus;
+  }
+
+  /* bratrax-theme.css §13 sets `input, textarea, select` background, border and
+     a focus ring with `!important`, which no utility class can beat. Left alone
+     it painted a second, differently-shaded box inside the composer and drew a
+     focus ring around the field rather than around the container. ChatInput
+     escapes this only because TipTap renders a contenteditable div rather than a
+     textarea, so the override has to answer `!important` in kind. Placeholder
+     colour is left to that same global rule, which already resolves to muted. */
+  .support-input {
+    background-color: transparent !important;
+    border-color: transparent !important;
+  }
+  .support-input:focus {
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Mirrors `.chat-empty*` in the AI sidebar. Height comes from the scroll
+     container, so the copy sits centred rather than pinned under the header. */
+  .support-empty {
+    @apply flex h-full flex-col items-center justify-center text-center;
+    @apply text-fg-secondary;
+  }
+  .support-empty-title {
+    @apply mb-1 text-base font-semibold text-fg-secondary;
+  }
+  .support-empty-subtitle {
+    @apply text-xs text-fg-secondary;
+  }
+
+  /* Matches `.chat-footer` in the AI sidebar's ChatFooter.svelte: 0.75rem,
+     muted, centred. The previous 10px uppercase mono in acid read as a heading
+     rather than fine print, which is why it looked oversized next to 14px body
+     copy despite being smaller. */
+  .support-footer {
+    @apply mx-auto max-w-xl text-fg-muted;
+    padding-top: 0.5rem;
+    font-size: 0.75rem;
+    text-align: center;
+  }
+  .support-footer a,
+  .support-footer button {
+    color: inherit;
+    text-decoration: none;
+  }
+  .support-footer a:hover,
+  .support-footer button:hover {
+    @apply text-bratrax-text-primary;
+    text-decoration: underline;
   }
 </style>

@@ -4,6 +4,10 @@ audience: shared
 order: 2
 group: start-here
 status: ready
+# Three of its steps need admin rights and five of its "Go deeper" links are
+# admin-only, so it dead-ends a demo viewer. The demo tour covers the same
+# ground for them, and still links here for anyone who wants the admin side.
+hide_for_demo: true
 ---
 
 # Your first hour: guided video tour

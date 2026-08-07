@@ -5,7 +5,11 @@
     Dialog,
     DialogContent,
   } from "@rilldata/web-common/components/dialog";
-  import { bratraxUser, bratraxShowWelcomeCard } from "$lib/bratrax/auth-store";
+  import {
+    bratraxUser,
+    bratraxShowWelcomeCard,
+    bratraxIsDemo,
+  } from "$lib/bratrax/auth-store";
   import { HELP_CENTER_URL, SUPPORT_EMAIL } from "$lib/bratrax/constants";
   import { getChecklist, dismissWelcome } from "./checklist";
 
@@ -38,36 +42,67 @@
 
 <Dialog bind:open onOpenChange={(v) => { if (!v) void gotIt(); }}>
   <DialogContent class="welcome-card">
-    <h2 class="title">
-      Welcome to {workspaceName || "Bratrax"} on Bratrax{firstName ? `, ${firstName}` : ""}.
-    </h2>
-    <p class="lede">
-      Your workspace is set up and ready. Here's how to get value out of it:
-    </p>
-
-    <div class="bullet">
-      <BarChart3 size={18} class="bicon" />
-      <span>
-        Open your
-        <a href="/canvas/campaign_deep_dive">Attribution dashboard</a>
-      </span>
-    </div>
-    <div class="bullet">
-      <Search size={18} class="bicon" />
-      <span>
-        <a href="/canvas/customer_analytics">Dive into customer analytics</a>
-      </span>
-    </div>
-    <div class="bullet">
-      <Sparkles size={18} class="bicon" />
-      <span>Ask the AI a question — try "What's my best ROAS day?"</span>
-    </div>
-
-    {#if adminEmail}
-      <p class="contact">
-        Need access changes? Contact a workspace admin:
-        <a href={`mailto:${adminEmail}`}>{adminEmail}</a>
+    <!-- Demo visitors get their own card. The owner copy is wrong for them line
+         by line — it is not their workspace, the data is synthetic, and they
+         cannot act on any of the three prompts — and the admin-contact line
+         showed the shared demo account's admin address to every visitor. -->
+    {#if $bratraxIsDemo}
+      <h2 class="title">
+        You're in the Bratrax demo{firstName ? `, ${firstName}` : ""}.
+      </h2>
+      <p class="lede">
+        A working Bratrax workspace running on a synthetic store. The dashboards
+        are real; the orders, ad spend and customers are generated. Nothing you
+        click can break it.
       </p>
+
+      <div class="bullet">
+        <Sparkles size={18} class="bicon" />
+        <span>
+          <a href="/help/demo-tour">Take the tour</a> — seven stops, about
+          fifteen minutes
+        </span>
+      </div>
+      <div class="bullet">
+        <BarChart3 size={18} class="bicon" />
+        <span>
+          Or go straight to
+          <a href="/canvas/campaign_deep_dive">Attribution</a>
+          or <a href="/canvas/performance_overview">Store Performance</a>
+        </span>
+      </div>
+    {:else}
+      <h2 class="title">
+        Welcome to {workspaceName || "Bratrax"} on Bratrax{firstName ? `, ${firstName}` : ""}.
+      </h2>
+      <p class="lede">
+        Your workspace is set up and ready. Here's how to get value out of it:
+      </p>
+
+      <div class="bullet">
+        <BarChart3 size={18} class="bicon" />
+        <span>
+          Open your
+          <a href="/canvas/campaign_deep_dive">Attribution dashboard</a>
+        </span>
+      </div>
+      <div class="bullet">
+        <Search size={18} class="bicon" />
+        <span>
+          <a href="/canvas/customer_analytics">Dive into customer analytics</a>
+        </span>
+      </div>
+      <div class="bullet">
+        <Sparkles size={18} class="bicon" />
+        <span>Ask the AI a question — try "What's my best ROAS day?"</span>
+      </div>
+
+      {#if adminEmail}
+        <p class="contact">
+          Need access changes? Contact a workspace admin:
+          <a href={`mailto:${adminEmail}`}>{adminEmail}</a>
+        </p>
+      {/if}
     {/if}
 
     <p class="contact">
