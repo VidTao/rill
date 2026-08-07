@@ -92,6 +92,25 @@ describe("sidebar visibility", () => {
     }
   });
 
+  it("keeps hide_for_demo pages out of a demo sidebar but still openable", () => {
+    // Start here otherwise offers a demo user three competing starting points.
+    // The page stays accessible because the demo tour links to it for the admin
+    // side of the product — hiding is a listing rule, not an access rule.
+    const first = HELP_PAGES.find((p) => p.slug === "start-here");
+    expect(first?.hideForDemo).toBe(true);
+    expect(pagesFor("viewer", true).map((p) => p.slug)).not.toContain("start-here");
+    expect(canAccess(first!, "viewer", true)).toBe(true);
+
+    // Everyone else still sees it.
+    expect(pagesFor("viewer", false).map((p) => p.slug)).toContain("start-here");
+    expect(pagesFor("admin", false).map((p) => p.slug)).toContain("start-here");
+  });
+
+  it("leaves Welcome to Bratrax in a demo sidebar", () => {
+    // Deliberate: demo users keep the tour plus one general orientation page.
+    expect(pagesFor("viewer", true).map((p) => p.slug)).toContain("viewer/welcome");
+  });
+
   it("still shows admin pages to admins and hides them from viewers", () => {
     expect(pagesFor("admin").some((p) => p.audience === "admin")).toBe(true);
     expect(pagesFor("viewer").some((p) => p.audience === "admin")).toBe(false);
