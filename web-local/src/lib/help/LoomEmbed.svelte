@@ -21,10 +21,19 @@
 
   const panelId = `loom-panel-${id}`;
 
-  // autoplay, so the click that reveals the player also starts it
+  // Deliberately no `autoplay` param: opening a disclosure loads the player and
+  // stops, so the reader presses play themselves. Autoplaying meant expanding
+  // two stops of a tour started two videos talking over each other, and it also
+  // made the open feel slow — the player could not paint until it had fetched
+  // enough video to begin, where a paused player shows Loom's poster frame as
+  // soon as the embed lands.
+  //
+  // `allow="autoplay"` stays on the iframe. It grants nothing on its own (the
+  // URL decides), and it keeps Loom's own controls working for anything that
+  // resumes playback without a fresh click inside the frame.
   $: src =
     `https://www.loom.com/embed/${id}` +
-    `?hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true&autoplay=1`;
+    `?hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true`;
 </script>
 
 <div class="loom">
