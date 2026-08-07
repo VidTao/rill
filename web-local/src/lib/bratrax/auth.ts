@@ -1,6 +1,10 @@
 import { get } from "svelte/store";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
-import { getEmbeddedToken } from "./shopify-embed";
+import {
+  getEmbeddedToken,
+  isShopifyEmbedded,
+  setEmbeddedToken,
+} from "./shopify-embed";
 
 export interface BratraxUser {
   id: number;
@@ -26,6 +30,25 @@ function getBaseUrl(): string {
 }
 
 /**
+ * Keep the JWT when we're inside the Shopify admin iframe.
+ *
+ * Both login and signup set bratrax_auth, but that cookie is SameSite=Lax and
+ * is never sent from a cross-site frame — so in the embedded app a successful
+ * login leaves the merchant looking logged out, and /login bounces them
+ * straight back to itself.
+ *
+ * Done here rather than at each call site so no entry point can miss it:
+ * /login, /signup, /accept-invite, /join and /shopify/connect all route
+ * through these two functions.
+ *
+ * Skipped entirely when not embedded — a normal browser session has a working
+ * cookie and does not need a second copy of the credential in sessionStorage.
+ */
+function rememberTokenIfEmbedded(token?: string): void {
+  if (token && isShopifyEmbedded()) setEmbeddedToken(token);
+}
+
+/**
  * `token` is the same JWT that gets set as the bratrax_auth cookie. Normally
  * the cookie is all a caller needs and this is ignored — but inside the
  * Shopify admin iframe the cookie is SameSite=Lax and never sent, so the
@@ -46,7 +69,9 @@ export async function bratraxLogin(
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `Login failed (${res.status})`);
   }
-  return res.json();
+  const data = await res.json();
+  rememberTokenIfEmbedded(data?.token);
+  return data;
 }
 
 export async function bratraxSignup(
@@ -64,7 +89,9 @@ export async function bratraxSignup(
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `Signup failed (${res.status})`);
   }
-  return res.json();
+  const data = await res.json();
+  rememberTokenIfEmbedded(data?.token);
+  return data;
 }
 
 export async function bratraxLogout(): Promise<void> {
