@@ -40,6 +40,10 @@ export interface OnboardMeResult {
   client_id: string | null;
   company_name: string;
   clickhouse_db: string;
+  // True only on the shared /try-demo workspace (server compares
+  // clickhouse_db against DEMO_CLIENT_SLUG). Optional so a response from an
+  // older Flask build parses as `undefined` → falsy → not-demo.
+  is_demo?: boolean;
   shopify_embed_enabled: boolean;
   is_paid_subscriber: boolean;
   subscription_status: string | null;

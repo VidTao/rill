@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { bratraxIsDemo, bratraxUser } from "$lib/bratrax/auth-store";
   import { canAccess, getHelpPage, splitHelpBody } from "$lib/help";
   import Markdown from "@rilldata/web-common/components/markdown/Markdown.svelte";
   import LoomEmbed from "$lib/help/LoomEmbed.svelte";
@@ -11,8 +11,9 @@
   $: role = $bratraxUser?.role ?? null;
   $: segments = helpPage ? splitHelpBody(helpPage.body) : [];
 
-  // If a viewer hits an admin-only page, send them to /help.
-  $: if (helpPage && !canAccess(helpPage, role)) {
+  // If a viewer hits an admin-only page — or anyone outside the demo
+  // workspace hits a demo-only one — send them to /help.
+  $: if (helpPage && !canAccess(helpPage, role, $bratraxIsDemo)) {
     goto("/help", { replaceState: true });
   }
 </script>
@@ -24,7 +25,7 @@
       No help page matches <code>{slug}</code>. Pick a page from the sidebar.
     </p>
   </article>
-{:else if canAccess(helpPage, role)}
+{:else if canAccess(helpPage, role, $bratraxIsDemo)}
   <article class="help-page">
     <div class="meta">
       <span class="audience-tag audience-{helpPage.audience}">

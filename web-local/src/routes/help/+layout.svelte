@@ -1,16 +1,18 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { bratraxIsDemo, bratraxUser } from "$lib/bratrax/auth-store";
   import HelpSearch from "$lib/help/HelpSearch.svelte";
   import { groupedPagesFor, pagesFor, type HelpPage } from "$lib/help";
   import { supportChatActions } from "@rilldata/web-common/features/chat/layouts/sidebar/support-chat-store";
 
   $: role = $bratraxUser?.role ?? null;
-  $: visiblePages = pagesFor(role);
+  // Search reads this list too, so demo-only pages stay out of a paying
+  // customer's results, not just their sidebar.
+  $: visiblePages = pagesFor(role, $bratraxIsDemo);
 
   // Sidebar sections come from each page's `group`, not its `audience` — see
   // the HelpGroup docs in $lib/help.
-  $: navGroups = groupedPagesFor(role);
+  $: navGroups = groupedPagesFor(role, $bratraxIsDemo);
 
   $: currentSlug = $page.url.pathname.replace(/^\/help\/?/, "");
 

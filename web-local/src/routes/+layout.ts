@@ -11,6 +11,7 @@ import {
   bratraxOnboardResumeRoute,
   bratraxShowWelcomeCard,
   bratraxViewerMidOnboarding,
+  bratraxIsDemo,
 } from "$lib/bratrax/auth-store";
 import {
   onboardMe,
@@ -180,6 +181,10 @@ export async function load({ url, depends, untrack, fetch }) {
     const resumeRoute = getOnboardResumeRoute(me?.step);
     bratraxOnboarded.set(resumeRoute == null);
     bratraxOnboardResumeRoute.set(resumeRoute);
+
+    // Demo-workspace flag — gates demo-only help content. `me` is null for
+    // super-admins and cross-client users, which correctly reads as not-demo.
+    bratraxIsDemo.set(!!me?.is_demo);
 
     // Fully-onboarded users typing /onboard/* directly: bounce to the
     // workspace landing. Without this they'd land on stale onboarding

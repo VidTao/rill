@@ -6,7 +6,10 @@
 // a tiny inline scanner — the schema is simple enough that a real YAML parser
 // would be overkill.
 
-export type Audience = "viewer" | "admin" | "shared";
+// "demo" is not a role — it's the shared /try-demo workspace. Pages marked
+// with it are visible ONLY to users sitting on that workspace, super_admins
+// included, so demo-only copy never shows up in a paying customer's sidebar.
+export type Audience = "viewer" | "admin" | "shared" | "demo";
 export type Status = "stub" | "draft" | "ready";
 
 /**
@@ -42,6 +45,7 @@ const GROUP_IDS = new Set<string>(HELP_GROUPS.map((g) => g.id));
 function defaultGroup(audience: Audience): HelpGroup {
   if (audience === "admin") return "workspace";
   if (audience === "shared") return "reference";
+  if (audience === "demo") return "start-here";
   return "going-deeper";
 }
 
@@ -124,8 +128,9 @@ export const HELP_PAGES: HelpPage[] = Object.entries(RAW_MODULES)
 /** Pages the given role may see, bucketed into sidebar groups (empty groups dropped). */
 export function groupedPagesFor(
   role: "viewer" | "admin" | "super_admin" | null,
+  isDemo = false,
 ): { id: HelpGroup; label: string; pages: HelpPage[] }[] {
-  const visible = pagesFor(role);
+  const visible = pagesFor(role, isDemo);
   return HELP_GROUPS.map(({ id, label }) => ({
     id,
     label,
@@ -143,18 +148,30 @@ export function getHelpPage(slug: string): HelpPage | null {
  * Pages an audience can see. Admins see admin + shared (and viewer too — admin
  * docs reference viewer concepts). Viewers see viewer + shared only.
  */
-export function pagesFor(role: "viewer" | "admin" | "super_admin" | null): HelpPage[] {
+export function pagesFor(
+  role: "viewer" | "admin" | "super_admin" | null,
+  isDemo = false,
+): HelpPage[] {
+  // Demo pages are orthogonal to role: only the demo workspace sees them, and
+  // it sees them on top of its normal viewer set. Filtered first so neither
+  // branch below has to repeat the check.
+  const pages = HELP_PAGES.filter((p) => p.audience !== "demo" || isDemo);
   if (role === "viewer") {
-    return HELP_PAGES.filter((p) => p.audience === "viewer" || p.audience === "shared");
+    return pages.filter(
+      (p) =>
+        p.audience === "viewer" || p.audience === "shared" || p.audience === "demo",
+    );
   }
-  // admin + super_admin see everything
-  return HELP_PAGES;
+  // admin + super_admin see everything else
+  return pages;
 }
 
 export function canAccess(
   page: HelpPage,
   role: "viewer" | "admin" | "super_admin" | null,
+  isDemo = false,
 ): boolean {
+  if (page.audience === "demo") return isDemo;
   if (page.audience === "shared") return true;
   if (page.audience === "viewer") return true; // viewer pages are universal
   if (page.audience === "admin") return role === "admin" || role === "super_admin";

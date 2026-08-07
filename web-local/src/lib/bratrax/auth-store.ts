@@ -19,3 +19,9 @@ export const bratraxShowWelcomeCard = writable<boolean>(false);
 // The layout renders a placeholder instead of dashboards; viewers can't fix
 // anything themselves, so they must never be sent into the /onboard/* funnel.
 export const bratraxViewerMidOnboarding = writable<boolean>(false);
+// True when the user sits on the shared /try-demo workspace (from
+// /onboard/me's `is_demo`). Gates demo-only surfaces — today the
+// /help/demo-tour page, which is the welcome email's primary CTA and would
+// be noise in a paying customer's help sidebar. Defaults false so nobody
+// sees demo-only content before the guard resolves.
+export const bratraxIsDemo = writable<boolean>(false);

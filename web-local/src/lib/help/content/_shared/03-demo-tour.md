@@ -1,6 +1,6 @@
 ---
 title: Touring the Bratrax demo
-audience: shared
+audience: demo
 group: start-here
 order: 3
 status: ready

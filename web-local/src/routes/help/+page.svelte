@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { bratraxIsDemo, bratraxUser } from "$lib/bratrax/auth-store";
   import HelpSearch from "$lib/help/HelpSearch.svelte";
   import { pagesFor } from "$lib/help";
 
   $: role = $bratraxUser?.role ?? null;
-  $: visiblePages = pagesFor(role);
+  $: visiblePages = pagesFor(role, $bratraxIsDemo);
   $: viewerCount = visiblePages.filter((p) => p.audience === "viewer").length;
   $: adminCount = visiblePages.filter((p) => p.audience === "admin").length;
   $: isAdmin = role === "admin" || role === "super_admin";
