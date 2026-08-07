@@ -1,5 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import { ArrowUp } from "lucide-svelte";
+  import Button from "@rilldata/web-common/components/button/Button.svelte";
   import { SUPPORT_EMAIL } from "$lib/bratrax/constants";
   import { askSupportBot, draftEscalationEmail } from "./api";
   import SupportMarkdown from "./SupportMarkdown.svelte";
@@ -216,35 +218,79 @@
     </div>
   {/if}
 
-  <div class="border-t border-bratrax-border px-4 py-3">
-    <div class="mx-auto flex max-w-xl items-end gap-2">
+  <!-- Deliberately mirrors the AI sidebar's composer
+       (web-common/features/chat/core/input/ChatInput.svelte): one bordered,
+       rounded surface holding a borderless input with a control row along its
+       bottom, focus ring on the container rather than the field, and the same
+       square ArrowUp Button component. The two sidebars sit behind adjacent
+       header buttons, so a composer of its own design read as a different
+       product. Keep them in step if ChatInput's shell changes. -->
+  <div class="px-4 pb-4 pt-3">
+    <div class="support-composer mx-auto max-w-xl">
       <textarea
         bind:this={textarea}
         bind:value={input}
         on:keydown={onKeydown}
         rows="2"
         placeholder="Ask a question about Bratrax…"
-        class="flex-1 resize-none border border-bratrax-border bg-bratrax-bg p-2 text-sm leading-relaxed focus:border-bratrax-acid focus:outline-none"
+        class="max-h-32 w-full resize-none overflow-auto border-0 bg-transparent p-0 text-sm leading-relaxed text-bratrax-text-body outline-none placeholder:text-bratrax-text-muted focus:outline-none focus:ring-0"
       />
-      <button
-        class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90 disabled:opacity-50"
-        disabled={!canSend}
-        on:click={send}
-      >
-        Send
-      </button>
+      <div class="flex flex-row items-center gap-3">
+        <!-- Escalation lives where ChatInput puts its @ affordance: a quiet
+             text control on the left of the same row as Send. -->
+        <a
+          class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted underline hover:text-bratrax-text-primary"
+          href={`mailto:${SUPPORT_EMAIL}`}
+        >
+          Email support
+        </a>
+        {#if hasConversation && !lastNeedsEscalation}
+          <button
+            class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted underline hover:text-bratrax-text-primary"
+            on:click={escalate}
+          >
+            Draft an email
+          </button>
+        {/if}
+        <div class="grow"></div>
+        <Button
+          type="primary"
+          label="Send message"
+          disabled={!canSend}
+          square
+          onClick={send}
+        >
+          <ArrowUp size="16px" />
+        </Button>
+      </div>
     </div>
-    <!-- Kept to a single dim line: the full explanation lives in the empty
-         state above, so repeating it here only ate the answer area. -->
+
+    <!-- On its own line below the box, so it can wrap without stranding a
+         separator dot at the start of a line the way the inline version did. -->
     <p
-      class="mx-auto mt-1.5 max-w-xl font-mono text-[10px] leading-tight text-bratrax-text-muted"
+      class="mx-auto mt-2 max-w-xl font-mono text-[10px] leading-tight text-bratrax-text-muted"
     >
-      Help-center answers · no access to your data ·
-      <a class="underline" href={`mailto:${SUPPORT_EMAIL}`}>Email support</a
-      >{#if hasConversation && !lastNeedsEscalation}
-        ·
-        <button class="underline" on:click={escalate}>Draft an email</button
-        >{/if}
+      Help-center answers · no access to your data
     </p>
   </div>
 </div>
+
+<style lang="postcss">
+  /* Same shell as `.chat-input-form` in
+     web-common/features/chat/core/input/ChatInput.svelte. Outer spacing is on
+     the wrapper here instead of `mx-4 mb-4`, since this sidebar owns its own
+     padding. `rounded-md` is currently a no-op — web-local/tailwind.config.ts
+     zeroes every borderRadius for the Bratrax square-corner look — but it is
+     kept so the two composers stay in step if that is ever relaxed. */
+  .support-composer {
+    @apply flex flex-col gap-1 p-3;
+    @apply rounded-md border bg-input;
+    transition: border-color 0.2s;
+  }
+
+  /* Focus lives on the container, not the textarea: that is what makes the box
+     read as one control rather than a field with a button parked beside it. */
+  .support-composer:focus-within {
+    @apply border-ring-focus;
+  }
+</style>
