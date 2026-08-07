@@ -1,6 +1,7 @@
 ---
 title: Touring the Bratrax demo
 audience: shared
+group: start-here
 order: 3
 status: ready
 ---
@@ -97,7 +98,7 @@ are the ones you'd get, filled with your data.
 
 The full product tour — including the admin side (connecting platforms, cost
 settings, metric trees) — is at
-[Start here: your first hour with Bratrax](/help/start-here).
+[Your first hour: guided video tour](/help/start-here).
 
 ## Questions
 

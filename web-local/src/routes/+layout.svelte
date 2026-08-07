@@ -402,7 +402,12 @@
         <!-- Page content and the support-bot panel share a flex row so opening
              the panel narrows the page rather than covering it. The panel is
              mounted here once instead of inside every page layout; it collapses
-             to `display: none` when closed, leaving this row a no-op. -->
+             to `display: none` when closed, leaving this row a no-op.
+
+             Suppressed on /embed/*: the panel's only toggle is the "?" button
+             in the header, which we don't render there, so it could never be
+             closed again — and a 420px column inside the ~1150px Shopify admin
+             iframe would leave nothing for the page. -->
         <div class="flex min-h-0 flex-1 flex-row">
           <div class="flex min-h-0 min-w-0 flex-1 flex-col">
             {#if $bratraxViewerMidOnboarding && !onHelpPage}
@@ -412,17 +417,10 @@
             {/if}
           </div>
 
-          {#if $bratraxUser}
+          {#if $bratraxUser && !onEmbedPage}
             <SupportChatSidebar />
           {/if}
         </div>
-        {#if $bratraxUser && !onEmbedPage}
-          <!-- Support-bot panel (the "?" header button). Fixed-position, so it
-               can live here once instead of inside every page layout. Hidden
-               on /embed/* — its toggle lives in the header we suppress there,
-               so it would be a fixed overlay with no way to open or close it. -->
-          <SupportChatSidebar />
-        {/if}
       </div>
     </OrderDrilldownProvider>
   </FileAndResourceWatcher>
