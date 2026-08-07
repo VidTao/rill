@@ -2,7 +2,7 @@
 title: Admin overview
 audience: admin
 order: 1
-group: workspace
+group: building
 status: ready
 ---
 
@@ -15,19 +15,22 @@ As an admin you can do everything a viewer can, plus build and modify the things
 - **Connect platforms** — Shopify, Facebook, Google, TikTok, Klaviyo and more, from the Connectors tab.
 - **Edit dashboards** — change layout, add tiles, build new dashboards from scratch.
 - **Define metrics** — declare which numbers are available and how they're calculated.
-- **Write models** — SQL that prepares data for metrics.
 - **Tune Claude** — give the AI analyst business context so it answers questions correctly.
 
-## The four authoring folders
+## The three authoring folders
 
-Open the file tree on the left. You'll see four folders you can edit:
+Open the file tree on the left. You'll see three folders you can edit:
 
 - **`/dashboards/`** — one YAML file per dashboard. This is the layout viewers see.
 - **`/metrics/`** — one YAML file per metrics view. Declares dimensions and measures.
-- **`/models/`** — one SQL file per model. Prepares the data that metrics views read from.
 - **`/knowledge/`** — text files used to give Claude business context.
 
 The `/sources/` folder is also visible but is read-only — those files are auto-generated when you connect a platform.
+
+You won't see a `/models/` folder. The SQL that prepares your data — joining orders
+to touchpoints, rolling up campaign spend, building the attribution tables — is
+maintained by Bratrax in the warehouse rather than authored per workspace. Metrics
+views read those prepared tables directly.
 
 ## What you can't change
 
@@ -39,7 +42,7 @@ If you need any of those changed, contact support.
 
 ## How a saved change goes live
 
-There's no separate publish step. When you save a model, metric, or dashboard file:
+There's no separate publish step. When you save a metric or dashboard file:
 
 1. The file validates immediately. Errors appear inline.
 2. If valid, it goes live for everyone with access.

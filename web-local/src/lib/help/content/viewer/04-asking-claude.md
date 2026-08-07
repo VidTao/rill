@@ -10,10 +10,10 @@ status: ready
 
 Claude is a built-in analyst. Open the chat panel and ask questions about your data in plain English — it answers using the same metrics and dimensions that power your dashboards.
 
-**Video walkthrough**
-
 ```loom
-846726e08bd6449382a2520807cbeaec
+id: 846726e08bd6449382a2520807cbeaec
+label: How to use AI inside Bratrax
+duration: 0:48
 ```
 
 ## How to phrase a good question

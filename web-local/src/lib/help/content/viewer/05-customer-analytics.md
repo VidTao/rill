@@ -10,10 +10,10 @@ status: ready
 
 Use [**Customer Analytics**](https://bratrax.com/canvas/customer_analytics) to understand customer quality, subscriber health, MRR, LTV, retention, and which acquisition sources create valuable subscribers.
 
-**Video walkthrough**
-
 ```loom
-ccd23ffea3b34320b2637286045f4821
+id: ccd23ffea3b34320b2637286045f4821
+label: Customer Analytics
+duration: 1:42
 ```
 
 ## Look first at

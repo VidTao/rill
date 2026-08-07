@@ -12,26 +12,29 @@ Conventions that keep your dashboards reliable and fast as the data grows.
 
 ## Naming
 
-- **Models** — prefix by purpose:
-  - `dim_*` for dimension-style tables (one row per entity: `dim_customers`, `dim_products`)
-  - `fct_*` for fact tables (one row per event: `fct_orders`, `fct_sessions`)
-  - `mart_*` for stitched/aggregated outputs (`mart_daily_performance`)
-- **Metrics views** — match the model name where possible (`order_metrics` over `fct_orders`)
-- **Dashboards** — kebab-case in the filename, human-readable in `display_name`
+The prepared tables you read from already follow a convention: `dim_*` holds one
+row per entity (`dim_customers`, `dim_products`), `fct_*` one row per event
+(`fct_orders`), and `*_v1` tables are pre-computed rollups.
 
-## When to make a new model vs. reuse one
+- **Metrics views** — name for the question they answer (`order_metrics`), not the
+  table they read (`dim_orders`).
+- **Dashboards** — kebab-case in the filename, human-readable in `display_name`.
 
-- **Reuse** if an existing model has the data you need at the right grain.
-- **New model** if you need a different grain (e.g. weekly when the existing one is daily) or a meaningfully different filter.
+## When to make a new metrics view vs. reuse one
 
-Avoid copy-pasting a model and editing one line. Either parameterize the original or use it as-is and filter at the metrics-view level.
+- **Reuse** if an existing view already exposes the measures and dimensions you
+  need. Filter at the dashboard level instead of duplicating the view.
+- **New view** if you need a different grain or a genuinely different set of
+  measures.
+
+Avoid copy-pasting a view and editing one line — a second view with the same
+measures is a second place to keep them correct.
 
 ## Performance
 
 - **Filter early.** Push `WHERE` clauses as close to the source as possible.
 - **Avoid `SELECT *`** on raw tables. Pick only the columns you need.
-- **Materialize heavy models.** Add `-- @materialize: true` at the top of any model that takes more than 2 seconds. The result gets cached and refreshed automatically.
-- **Use date filters** even when a dashboard shows "all time." Limit the underlying model to the longest range you actually need (e.g. 2 years).
+- **Set a sensible default time range** rather than "all time." Most questions are answered by the last 30 or 90 days, and a narrower default draws faster.
 
 ## Dashboard design
 

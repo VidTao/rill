@@ -13,10 +13,9 @@ company details, the team, billing, and integrations. Open it from the
 **SETTINGS** dropdown in the top header (visible to admins; viewers don't see
 this menu).
 
-**Video walkthrough**
-
 ```loom
-aeca0d86c03641ee959a15ca745d6f8b
+id: aeca0d86c03641ee959a15ca745d6f8b
+label: Settings
 ```
 
 Settings is **not** where costs live. COGS, shipping, gateway fees, custom

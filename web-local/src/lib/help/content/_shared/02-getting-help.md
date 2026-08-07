@@ -10,10 +10,10 @@ status: ready
 
 ## What's the fastest way to get support?
 
-**Video walkthrough**
-
 ```loom
-fa947b32df364ecbbfb2d72208162d9e
+id: fa947b32df364ecbbfb2d72208162d9e
+label: Tab — Help
+duration: 1:48
 ```
 
 Three options, ranked by speed:

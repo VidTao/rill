@@ -8,14 +8,14 @@ status: ready
 
 # Metrics views
 
-A **metrics view** is the layer between your data (a model) and a dashboard. It declares which numbers can be measured and how they can be sliced. Metrics views live in `/metrics/` as YAML files.
+A **metrics view** is the layer between your prepared data and a dashboard. It declares which numbers can be measured and how they can be sliced. Metrics views live in `/metrics/` as YAML files.
 
 ## Anatomy of a metrics view
 
 ```yaml
 type: metrics_view
 display_name: Order metrics
-table: orders_by_day        # the model this reads from
+table: orders_by_day        # the prepared table this reads from
 timeseries: order_date      # the date column
 
 dimensions:
@@ -46,7 +46,7 @@ Save the file and the metrics view is immediately queryable from any dashboard.
 Dimensions are the things you group or filter by — channel, product, country, etc.
 
 - **`name`** — what dashboards refer to it as
-- **`column`** — the column on the model
+- **`column`** — the column on the table this view reads from
 - **`display_name`** — what users see in the UI
 - **`description`** — optional, surfaces as a tooltip
 
@@ -76,7 +76,7 @@ where: order_status != 'test'
 
 ## Common validation errors
 
-- **"Unknown column"** — the column doesn't exist on the model. Check spelling, then save the model.
+- **"Unknown column"** — the column doesn't exist on the table this view reads from. Check the spelling; ClickHouse is case-sensitive.
 - **"Duplicate measure name"** — two measures share a `name`. Rename one.
 - **"Invalid expression"** — SQL won't parse. The error points to the line.
 
