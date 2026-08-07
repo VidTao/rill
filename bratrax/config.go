@@ -38,6 +38,15 @@ type Config struct {
 	// is hidden). Surfaced to the frontend via GET /bratrax/auth/config. Read
 	// from ALLOW_WOOCOMMERCE; flip per need without a code change.
 	AllowWoocommerce bool
+
+	// ShopifyClientID / ShopifyClientSecret are the Shopify app's OAuth
+	// credentials, used here only to verify App Bridge session tokens (HS256,
+	// signed with the secret, audience = the client id). Both must be set for
+	// embedded-admin auth to work; when either is empty the session-token path
+	// is disabled and only the bratrax_auth cookie is accepted. Same values
+	// Flask reads as SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET.
+	ShopifyClientID     string
+	ShopifyClientSecret string
 }
 
 // ConfigFromEnv reads Bratrax configuration from environment variables.
@@ -110,13 +119,15 @@ func ConfigFromEnv() (*Config, error) {
 	}
 
 	return &Config{
-		TargetURL:          u,
-		UsersDSN:           usersDSN,
-		IssuerURL:          issuerURL,
-		AudienceURL:        audienceURL,
-		RuntimeAddr:        runtimeAddr,
-		SecureCookie:       secureCookie,
-		OnlyInvitationLink: onlyInvitationLink,
-		AllowWoocommerce:   allowWoocommerce,
+		TargetURL:           u,
+		UsersDSN:            usersDSN,
+		IssuerURL:           issuerURL,
+		AudienceURL:         audienceURL,
+		RuntimeAddr:         runtimeAddr,
+		SecureCookie:        secureCookie,
+		OnlyInvitationLink:  onlyInvitationLink,
+		AllowWoocommerce:    allowWoocommerce,
+		ShopifyClientID:     os.Getenv("SHOPIFY_CLIENT_ID"),
+		ShopifyClientSecret: os.Getenv("SHOPIFY_CLIENT_SECRET"),
 	}, nil
 }

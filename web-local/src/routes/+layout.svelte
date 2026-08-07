@@ -159,6 +159,13 @@
   // nav, so a mid-onboarding user still gets a Settings + Help strip.
   $: onOnboardPage = $page.url.pathname.startsWith("/onboard");
 
+  // /embed/* renders inside the Shopify admin iframe, which supplies its own
+  // navigation. Our header, dashboard tabs, client switcher, checklist banner
+  // and support panel would be a second, competing chrome inside a container
+  // that is already only ~1150px wide on desktop and ~400px on mobile admin.
+  // The embedded pages carry their own "Open in Bratrax" affordance instead.
+  $: onEmbedPage = $page.url.pathname.startsWith("/embed");
+
   // Role-based nav visibility. The DB-side enum is super_admin / admin / viewer.
   $: role = $bratraxUser?.role ?? null;
   $: isViewer = role === "viewer";
@@ -256,7 +263,7 @@
       <div
         class="body h-screen w-screen overflow-hidden absolute flex flex-col"
       >
-        {#if $bratraxUser}
+        {#if $bratraxUser && !onEmbedPage}
           <BannerCenter />
           <RepresentingUserBanner />
           <ApplicationHeader
@@ -409,6 +416,13 @@
             <SupportChatSidebar />
           {/if}
         </div>
+        {#if $bratraxUser && !onEmbedPage}
+          <!-- Support-bot panel (the "?" header button). Fixed-position, so it
+               can live here once instead of inside every page layout. Hidden
+               on /embed/* — its toggle lives in the header we suppress there,
+               so it would be a fixed overlay with no way to open or close it. -->
+          <SupportChatSidebar />
+        {/if}
       </div>
     </OrderDrilldownProvider>
   </FileAndResourceWatcher>

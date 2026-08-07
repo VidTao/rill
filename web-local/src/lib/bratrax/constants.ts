@@ -15,3 +15,13 @@ export const PRIVACY_POLICY_URL = "https://bratrax.com/privacy-policy";
 // on /signup, the browser redirects here with their email appended as
 // #email=<URL-encoded>. The survey has a matching `email` parameter configured.
 export const WAITLIST_TYPEFORM_URL = "https://form.typeform.com/to/NEugqBiK";
+
+/**
+ * The Shopify app's handle, as it appears in admin deep links:
+ *   https://admin.shopify.com/store/<store>/apps/<handle>
+ *
+ * Matches `handle` in the bratrax repo's shopify.app.toml. Shopify rewrites
+ * the per-install app handle in Liquid block types, but the admin URL uses
+ * this stable one.
+ */
+export const SHOPIFY_APP_HANDLE = "platform-connector-2";

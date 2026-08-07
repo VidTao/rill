@@ -40,6 +40,7 @@ type User struct {
 type UserStoreInterface interface {
 	Authenticate(ctx context.Context, email, password string) (*User, error)
 	GetByID(ctx context.Context, id int) (*User, error)
+	GetPrimaryUserForClient(ctx context.Context, clientID string) (*User, error)
 	CreateUser(ctx context.Context, email, password, name, role string, projectID *string) (*User, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	LinkUserToClient(ctx context.Context, userID int, clientID string) error
@@ -109,6 +110,44 @@ func (s *UserStore) GetByID(ctx context.Context, id int) (*User, error) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("bratrax userstore: query failed: %w", err)
+	}
+	return &u, nil
+}
+
+// GetPrimaryUserForClient returns the account a Shopify session token should
+// act as: the earliest-created admin on the client, falling back to the
+// earliest non-viewer.
+//
+// A session token proves which SHOP the request came from, not which person is
+// driving it — Shopify's `sub` claim is a Shopify user id with no Bratrax
+// counterpart. So embedded requests act as the workspace owner. That is the
+// same identity the merchant would get logging in directly, and it keeps the
+// X-Bratrax-* headers downstream identical to the cookie path.
+//
+// Viewers are excluded deliberately: a workspace whose only members are
+// viewers should fail closed rather than silently granting write access to
+// anyone who can open the app in that shop's admin. super_admins are excluded
+// for the same reason in reverse — an embedded session must never inherit
+// cross-tenant powers.
+func (s *UserStore) GetPrimaryUserForClient(ctx context.Context, clientID string) (*User, error) {
+	if clientID == "" {
+		return nil, nil
+	}
+	var u User
+	err := s.db.GetContext(ctx, &u,
+		`SELECT id, email, '' AS password_hash, name, role, project_id, client_id,
+		        last_client_id, multi_client_id, created_at, updated_at
+		   FROM rill_users
+		  WHERE client_id = $1 AND role = 'admin'
+		  ORDER BY created_at ASC
+		  LIMIT 1`,
+		clientID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("bratrax userstore: primary user query failed: %w", err)
 	}
 	return &u, nil
 }

@@ -2,6 +2,7 @@ package bratrax
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -44,6 +45,25 @@ type AuthMapper struct {
 	logger      *zap.Logger
 	issuerURL   string
 	audienceURL string
+
+	// Shopify app credentials for verifying App Bridge session tokens. Both
+	// empty disables that path entirely; see WithShopifySessionAuth.
+	shopifyClientID     string
+	shopifyClientSecret string
+}
+
+// WithShopifySessionAuth enables the Shopify embedded-admin auth path, where a
+// merchant is identified by an App Bridge session token instead of the
+// bratrax_auth cookie (which is third-party inside the admin iframe and blocked
+// by Safari). Returns the mapper for chaining.
+//
+// A setter rather than two more constructor arguments: the cookie path is
+// unchanged whether or not this is called, and every existing NewAuthMapper
+// caller keeps working untouched.
+func (a *AuthMapper) WithShopifySessionAuth(clientID, clientSecret string) *AuthMapper {
+	a.shopifyClientID = clientID
+	a.shopifyClientSecret = clientSecret
+	return a
 }
 
 // NewAuthMapper creates an AuthMapper with all required dependencies.
@@ -82,13 +102,15 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 		}
 
 		// 1. Extract cookie
+		var bearerToken string
 		cookie, err := r.Cookie(bratraxCookieName)
 		if err != nil {
 			// Also check Authorization header as fallback (for popup OAuth flows
 			// where cookies may not be sent due to browser restrictions)
 			authHeader := r.Header.Get("Authorization")
 			if strings.HasPrefix(authHeader, "Bearer ") {
-				cookie = &http.Cookie{Value: strings.TrimPrefix(authHeader, "Bearer ")}
+				bearerToken = strings.TrimPrefix(authHeader, "Bearer ")
+				cookie = &http.Cookie{Value: bearerToken}
 			} else {
 				writeJSONError(w, http.StatusUnauthorized, "authentication required")
 				return
@@ -101,6 +123,15 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			jwt.WithValidMethods([]string{"RS256"}),
 		)
 		if err != nil {
+			// Not one of ours. Inside the Shopify admin iframe the bratrax_auth
+			// cookie is third-party (blocked outright by Safari's ITP), so App
+			// Bridge sends a Shopify session token as the bearer instead. Try
+			// that before giving up. Deliberately second: the cookie path stays
+			// byte-identical, and a normal expired token pays only one extra
+			// HS256 parse before its 401.
+			if bearerToken != "" && a.serveShopifySession(w, r, next, bearerToken) {
+				return
+			}
 			a.logger.Debug("jwt validation failed", zap.Error(err))
 			writeJSONError(w, http.StatusUnauthorized, "invalid or expired token")
 			return
@@ -170,29 +201,133 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			})
 		}
 
-		// 5. Strip any incoming identity headers to prevent spoofing
-		// Uses case-insensitive matching to block all variations.
-		stripBratraxHeaders(r.Header)
-
-		// 6. Set identity headers for Flask.
-		// X-Bratrax-Org-Id is retained for backwards compatibility with legacy Flask
-		// code (credentials.py, connectors/*.py) that reads it via helpers/auth.get_user_organization_id().
-		// It now always mirrors user.id — which is what it semantically was in the old schema.
-		r.Header.Set("user-id", strconv.Itoa(user.ID))
-		r.Header.Set("X-Bratrax-User-Id", strconv.Itoa(user.ID))
-		r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(user.ID))
-		if client != nil {
-			r.Header.Set("X-Bratrax-Client-Id", client.ClientID)
-		}
-		if user.MultiClientID != nil && *user.MultiClientID != "" {
-			r.Header.Set("X-Bratrax-Multi-Client-Id", *user.MultiClientID)
-		}
-		r.Header.Set("X-Bratrax-User-Email", user.Email)
-		r.Header.Set("X-Bratrax-User-Role", user.Role)
+		// 5+6. Strip incoming identity headers (anti-spoofing) and set ours.
+		applyIdentityHeaders(r, user, client)
 
 		// 7. Forward to next handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+// applyIdentityHeaders strips any caller-supplied identity headers and sets the
+// ones Flask trusts. Shared by the cookie path and the Shopify session-token
+// path so the two cannot drift — downstream must not be able to tell which
+// credential authenticated the request.
+//
+// X-Bratrax-Org-Id is retained for backwards compatibility with legacy Flask
+// code (credentials.py, connectors/*.py) that reads it via
+// helpers/auth.get_user_organization_id(). It now always mirrors user.id —
+// which is what it semantically was in the old schema.
+func applyIdentityHeaders(r *http.Request, user *User, client *Client) {
+	stripBratraxHeaders(r.Header)
+
+	r.Header.Set("user-id", strconv.Itoa(user.ID))
+	r.Header.Set("X-Bratrax-User-Id", strconv.Itoa(user.ID))
+	r.Header.Set("X-Bratrax-Org-Id", strconv.Itoa(user.ID))
+	if client != nil {
+		r.Header.Set("X-Bratrax-Client-Id", client.ClientID)
+	}
+	if user.MultiClientID != nil && *user.MultiClientID != "" {
+		r.Header.Set("X-Bratrax-Multi-Client-Id", *user.MultiClientID)
+	}
+	r.Header.Set("X-Bratrax-User-Email", user.Email)
+	r.Header.Set("X-Bratrax-User-Role", user.Role)
+}
+
+// serveShopifySession authenticates a request carrying a Shopify App Bridge
+// session token and, on success, forwards it with the usual identity headers.
+//
+// Returns true when the request has been fully handled (either served or
+// answered with an error); false means "this wasn't a Shopify session token",
+// and the caller should fall through to its normal 401.
+//
+// The token proves which SHOP is asking. Mapping shop -> client is guaranteed
+// single-valued by idx_onboarding_shopify_shop_unique, and the request then
+// acts as that workspace's primary admin — see UserStore.GetPrimaryUserForClient
+// for why an embedded session gets an owner identity rather than a per-person one.
+func (a *AuthMapper) serveShopifySession(w http.ResponseWriter, r *http.Request, next http.Handler, token string) bool {
+	user, client, err := a.resolveShopifySessionDetailed(r, token)
+	switch {
+	case err == nil:
+		applyIdentityHeaders(r, user, client)
+		next.ServeHTTP(w, r)
+		return true
+	case errors.Is(err, errShopifySessionNotOurs):
+		// Not a Shopify session token at all — let the caller fall through to
+		// its normal 401 for an unrecognised credential.
+		return false
+	case errors.Is(err, errShopifyShopUnlinked):
+		// Valid token, but nobody has claimed this shop yet — the normal state
+		// for an App Store install with no Bratrax account behind it. Distinct
+		// message so the embedded frontend can route to signup instead of
+		// treating it as a broken session.
+		writeJSONError(w, http.StatusUnauthorized, "shopify shop not linked to a bratrax account")
+		return true
+	case errors.Is(err, errShopifyNoAccount):
+		writeJSONError(w, http.StatusForbidden, "no account provisioned for this shop")
+		return true
+	default:
+		writeJSONError(w, http.StatusInternalServerError, "internal error")
+		return true
+	}
+}
+
+var (
+	errShopifySessionNotOurs = errors.New("bratrax: not a shopify session token")
+	errShopifyShopUnlinked   = errors.New("bratrax: shopify shop has no client")
+	errShopifyNoAccount      = errors.New("bratrax: shopify client has no admin user")
+)
+
+// resolveShopifySessionDetailed verifies a session token and maps it to a
+// tenant, distinguishing the failure modes so callers can respond differently.
+//
+// Shared by the request middleware and ResolveClientFromCookie — the latter is
+// what InstanceRouterMiddleware uses to pick the tenant's Rill instance, so
+// both must agree or an embedded dashboard authenticates fine yet reads from
+// the wrong (empty) instance.
+func (a *AuthMapper) resolveShopifySessionDetailed(r *http.Request, token string) (*User, *Client, error) {
+	shop, err := verifyShopifySessionToken(token, a.shopifyClientID, a.shopifyClientSecret)
+	if err != nil {
+		if !errors.Is(err, errShopifySessionDisabled) {
+			a.logger.Debug("shopify session token rejected", zap.Error(err))
+		}
+		return nil, nil, errShopifySessionNotOurs
+	}
+
+	client, err := a.clientStore.GetByShopifyShop(r.Context(), shop)
+	if err != nil {
+		a.logger.Error("shopify shop lookup failed", zap.String("shop", shop), zap.Error(err))
+		return nil, nil, err
+	}
+	if client == nil {
+		a.logger.Info("shopify session for unlinked shop", zap.String("shop", shop))
+		return nil, nil, errShopifyShopUnlinked
+	}
+
+	user, err := a.userStore.GetPrimaryUserForClient(r.Context(), client.ClientID)
+	if err != nil {
+		a.logger.Error("shopify primary user lookup failed",
+			zap.String("client_id", client.ClientID), zap.Error(err))
+		return nil, nil, err
+	}
+	if user == nil {
+		a.logger.Warn("shopify session for client with no admin user",
+			zap.String("shop", shop), zap.String("client_id", client.ClientID))
+		return nil, nil, errShopifyNoAccount
+	}
+
+	return user, client, nil
+}
+
+// resolveShopifySession is the boolean-shaped wrapper ResolveClientFromCookie
+// wants: any failure is simply "no identity", since that path has no response
+// writer and its callers already handle a nil client.
+func (a *AuthMapper) resolveShopifySession(r *http.Request, token string) (*User, *Client, bool) {
+	user, client, err := a.resolveShopifySessionDetailed(r, token)
+	if err != nil {
+		return nil, nil, false
+	}
+	return user, client, true
 }
 
 // ResolveClientFromCookie validates the bratrax_auth JWT cookie on the request and returns
@@ -200,12 +335,14 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 // or invalid token. Returns (user, nil, nil) if the user has no provisioned client yet.
 // Reusable from other middleware (e.g. the per-user instance router).
 func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, error) {
+	var bearerToken string
 	cookie, err := r.Cookie(bratraxCookieName)
 	if err != nil {
 		// Authorization header fallback (popup OAuth flows)
 		authHeader := r.Header.Get("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
-			cookie = &http.Cookie{Value: strings.TrimPrefix(authHeader, "Bearer ")}
+			bearerToken = strings.TrimPrefix(authHeader, "Bearer ")
+			cookie = &http.Cookie{Value: bearerToken}
 		} else {
 			return nil, nil, nil
 		}
@@ -214,6 +351,19 @@ func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, e
 	claims := &bratraxClaims{}
 	_, err = jwt.ParseWithClaims(cookie.Value, claims, a.jwks.Keyfunc, jwt.WithValidMethods([]string{"RS256"}))
 	if err != nil {
+		// Shopify embedded admin: no bratrax_auth cookie exists on this origin,
+		// so the runtime client authenticates with an App Bridge session token.
+		//
+		// This matters more than it looks. InstanceRouterMiddleware calls this
+		// function to rewrite /v1/instances/default/* to the tenant's real
+		// instance. Without this branch an embedded request resolves to no
+		// client, falls through to the empty "default" instance, and the
+		// embedded dashboard renders with no data at all.
+		if bearerToken != "" {
+			if user, client, ok := a.resolveShopifySession(r, bearerToken); ok {
+				return user, client, nil
+			}
+		}
 		return nil, nil, nil
 	}
 	if !claims.VerifyIssuer(a.issuerURL, true) || !claims.VerifyAudience(a.audienceURL, true) {

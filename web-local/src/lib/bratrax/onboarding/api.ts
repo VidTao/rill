@@ -1,5 +1,6 @@
 import { get } from "svelte/store";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+import { shopifyAuthHeader } from "../shopify-app-bridge";
 
 function getBaseUrl(): string {
   return get(runtime).host;
@@ -9,9 +10,18 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  // Inside the Shopify admin iframe, bratrax_auth is a third-party cookie and
+  // Safari blocks it outright — so embedded requests authenticate with a
+  // Shopify App Bridge session token instead. The Go proxy accepts either and
+  // injects identical identity headers downstream (bratrax/auth.go).
+  //
+  // Returns {} when not embedded, so every existing caller is byte-identical.
+  const authHeader = await shopifyAuthHeader();
+
   const res = await fetch(`${getBaseUrl()}${path}`, {
     credentials: "include",
     ...init,
+    headers: { ...(init?.headers ?? {}), ...authHeader },
   });
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
@@ -192,6 +202,13 @@ export async function onboardStart(
     requiresPayment?: boolean;
     isMultiStore?: boolean;
     lockedStore?: "shopify" | "woocommerce";
+    /**
+     * Token for a Shopify App Store install already parked in
+     * rill_shopify_pending_installs. When present the backend adopts that
+     * connection onto the new client, so the merchant skips /onboard/store —
+     * they connected their store before they had an account.
+     */
+    shopifyInstallToken?: string;
   } = {},
 ): Promise<OnboardStartResult> {
   // requires_payment defaults true on the backend, so we only send the field
@@ -211,6 +228,9 @@ export async function onboardStart(
   // + disables the other option (persisted in stack_selections.locked_store_platform).
   if (options.lockedStore) {
     body.locked_store_platform = options.lockedStore;
+  }
+  if (options.shopifyInstallToken) {
+    body.shopify_install_token = options.shopifyInstallToken;
   }
   return apiFetch<OnboardStartResult>("/bratrax/onboard/start", {
     method: "POST",
@@ -414,17 +434,93 @@ export interface PaymentCheckoutResult {
   error?: string;
 }
 
-export async function getPaymentCheckoutUrl(): Promise<PaymentCheckoutResult> {
+/**
+ * `embedded` tells the backend to point Lemon Squeezy's post-payment redirect
+ * at /payment-complete instead of /onboard/payment?return=1. Checkout has to
+ * run in a new top-level tab when we're inside the Shopify admin iframe, and
+ * that tab must not land on an onboarding screen the merchant is already
+ * looking at behind it.
+ */
+export async function getPaymentCheckoutUrl(
+  embedded = false,
+): Promise<PaymentCheckoutResult> {
   return apiFetch<PaymentCheckoutResult>("/bratrax/onboard/payment/checkout", {
     method: "POST",
+    body: JSON.stringify({ embedded }),
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 export interface PaymentStatusResult {
   is_paid: boolean;
   subscription_status: string | null;
+  /**
+   * Onboarding step as of this read. Lets the payment page route off the
+   * resume map rather than assuming /onboard/store — an App Store merchant
+   * already has their store connected and resolves to embed_pending.
+   */
+  step?: string | null;
 }
 
 export async function getPaymentStatus(): Promise<PaymentStatusResult> {
   return apiFetch<PaymentStatusResult>("/bratrax/onboard/payment/status");
+}
+
+// -------------------------------------------------------------------------
+// Embedded session hand-off ("Open in Bratrax")
+// -------------------------------------------------------------------------
+// Inside the Shopify admin iframe the merchant is authenticated by a Shopify
+// App Bridge session token, so there is no bratrax_auth cookie on this origin
+// — opening the full app in a new tab would land on /login. This mints a
+// single-use token; GET /auth/handoff (Go proxy) exchanges it for the real
+// cookie and redirects. 60-second TTL, so call it at click time, not ahead.
+
+export interface EmbedHandoffResult {
+  url: string;
+  expires_in: number;
+}
+
+export async function createEmbedHandoff(): Promise<EmbedHandoffResult> {
+  return apiFetch<EmbedHandoffResult>("/bratrax/auth/embed-handoff", {
+    method: "POST",
+  });
+}
+
+// -------------------------------------------------------------------------
+// Shopify App Store account creation
+// -------------------------------------------------------------------------
+// The parked install token is the authorisation — see the note on
+// routes/shopify_install.py::shopify_install_account for why this exists
+// separately from /signup (waitlist-gated) and /bratrax/auth/signup (gated by
+// ONLY_INVITATION_LINK).
+
+export interface ShopifyAccountResult {
+  status: "ok" | "already_user" | "already_claimed";
+  shop?: string;
+}
+
+export async function createShopifyAccount(opts: {
+  shopifyInstallToken: string;
+  email: string;
+  password: string;
+  name?: string;
+}): Promise<ShopifyAccountResult> {
+  const res = await fetch(`${getBaseUrl()}/shopify/install/account`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      shopify_install_token: opts.shopifyInstallToken,
+      email: opts.email,
+      password: opts.password,
+      name: opts.name,
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  // 409 is a routing signal, not a failure: the caller switches to the log-in
+  // tab. Anything else non-2xx is a real error.
+  if (!res.ok && res.status !== 409) {
+    throw new Error(body.error ?? `Request failed (${res.status})`);
+  }
+  return body as ShopifyAccountResult;
 }

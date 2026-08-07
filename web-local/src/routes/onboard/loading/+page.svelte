@@ -14,6 +14,7 @@
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import { ResourceKind } from "@rilldata/web-common/features/entity-management/resource-selectors";
   import { isRillDemoCanvas } from "$lib/bratrax/dashboardPrefs";
+  import { isShopifyEmbedded } from "$lib/bratrax/shopify-embed";
 
   type VerifyState = "pending" | "running" | "refreshing" | "done" | "error";
 
@@ -471,7 +472,14 @@
 
       let target: string;
       if (firstCanvasName) {
-        target = `/canvas/${firstCanvasName}`;
+        // Embedded merchants land on the single-dashboard view instead of the
+        // full app shell — inside the Shopify admin iframe our own header,
+        // dashboard tabs and switcher would be a second chrome competing with
+        // Shopify's own, in ~1150px. /embed/canvas carries an "Open in
+        // Bratrax" button for anyone who wants the full thing.
+        target = isShopifyEmbedded()
+          ? `/embed/canvas/${firstCanvasName}`
+          : `/canvas/${firstCanvasName}`;
       } else {
         // Fallback: surface any Explore dashboard via the file editor (no
         // preview route exists for those in the Bratrax fork).
@@ -518,24 +526,30 @@
 <div class="loading-page flex h-screen w-screen items-center justify-center">
   <div class="halftone-bg"></div>
 
-  <div class="relative w-full max-w-lg border border-bratrax-border bg-bratrax-surface p-8">
+  <div
+    class="relative w-full max-w-lg border border-bratrax-border bg-bratrax-surface p-8"
+  >
     <div class="absolute left-0 right-0 top-0 h-1 bg-bratrax-acid"></div>
 
     <div class="mb-6 text-center">
-      <div class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+      <div
+        class="mb-2 font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+      >
         INITIALIZING
       </div>
       <h1 class="text-2xl font-black text-bratrax-text-headline">
         Setting up your analytics
       </h1>
       <p class="mt-2 text-sm font-light text-bratrax-text-body">
-        This usually takes 10–15 minutes. You can close this tab and come back
-        — we'll keep working in the background.
+        This usually takes 10–15 minutes. You can close this tab and come back —
+        we'll keep working in the background.
       </p>
     </div>
 
     {#if error}
-      <div class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
+      <div
+        class="mb-4 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+      >
         {error}
       </div>
     {/if}
@@ -545,23 +559,51 @@
         {@const state = status ? step.check(status, verifyState) : "pending"}
         <div class="flex items-center gap-3">
           {#if state === "done"}
-            <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center bg-bratrax-acid/20">
-              <svg class="h-4 w-4 text-bratrax-acid" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            <div
+              class="flex h-6 w-6 flex-shrink-0 items-center justify-center bg-bratrax-acid/20"
+            >
+              <svg
+                class="h-4 w-4 text-bratrax-acid"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
           {:else if state === "running"}
             <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center">
-              <div class="h-5 w-5 animate-spin border-2 border-bratrax-border border-t-bratrax-acid"></div>
+              <div
+                class="h-5 w-5 animate-spin border-2 border-bratrax-border border-t-bratrax-acid"
+              ></div>
             </div>
           {:else if state === "error"}
-            <div class="flex h-6 w-6 flex-shrink-0 items-center justify-center bg-bratrax-tomato/20">
-              <svg class="h-4 w-4 text-bratrax-tomato" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            <div
+              class="flex h-6 w-6 flex-shrink-0 items-center justify-center bg-bratrax-tomato/20"
+            >
+              <svg
+                class="h-4 w-4 text-bratrax-tomato"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </div>
           {:else}
-            <div class="h-6 w-6 flex-shrink-0 border-2 border-bratrax-border"></div>
+            <div
+              class="h-6 w-6 flex-shrink-0 border-2 border-bratrax-border"
+            ></div>
           {/if}
 
           <span
@@ -580,7 +622,9 @@
     <!-- Tap-level extraction details -->
     {#if status && getTapDetails(status).length > 0}
       <div class="mt-6 border-t border-bratrax-border pt-4">
-        <p class="mb-2 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+        <p
+          class="mb-2 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+        >
           Data sync progress
         </p>
         <div class="flex flex-col gap-1.5">
@@ -589,7 +633,10 @@
               <span class="capitalize text-bratrax-text-body">{tap.label}</span>
               <span class="font-mono">
                 {#if tap.failed}
-                  <span class="text-bratrax-tomato" title="Extract reported an error">✗ error</span>
+                  <span
+                    class="text-bratrax-tomato"
+                    title="Extract reported an error">✗ error</span
+                  >
                 {:else if tap.ready}
                   <span class="text-bratrax-acid">✓ ready</span>
                 {:else}

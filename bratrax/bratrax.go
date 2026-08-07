@@ -61,7 +61,8 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	clientStore := NewClientStore(store.DB())
 
 	proxy := NewProxy(cfg.TargetURL, logger)
-	authMapper := NewAuthMapper(store, clientStore, authSvc.JWKS(), logger, cfg.IssuerURL, cfg.AudienceURL)
+	authMapper := NewAuthMapper(store, clientStore, authSvc.JWKS(), logger, cfg.IssuerURL, cfg.AudienceURL).
+		WithShopifySessionAuth(cfg.ShopifyClientID, cfg.ShopifyClientSecret)
 
 	// Local health endpoint — confirms the proxy layer is alive.
 	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +109,44 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	// to Flask's email_pause_routes blueprint verbatim.
 	observability.MuxHandle(mux, "GET /email/pause",
 		observability.Middleware("bratrax", logger, proxy))
+
+	// Shopify App Store install entry. A merchant clicking "Install" on the
+	// listing has no Bratrax session, so both routes bypass the auth mapper —
+	// the `hmac` query param Shopify signs is the auth, verified in Flask.
+	// Outside the /bratrax/ prefix so the redirect URI registered in the Partner
+	// dashboard stays clean; the prefix-stripper leaves non-/bratrax paths
+	// unchanged, so these reach shopify_install_routes verbatim. Registered
+	// before the /bratrax/ catch-all for the same reason /email/pause is.
+	observability.MuxHandle(mux, "GET /shopify/install",
+		observability.Middleware("bratrax", logger, proxy))
+	observability.MuxHandle(mux, "GET /shopify/install/callback",
+		observability.Middleware("bratrax", logger, proxy))
+	// Account creation against a parked install. Public for the same reason:
+	// the merchant has no Bratrax session yet, and the install token they hold
+	// (minted only after a verified OAuth round-trip with Shopify) is the
+	// authorisation. /signup is waitlist-gated and /bratrax/auth/signup is
+	// gated by ONLY_INVITATION_LINK — neither is appropriate for someone who
+	// already found us on the App Store and granted scopes.
+	observability.MuxHandle(mux, "POST /shopify/install/account",
+		observability.Middleware("bratrax", logger, proxy))
+
+	// "Open in Bratrax" hand-off. A merchant inside the Shopify admin iframe is
+	// authenticated by an App Bridge session token and therefore has no
+	// bratrax_auth cookie on this origin, so a new tab would land on /login.
+	// Flask mints a single-use token; this exchanges it for the normal cookie.
+	// Unauthenticated by necessity — the token in `?t=` IS the credential — and
+	// outside the /bratrax/ prefix so the auth catch-all can't swallow it.
+	handoffSvc := NewEmbedHandoffService(store.DB(), authSvc, logger, cfg.SecureCookie)
+	observability.MuxHandle(mux, "GET /auth/handoff",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(handoffSvc.HandleHandoff)))
+
+	// NOTE: /payment-complete (the landing tab for an embedded Lemon Squeezy
+	// checkout) is deliberately NOT registered here. It is a SvelteKit page,
+	// not a Flask route, so it falls through to Rill's static handler like
+	// /login and /forgot-password do. It only needs the isPublicRoute
+	// allowlist entry in web-local/src/routes/+layout.ts. The three-place
+	// public-route checklist in CLAUDE.md applies to FLASK routes outside the
+	// /bratrax/ prefix — /email/pause and /auth/handoff above.
 
 	// WooCommerce wc-auth callback. The merchant's store POSTs the generated
 	// REST API key pair here server-to-server (no login cookie), so it must

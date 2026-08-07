@@ -26,7 +26,10 @@ import {
   type V1ListFilesResponse,
 } from "@rilldata/web-common/runtime-client/index.js";
 import { handleUninitializedProject } from "@rilldata/web-common/features/welcome/is-project-initialized.js";
-import { isInternalSuperadminCanvas, isRillDemoCanvas } from "$lib/bratrax/dashboardPrefs";
+import {
+  isInternalSuperadminCanvas,
+  isRillDemoCanvas,
+} from "$lib/bratrax/dashboardPrefs";
 import { Settings } from "luxon";
 
 Settings.defaultLocale = "en";
@@ -59,7 +62,11 @@ export async function load({ url, depends, untrack, fetch }) {
             const name = r.meta?.name?.name;
             // Skip Rill upstream demo canvases (margin_scorecard etc.) — see
             // RILL_DEMO_CANVAS_NAMES in dashboardPrefs.ts for context.
-            if (name && !isRillDemoCanvas(name) && (user.role === "super_admin" || !isInternalSuperadminCanvas(name))) {
+            if (
+              name &&
+              !isRillDemoCanvas(name) &&
+              (user.role === "super_admin" || !isInternalSuperadminCanvas(name))
+            ) {
               throw redirect(307, `/canvas/${name}`);
             }
           }
@@ -90,6 +97,14 @@ export async function load({ url, depends, untrack, fetch }) {
     url.pathname.startsWith("/vs/") ||
     url.pathname.startsWith("/faq") ||
     url.pathname.startsWith("/try-demo") ||
+    // Landing tab for an embedded Lemon Squeezy checkout. That tab may carry
+    // no bratrax_auth cookie at all — the merchant authenticated inside the
+    // Shopify iframe with a session token, which sets nothing on this origin.
+    // Gating it would bounce them to /login the instant after they paid.
+    url.pathname.startsWith("/payment-complete") ||
+    // Shopify App Store account-creation entry. The merchant has no Bratrax
+    // session yet — the parked install token in the URL is their credential.
+    url.pathname.startsWith("/shopify/connect") ||
     url.pathname.startsWith("/join");
 
   if (isPublicRoute) {
@@ -105,7 +120,9 @@ export async function load({ url, depends, untrack, fetch }) {
   }
 
   if (url.pathname.startsWith("/canvas/")) {
-    const canvasName = decodeURIComponent(url.pathname.slice("/canvas/".length).split("/")[0] ?? "");
+    const canvasName = decodeURIComponent(
+      url.pathname.slice("/canvas/".length).split("/")[0] ?? "",
+    );
     if (isInternalSuperadminCanvas(canvasName) && user.role !== "super_admin") {
       throw redirect(307, "/developer");
     }
@@ -141,8 +158,17 @@ export async function load({ url, depends, untrack, fetch }) {
   // must be able to reach their account settings and help. The minimal nav in
   // the root layout surfaces them; this exemption stops the resume-redirect
   // below from bouncing the user straight back into /onboard/*.
+  // /embed/* is the Shopify-admin surface. A `ready` merchant landing there
+  // must not be bounced by the resume guard, and — more subtly — must not be
+  // bounced by the "fully-onboarded users typing /onboard/* get sent to
+  // /developer" rule either, since /developer is the full app shell and
+  // useless in an iframe. Treated like /settings and /help: reachable at any
+  // onboarding step, because the embedded dashboard is where an embedded
+  // merchant belongs regardless of where the funnel thinks they are.
   const isAlwaysAllowed =
-    url.pathname.startsWith("/settings") || url.pathname.startsWith("/help");
+    url.pathname.startsWith("/settings") ||
+    url.pathname.startsWith("/help") ||
+    url.pathname.startsWith("/embed");
 
   try {
     const me = await onboardMe();
@@ -221,7 +247,8 @@ export async function load({ url, depends, untrack, fetch }) {
         // picker). Let it through every hard gate so the token exchange can
         // complete — at step "created" the callback is where the connect flow
         // finishes, and it self-redirects once the step advances.
-        const isShopifyOAuthReturn = url.pathname.startsWith("/onboard/shopify");
+        const isShopifyOAuthReturn =
+          url.pathname.startsWith("/onboard/shopify");
         if (!url.pathname.startsWith(target) && !isShopifyOAuthReturn) {
           throw redirect(307, target);
         }
