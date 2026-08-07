@@ -48,6 +48,7 @@
     bratraxViewerMidOnboarding,
   } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
+  import { clearEmbeddedToken } from "$lib/bratrax/shopify-embed";
   import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
   import AddStoreButton from "$lib/bratrax/AddStoreButton.svelte";
   import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
@@ -99,8 +100,16 @@
   // identity-aware reactive block below — when canvasUserKey first goes
   // from "anon" to "<userId>:<clientId>", we reset + load fresh.
 
+  // Imported here rather than in auth.ts so the logout path owns clearing
+  // both credentials in one place.
   async function handleBratraxLogout() {
     await bratraxLogout();
+    // bratraxLogout only expires the bratrax_auth cookie. Inside the Shopify
+    // iframe that cookie was never usable — the session is held by the bearer
+    // token in sessionStorage — so without this the merchant stays signed in,
+    // /login sees a valid session and bounces them straight back to the page
+    // they just tried to leave.
+    clearEmbeddedToken();
     bratraxUser.set(null);
     window.location.href = "/login";
   }

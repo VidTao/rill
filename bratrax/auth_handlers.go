@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MicahParks/keyfunc"
@@ -41,6 +42,19 @@ type AuthService struct {
 	secureCookie       bool
 	onlyInvitationLink bool
 	allowWoocommerce   bool
+
+	// sessionResolver, when set, lets cookie-less handlers fall back to Shopify
+	// App Bridge session tokens. Injected after construction because the mapper
+	// itself depends on this service. Nil in tests and when Shopify is unconfigured.
+	sessionResolver *AuthMapper
+}
+
+// WithSessionResolver lets /bratrax/auth/me (and the other authenticateRequest
+// callers) accept a Shopify session token, so a merchant opening the embedded
+// app in a fresh tab — no cookie, no stored JWT — is still recognised.
+func (s *AuthService) WithSessionResolver(m *AuthMapper) *AuthService {
+	s.sessionResolver = m
+	return s
 }
 
 // jwksKeyFile is the path where the dev JWT signing key is persisted.
@@ -417,16 +431,38 @@ func (s *AuthService) HandleAuthConfig(w http.ResponseWriter, r *http.Request) {
 // authenticateRequest extracts and validates the JWT from the auth cookie,
 // then resolves the user from the store.
 func (s *AuthService) authenticateRequest(r *http.Request) (*User, error) {
-	cookie, err := r.Cookie(bratraxCookieName)
-	if err != nil {
+	// Cookie first, then Authorization: Bearer.
+	//
+	// The bearer fallback matters because this function backs /bratrax/auth/me,
+	// which the root layout calls before rendering anything. Inside the Shopify
+	// admin iframe bratrax_auth is SameSite=Lax and never sent, so a cookie-only
+	// check 401s, the layout concludes the merchant is logged out, and every
+	// navigation bounces to /login — even though AuthMapper.Middleware (which
+	// has had this fallback all along) was happily authenticating the very same
+	// requests one route over.
+	var raw string
+	if cookie, err := r.Cookie(bratraxCookieName); err == nil {
+		raw = cookie.Value
+	} else if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
+		raw = strings.TrimPrefix(authHeader, "Bearer ")
+	} else {
 		return nil, err
 	}
 
 	claims := &jwt.RegisteredClaims{}
-	_, err = jwt.ParseWithClaims(cookie.Value, claims, s.jwks.Keyfunc,
+	_, err := jwt.ParseWithClaims(raw, claims, s.jwks.Keyfunc,
 		jwt.WithValidMethods([]string{"RS256"}),
 	)
 	if err != nil {
+		// Not one of ours. In the embedded admin the only credential a returning
+		// merchant has is a Shopify App Bridge session token — sessionStorage is
+		// empty on a fresh tab, so there is no bratrax JWT to fall back on.
+		// Without this they would land on /login inside the iframe every time.
+		if s.sessionResolver != nil && raw != "" {
+			if user, _, ok := s.sessionResolver.resolveShopifySession(r, raw); ok {
+				return user, nil
+			}
+		}
 		return nil, err
 	}
 

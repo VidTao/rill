@@ -63,6 +63,10 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	proxy := NewProxy(cfg.TargetURL, logger)
 	authMapper := NewAuthMapper(store, clientStore, authSvc.JWKS(), logger, cfg.IssuerURL, cfg.AudienceURL).
 		WithShopifySessionAuth(cfg.ShopifyClientID, cfg.ShopifyClientSecret)
+	// Let the self-authenticating handlers (auth/me, auth/users, the client
+	// switcher) resolve Shopify session tokens too. Wired after construction
+	// because the mapper depends on authSvc, not the other way round.
+	authSvc.WithSessionResolver(authMapper)
 
 	// Local health endpoint — confirms the proxy layer is alive.
 	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
