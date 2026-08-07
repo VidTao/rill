@@ -2,7 +2,7 @@
   import CanvasDashboardEmbed from "@rilldata/web-common/features/canvas/CanvasDashboardEmbed.svelte";
   import CanvasProvider from "@rilldata/web-common/features/canvas/CanvasProvider.svelte";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
-  import { openTopLevel } from "$lib/bratrax/shopify-embed";
+  import { reserveTopLevelTab } from "$lib/bratrax/shopify-embed";
   import { createEmbedHandoff } from "$lib/bratrax/onboarding/api";
   import type { PageData } from "./$types";
 
@@ -36,14 +36,22 @@
   async function openInBratrax() {
     opening = true;
     openError = "";
+
+    // Reserve the tab synchronously — the click's popup grant does not survive
+    // the await below, so opening afterwards would be blocked almost always.
+    const tab = reserveTopLevelTab();
+
     try {
       const { url } = await createEmbedHandoff();
-      if (!openTopLevel(url)) {
-        // Popup blocked. The token is single-use and expires in 60s, so we
-        // can't render it as a persistent link — ask for the click again.
+      if (tab.ok) {
+        tab.navigate(url);
+      } else {
+        // Popup blocked outright. The token is single-use and expires in 60s,
+        // so it can't be offered as a persistent link — ask for the click again.
         openError = "Allow pop-ups for this page, then try again.";
       }
     } catch {
+      tab.close();
       openError = "Couldn't open Bratrax. Please try again.";
     } finally {
       opening = false;

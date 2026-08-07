@@ -69,6 +69,9 @@ export function isShopifyEmbedded(): boolean {
 /**
  * Open a URL in a new top-level tab, breaking out of the Shopify iframe.
  *
+ * Only safe to call SYNCHRONOUSLY inside a click handler. If you need to fetch
+ * something first, use reserveTopLevelTab() — see the note there.
+ *
  * Returns false when the popup was blocked, so the caller can render a plain
  * clickable link instead of failing silently — losing a merchant at the
  * checkout step because a popup blocker ate the window is not acceptable.
@@ -81,6 +84,59 @@ export function openTopLevel(url: string): boolean {
     /* fall through */
   }
   return false;
+}
+
+/** Handle to a tab opened ahead of knowing its destination. */
+export interface ReservedTab {
+  /** False when the popup was blocked and nothing was opened. */
+  readonly ok: boolean;
+  /** Send the reserved tab to `url`. No-op when the popup was blocked. */
+  navigate(url: string): void;
+  /** Close the reserved tab — call this if the URL never arrives. */
+  close(): void;
+}
+
+/**
+ * Reserve a blank top-level tab NOW, to navigate once a URL is available.
+ *
+ * Browsers grant `window.open` off a user gesture, and that grant does not
+ * survive an `await`. Both places we break out of the iframe — Lemon Squeezy
+ * checkout and "Open in Bratrax" — have to call the backend first, so opening
+ * afterwards is blocked essentially every time rather than occasionally. The
+ * fallback would become the normal path.
+ *
+ * So: open synchronously on the click, then point the tab at the URL when it
+ * arrives. Deliberately no `noopener` — that makes window.open return null in
+ * several browsers, and we need the handle. `opener` is nulled after
+ * navigating, which gets the same protection.
+ */
+export function reserveTopLevelTab(): ReservedTab {
+  let win: Window | null = null;
+  try {
+    win = window.open("about:blank", "_blank");
+  } catch {
+    win = null;
+  }
+
+  return {
+    ok: !!win,
+    navigate(url: string) {
+      if (!win) return;
+      try {
+        win.opener = null;
+        win.location.replace(url);
+      } catch {
+        /* tab closed by the user mid-flight */
+      }
+    },
+    close() {
+      try {
+        win?.close();
+      } catch {
+        /* already gone */
+      }
+    },
+  };
 }
 
 /**

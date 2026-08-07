@@ -94,3 +94,80 @@ export async function shopifyAuthHeader(): Promise<Record<string, string>> {
   const token = await getShopifySessionToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
+
+// --------------------------------------------------------------------------
+// Rill runtime client
+// --------------------------------------------------------------------------
+// The dashboard's data comes from the Rill runtime client, which does NOT go
+// through apiFetch — it has its own transport (http-client.ts, plus the
+// streaming and SSE clients). All three read the token from ONE place:
+// `runtime.jwt`. web-local never sets it ("backwards-compatibility for
+// web-local (where there's no JWT)"), because locally the cookie is enough.
+//
+// Inside the Shopify iframe there is no cookie, so without this the runtime
+// client sends nothing, InstanceRouterMiddleware resolves no client, the
+// request falls through to the empty "default" instance, and the embedded
+// dashboard renders blank — authenticated everywhere else, but with no data.
+//
+// authContext "embed" is deliberate: maybeWaitForFreshJWT() early-returns for
+// it and skips the client-side expiry check, which assumes a long-lived admin
+// token and would otherwise busy-wait forever on a ~60s Shopify token. Keeping
+// it fresh is therefore our job, hence the interval below.
+
+const SESSION_REFRESH_MS = 30_000; // Shopify tokens live ~60s; refresh at half-life.
+
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Put a Shopify session token into the runtime store and keep it current.
+ *
+ * Await this before rendering anything that queries the runtime — a query that
+ * fires first would go out unauthenticated and read the wrong instance.
+ * Returns true once the runtime client is authenticated.
+ *
+ * Idempotent; no-ops when not embedded.
+ */
+export async function startRuntimeSessionSync(
+  queryClient: unknown,
+  host: string,
+  instanceId: string,
+): Promise<boolean> {
+  if (!isShopifyEmbedded()) return false;
+
+  const { runtime } = await import(
+    "@rilldata/web-common/runtime-client/runtime-store"
+  );
+
+  const push = async (): Promise<boolean> => {
+    const token = await getShopifySessionToken();
+    if (!token) return false;
+    // setRuntime skips the update when nothing changed, so re-pushing the same
+    // token is cheap; a new token bumps receivedAt and invalidates as needed.
+    await runtime.setRuntime(
+      queryClient as never,
+      host,
+      instanceId,
+      token,
+      "embed",
+    );
+    return true;
+  };
+
+  const ok = await push();
+
+  if (!refreshTimer) {
+    refreshTimer = setInterval(() => {
+      void push();
+    }, SESSION_REFRESH_MS);
+  }
+
+  return ok;
+}
+
+/** Stop the refresh loop. Only needed in tests / teardown. */
+export function stopRuntimeSessionSync(): void {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+}

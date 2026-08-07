@@ -8,7 +8,10 @@
     getPaymentStatus,
     getOnboardResumeRoute,
   } from "$lib/bratrax/onboarding/api";
-  import { isShopifyEmbedded, openTopLevel } from "$lib/bratrax/shopify-embed";
+  import {
+    isShopifyEmbedded,
+    reserveTopLevelTab,
+  } from "$lib/bratrax/shopify-embed";
 
   type Mode = "loading" | "intro" | "confirming" | "timeout" | "error";
 
@@ -83,14 +86,23 @@
     busy = true;
     error = "";
     manualCheckoutUrl = "";
+
+    // Reserve the tab NOW, while the click's popup grant is still live. It does
+    // not survive the await below, so opening afterwards would be blocked
+    // essentially every time — the fallback link would become the normal path
+    // rather than the exception.
+    const tab = embedded ? reserveTopLevelTab() : null;
+
     try {
       const result = await getPaymentCheckoutUrl(embedded);
       if (result.already_paid) {
+        tab?.close();
         const me = await onboardMe().catch(() => null);
         await goto(getOnboardResumeRoute(me?.step) ?? "/onboard/store");
         return;
       }
       if (!result.checkout_url) {
+        tab?.close();
         error = result.error || "Could not start checkout. Please try again.";
         return;
       }
@@ -102,15 +114,17 @@
         return;
       }
 
-      // Embedded: break out to a new top-level tab and keep polling here. The
-      // popped tab lands on /payment-complete; this window advances as soon as
-      // the LS webhook flips is_paid, so the merchant never has to come back
-      // to it manually.
-      if (!openTopLevel(result.checkout_url)) {
+      // Embedded: send the reserved tab to checkout and keep polling here. It
+      // lands on /payment-complete; this window advances as soon as the LS
+      // webhook flips is_paid, so the merchant never has to come back to it.
+      if (tab?.ok) {
+        tab.navigate(result.checkout_url);
+      } else {
         manualCheckoutUrl = result.checkout_url;
       }
       startPolling();
     } catch (e) {
+      tab?.close();
       error = e instanceof Error ? e.message : String(e);
     } finally {
       busy = false;
