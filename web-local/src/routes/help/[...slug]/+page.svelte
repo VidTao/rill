@@ -40,7 +40,11 @@
 
     {#each segments as segment}
       {#if segment.kind === "loom"}
-        <LoomEmbed id={segment.id} />
+        <LoomEmbed
+          id={segment.id}
+          label={segment.label ?? ""}
+          duration={segment.duration ?? ""}
+        />
       {:else}
         <Markdown content={segment.value} />
       {/if}

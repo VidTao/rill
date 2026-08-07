@@ -145,25 +145,22 @@ export function getHelpPage(slug: string): HelpPage | null {
 }
 
 /**
- * Pages an audience can see. Admins see admin + shared (and viewer too — admin
- * docs reference viewer concepts). Viewers see viewer + shared only.
+ * Pages the given role may see in the sidebar. Admins see admin + shared (and
+ * viewer too — admin docs reference viewer concepts). Viewers see viewer +
+ * shared only. Demo pages are orthogonal to role: only the demo workspace sees
+ * them, on top of its normal set.
+ *
+ * Delegates to `canAccess` so the sidebar and the page itself can never
+ * disagree. They used to duplicate the audience rules, and the copies had
+ * drifted: this returned every page for a null role, including admin pages
+ * `canAccess` rejects, so the sidebar offered links that redirected straight
+ * back to /help.
  */
 export function pagesFor(
   role: "viewer" | "admin" | "super_admin" | null,
   isDemo = false,
 ): HelpPage[] {
-  // Demo pages are orthogonal to role: only the demo workspace sees them, and
-  // it sees them on top of its normal viewer set. Filtered first so neither
-  // branch below has to repeat the check.
-  const pages = HELP_PAGES.filter((p) => p.audience !== "demo" || isDemo);
-  if (role === "viewer") {
-    return pages.filter(
-      (p) =>
-        p.audience === "viewer" || p.audience === "shared" || p.audience === "demo",
-    );
-  }
-  // admin + super_admin see everything else
-  return pages;
+  return HELP_PAGES.filter((p) => canAccess(p, role, isDemo));
 }
 
 export function canAccess(
@@ -180,14 +177,27 @@ export function canAccess(
 
 export type HelpSegment =
   | { kind: "markdown"; value: string }
-  | { kind: "loom"; id: string };
+  | { kind: "loom"; id: string; label?: string; duration?: string };
 
 // Splits a help body into markdown runs and Loom video embeds. A video is
-// authored as a fenced ```loom block whose only content is the Loom video id:
+// authored as a fenced ```loom block, either as a bare video id:
 //
 //   ```loom
 //   58f3efa9a75e483892ebe484a6c59afa
 //   ```
+//
+// or with a label and duration, which turn the embed into a titled disclosure
+// the reader clicks to open:
+//
+//   ```loom
+//   id: 58f3efa9a75e483892ebe484a6c59afa
+//   label: Store Performance
+//   duration: 1:46
+//   ```
+//
+// Authoring the label inside the fence rather than as markdown above it is what
+// lets the title itself be the control; a markdown "▶ Watch — …" line beside the
+// player looks like a disclosure but cannot be clicked.
 //
 // The shared Markdown component sanitizes out iframes (it also renders AI chat
 // output), so the help page renders loom segments with the LoomEmbed component
@@ -202,13 +212,42 @@ export function splitHelpBody(body: string): HelpSegment[] {
       const md = body.slice(last, m.index).trim();
       if (md) segments.push({ kind: "markdown", value: md });
     }
-    const id = m[1].trim();
-    if (id) segments.push({ kind: "loom", id });
+    const seg = parseLoomFence(m[1]);
+    if (seg) segments.push(seg);
     last = re.lastIndex;
   }
   const tail = body.slice(last).trim();
   if (tail) segments.push({ kind: "markdown", value: tail });
   return segments;
+}
+
+function parseLoomFence(raw: string): HelpSegment | null {
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!lines.length) return null;
+
+  // Bare-id form: the whole fence is the id. A Loom id never contains a colon,
+  // so any "key: value" first line means the fence is the keyed form — treating
+  // it as bare would silently embed "label: …" as the video id.
+  if (!/^[a-zA-Z_-]+\s*:/.test(lines[0])) {
+    return { kind: "loom", id: lines[0] };
+  }
+
+  const fields: Record<string, string> = {};
+  for (const line of lines) {
+    const idx = line.indexOf(":");
+    if (idx === -1) continue;
+    fields[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
+  }
+  if (!fields.id) return null;
+  return {
+    kind: "loom",
+    id: fields.id,
+    label: fields.label || undefined,
+    duration: fields.duration || undefined,
+  };
 }
 
 // Sentinels wrap matched terms inside snippet strings so the rendering layer
