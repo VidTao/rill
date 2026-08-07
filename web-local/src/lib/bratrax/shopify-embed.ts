@@ -86,6 +86,51 @@ export function openTopLevel(url: string): boolean {
   return false;
 }
 
+// --------------------------------------------------------------------------
+// Embedded bearer token
+// --------------------------------------------------------------------------
+// The bratrax_auth cookie is SameSite=Lax, so it is not sent from inside the
+// Shopify admin iframe. That breaks the account-creation flow specifically:
+// onboard_start needs an authenticated caller, and a Shopify session token
+// cannot stand in for one — it resolves shop -> client, and the client is
+// exactly what onboard_start is there to create. Chicken and egg.
+//
+// POST /bratrax/auth/login already returns the JWT in its body, and the Go
+// middleware already accepts it as `Authorization: Bearer` (a fallback added
+// for popup OAuth flows "where cookies may not be sent due to browser
+// restrictions" — the same problem). So in the iframe we keep the token and
+// send it explicitly.
+//
+// sessionStorage, not localStorage: scoped to this tab, gone when it closes.
+
+const TOKEN_KEY = "bratrax_embedded_token";
+
+/** Remember the JWT from a login performed inside the iframe. */
+export function setEmbeddedToken(token: string | undefined | null): void {
+  if (!token) return;
+  try {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    /* storage unavailable — requests fall back to the cookie */
+  }
+}
+
+export function getEmbeddedToken(): string | null {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearEmbeddedToken(): void {
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Handle to a tab opened ahead of knowing its destination. */
 export interface ReservedTab {
   /** False when the popup was blocked and nothing was opened. */

@@ -1,5 +1,6 @@
 import { get } from "svelte/store";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+import { getEmbeddedToken } from "./shopify-embed";
 
 export interface BratraxUser {
   id: number;
@@ -24,10 +25,17 @@ function getBaseUrl(): string {
   return get(runtime).host;
 }
 
+/**
+ * `token` is the same JWT that gets set as the bratrax_auth cookie. Normally
+ * the cookie is all a caller needs and this is ignored — but inside the
+ * Shopify admin iframe the cookie is SameSite=Lax and never sent, so the
+ * embedded flow keeps this and passes it as `Authorization: Bearer`.
+ * See lib/bratrax/shopify-embed.ts::setEmbeddedToken.
+ */
 export async function bratraxLogin(
   email: string,
   password: string,
-): Promise<{ user: BratraxUser }> {
+): Promise<{ user: BratraxUser; token?: string }> {
   const res = await fetch(`${getBaseUrl()}/bratrax/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -104,7 +112,9 @@ export async function consumeStoreSignupLink(
   );
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.status ?? body.error ?? `Request failed (${res.status})`);
+    throw new Error(
+      body.status ?? body.error ?? `Request failed (${res.status})`,
+    );
   }
   return body;
 }
@@ -184,8 +194,14 @@ export async function requestDemo(
 export async function bratraxGetMe(
   fetchFn: typeof fetch = fetch,
 ): Promise<BratraxUser | null> {
+  // The root layout calls this before rendering anything. Inside the Shopify
+  // iframe the bratrax_auth cookie is SameSite=Lax and never sent, so without
+  // the Bearer this always 401s, the layout treats the merchant as logged out,
+  // and every navigation bounces to /login.
+  const token = getEmbeddedToken();
   const res = await fetchFn(`${getBaseUrl()}/bratrax/auth/me`, {
     credentials: "include",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error(`Auth check failed (${res.status})`);

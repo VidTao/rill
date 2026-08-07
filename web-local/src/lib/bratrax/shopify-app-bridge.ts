@@ -20,7 +20,7 @@
  * a secret — it appears in every OAuth URL already.
  */
 
-import { isShopifyEmbedded } from "./shopify-embed";
+import { getEmbeddedToken, isShopifyEmbedded } from "./shopify-embed";
 
 /** Shopify app client_id. Matches `client_id` in bratrax/shopify.app.toml. */
 const SHOPIFY_API_KEY = "b1afe70db24dd0e683b49ec1f5ccd325";
@@ -91,6 +91,16 @@ export async function getShopifySessionToken(): Promise<string | null> {
  * path is completely untouched for every existing user.
  */
 export async function shopifyAuthHeader(): Promise<Record<string, string>> {
+  // A bratrax JWT captured from an in-iframe login wins over the Shopify
+  // session token. It has to: during account creation the shop has no client
+  // yet, so a session token resolves to nothing and onboard_start 401s. The
+  // bratrax token names the user directly and works from the first request.
+  //
+  // Once the client exists either would do, but preferring this one keeps the
+  // whole embedded session on a single identity.
+  const embedded = getEmbeddedToken();
+  if (embedded) return { Authorization: `Bearer ${embedded}` };
+
   const token = await getShopifySessionToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

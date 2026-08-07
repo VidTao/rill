@@ -11,7 +11,10 @@
     checkCompanyAvailable,
     createShopifyAccount,
   } from "$lib/bratrax/onboarding/api";
-  import { markShopifyEmbedded } from "$lib/bratrax/shopify-embed";
+  import {
+    markShopifyEmbedded,
+    setEmbeddedToken,
+  } from "$lib/bratrax/shopify-embed";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
   import {
     TERMS_OF_SERVICE_URL,
@@ -43,6 +46,7 @@
 
   let email = "";
   let password = "";
+  let confirm = "";
   let companyName = "";
   let agreedToTerms = false;
   let error = "";
@@ -59,10 +63,12 @@
     markShopifyEmbedded();
   });
 
+  $: passwordsMatch = password.length > 0 && password === confirm;
   $: canCreate =
     !!installToken &&
     email.includes("@") &&
     password.length >= 8 &&
+    passwordsMatch &&
     companyChecked &&
     agreedToTerms &&
     !loading;
@@ -122,8 +128,14 @@
   }
 
   async function loginThenOnboard() {
-    const user = await bratraxLogin(email.trim().toLowerCase(), password);
-    bratraxUser.set(user);
+    const res = await bratraxLogin(email.trim().toLowerCase(), password);
+    // Keep the JWT: the login cookie is SameSite=Lax and will not be sent from
+    // inside the Shopify iframe, so every following /bratrax/* call carries it
+    // as a Bearer instead. Without this onboard_start 401s with
+    // "authentication required" — and a Shopify session token can't substitute,
+    // because the shop has no client until onboard_start makes one.
+    setEmbeddedToken(res.token);
+    bratraxUser.set(res.user);
     queryClient.clear();
 
     // Adoption happens inside onboard_start: it claims the parked install and
@@ -139,20 +151,38 @@
     error = "";
     loading = true;
     try {
-      const user = await bratraxLogin(email.trim().toLowerCase(), password);
-      bratraxUser.set(user);
+      const res = await bratraxLogin(email.trim().toLowerCase(), password);
+      setEmbeddedToken(res.token);
+      bratraxUser.set(res.user);
       queryClient.clear();
+
+      // A user with no client yet is not an "existing customer adding a second
+      // store" — they're a half-finished signup. That happens when account
+      // creation succeeded but onboard_start didn't, which leaves them unable
+      // to use either tab: "new account" reports already_user, and the
+      // multi-store chain below would 400 with "No client to promote". Finish
+      // the signup they started instead.
+      if (!res.user?.client_id) {
+        await onboardStart(companyName.trim() || shopLabel, {
+          shopifyInstallToken: installToken,
+        });
+        await goto("/onboard/payment");
+        return;
+      }
 
       // Existing customer adding another store: promote to multi-store if
       // needed (no-op when they already are), create the sub-store, switch to
       // it, then adopt the parked install onto it. Kept as separate calls so a
       // failure at any step leaves the earlier ones intact and retryable.
       const host = get(runtime).host;
+      // Same reason as above — the cookie doesn't cross the iframe boundary,
+      // so these carry the JWT explicitly.
+      const bearer = res.token ? { Authorization: `Bearer ${res.token}` } : {};
       const call = async (path: string, body?: unknown) => {
         const r = await fetch(`${host}${path}`, {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...bearer },
           body: body ? JSON.stringify(body) : undefined,
         });
         if (!r.ok)
@@ -323,6 +353,29 @@
             >
           {/if}
         </div>
+
+        {#if tab === "create"}
+          <div class="flex flex-col gap-1">
+            <label
+              for="confirm"
+              class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted"
+            >
+              Confirm password
+            </label>
+            <input
+              id="confirm"
+              type="password"
+              bind:value={confirm}
+              autocomplete="new-password"
+              class="border border-bratrax-border bg-bratrax-bg px-3 py-2.5 text-sm text-bratrax-text-primary outline-none transition-colors focus:border-bratrax-acid"
+            />
+            {#if confirm.length > 0 && !passwordsMatch}
+              <span class="font-mono text-[10px] text-bratrax-tomato"
+                >Passwords don't match.</span
+              >
+            {/if}
+          </div>
+        {/if}
 
         {#if tab === "create"}
           <label class="flex items-start gap-2 text-xs text-bratrax-text-muted">
