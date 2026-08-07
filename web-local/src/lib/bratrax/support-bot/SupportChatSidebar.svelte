@@ -46,25 +46,36 @@
 </aside>
 
 <style lang="postcss">
-  /* Fixed panel below the 3.25rem application header. Overlays page content
-     rather than squeezing it (unlike the per-page AI sidebar) so it works on
-     every route without touching page layouts. */
+  /* In-flow flex sibling of the page content (see web-local/src/routes/
+     +layout.svelte), so opening the panel narrows the page instead of
+     covering it — matching how the per-page AI sidebar behaves. Mounted once
+     in the root layout, so it works on every route without touching page
+     layouts. `display: none` while closed keeps it out of the flex row and
+     preserves the conversation across toggles. */
   .support-sidebar {
-    position: fixed;
-    top: 3.25rem;
-    right: 0;
-    bottom: 0;
+    flex: none;
     width: 420px;
-    max-width: 100vw;
-    z-index: 40;
+    max-width: 100%;
+    height: 100%;
+    min-height: 0;
+    /* Above any page content that overflows its own (now narrower) column. */
+    position: relative;
+    z-index: 20;
     display: none;
     flex-direction: column;
     background: var(--color-bg, var(--surface));
     border-left: 1px solid var(--color-border-strong, var(--border));
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25);
   }
   .support-sidebar.open {
     display: flex;
+  }
+
+  /* Below the widest phone the app is usable on, a 420px column would leave
+     nothing for the page; take the full width instead. */
+  @media (max-width: 720px) {
+    .support-sidebar {
+      width: 100%;
+    }
   }
 
   .panel-header {

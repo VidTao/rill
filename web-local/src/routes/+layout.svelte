@@ -399,12 +399,23 @@
           <ChecklistBanner />
         {/if}
 
-        {#if $bratraxViewerMidOnboarding && !onHelpPage}
-          <MidOnboardingViewer />
-        {:else}
-          <slot />
-        {/if}
+        <!-- Page content and the support-bot panel share a flex row so opening
+             the panel narrows the page rather than covering it. The panel is
+             mounted here once instead of inside every page layout; it collapses
+             to `display: none` when closed, leaving this row a no-op. -->
+        <div class="flex min-h-0 flex-1 flex-row">
+          <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+            {#if $bratraxViewerMidOnboarding && !onHelpPage}
+              <MidOnboardingViewer />
+            {:else}
+              <slot />
+            {/if}
+          </div>
 
+          {#if $bratraxUser}
+            <SupportChatSidebar />
+          {/if}
+        </div>
         {#if $bratraxUser && !onEmbedPage}
           <!-- Support-bot panel (the "?" header button). Fixed-position, so it
                can live here once instead of inside every page layout. Hidden

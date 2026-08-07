@@ -2,6 +2,7 @@
   import { tick } from "svelte";
   import { SUPPORT_EMAIL } from "$lib/bratrax/constants";
   import { askSupportBot, draftEscalationEmail } from "./api";
+  import SupportMarkdown from "./SupportMarkdown.svelte";
   import type { ChatMessage, EscalateResponse } from "./types";
 
   interface DisplayMessage extends ChatMessage {
@@ -119,8 +120,9 @@
         </p>
         <p class="mt-3 text-sm text-bratrax-text-muted">
           Ask anything about Bratrax — connecting platforms, attribution,
-          billing, dashboards. Answers come from our verified knowledge base.
-          For account-specific issues, we'll help you reach a human.
+          billing, dashboards. Answers come from our verified knowledge base;
+          the assistant can't see your account data. For account-specific
+          issues, we'll help you reach a human.
         </p>
       </div>
     {/if}
@@ -135,9 +137,9 @@
           </div>
         {:else}
           <div
-            class="max-w-[85%] self-start whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-bratrax-border bg-bratrax-surface px-4 py-2 text-sm leading-relaxed"
+            class="max-w-[85%] self-start rounded-2xl rounded-bl-sm border border-bratrax-border bg-bratrax-surface px-4 py-2"
           >
-            {m.content}
+            <SupportMarkdown content={m.content} />
           </div>
           {#if m.needsEscalation && i === messages.length - 1 && !draft}
             <button
@@ -232,16 +234,17 @@
         Send
       </button>
     </div>
+    <!-- Kept to a single dim line: the full explanation lives in the empty
+         state above, so repeating it here only ate the answer area. -->
     <p
-      class="mx-auto mt-2 max-w-xl font-mono text-[10px] text-bratrax-text-muted"
+      class="mx-auto mt-1.5 max-w-xl font-mono text-[10px] leading-tight text-bratrax-text-muted"
     >
-      Answers come from the Bratrax help knowledge base. The assistant has no
-      access to your data. Need a human? Email
-      <a class="underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a
-      >{#if hasConversation && !lastNeedsEscalation}&nbsp;or
-        <button class="underline" on:click={escalate}
-          >let me draft it for you</button
-        >{/if}.
+      Help-center answers · no access to your data ·
+      <a class="underline" href={`mailto:${SUPPORT_EMAIL}`}>Email support</a
+      >{#if hasConversation && !lastNeedsEscalation}
+        ·
+        <button class="underline" on:click={escalate}>Draft an email</button
+        >{/if}
     </p>
   </div>
 </div>

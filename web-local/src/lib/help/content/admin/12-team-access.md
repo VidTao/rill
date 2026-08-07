@@ -1,7 +1,8 @@
 ---
 title: Team & access
 audience: admin
-order: 12
+order: 3
+group: workspace
 status: ready
 ---
 

@@ -1,7 +1,8 @@
 ---
 title: Commerce Profile Graph
 audience: viewer
-order: 9
+order: 7
+group: dashboards
 status: ready
 ---
 

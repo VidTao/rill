@@ -1,7 +1,8 @@
 ---
 title: Billing & subscription
 audience: admin
-order: 13
+order: 4
+group: workspace
 status: ready
 ---
 

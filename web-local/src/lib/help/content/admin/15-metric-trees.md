@@ -1,7 +1,8 @@
 ---
 title: Metric Trees
 audience: admin
-order: 15
+order: 7
+group: workspace
 status: ready
 ---
 

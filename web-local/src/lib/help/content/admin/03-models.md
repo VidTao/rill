@@ -1,7 +1,8 @@
 ---
 title: Models (SQL)
 audience: admin
-order: 3
+order: 1
+group: building
 status: ready
 ---
 

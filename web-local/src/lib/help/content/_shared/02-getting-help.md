@@ -2,6 +2,7 @@
 title: Getting help
 audience: shared
 order: 2
+group: reference
 status: ready
 ---
 

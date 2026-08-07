@@ -1,7 +1,8 @@
 ---
 title: Email & SMS
 audience: viewer
-order: 6
+order: 5
+group: dashboards
 status: ready
 ---
 

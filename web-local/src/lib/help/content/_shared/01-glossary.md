@@ -2,6 +2,7 @@
 title: Glossary
 audience: shared
 order: 1
+group: reference
 status: ready
 ---
 

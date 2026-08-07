@@ -1,7 +1,8 @@
 ---
 title: Customer Analytics
 audience: viewer
-order: 5
+order: 4
+group: dashboards
 status: ready
 ---
 

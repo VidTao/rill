@@ -1,7 +1,8 @@
 ---
-title: Troubleshooting
+title: Troubleshooting builds
 audience: admin
-order: 8
+order: 6
+group: building
 status: ready
 ---
 
@@ -57,7 +58,7 @@ Check the connector card — there's usually an error message. Common causes:
 - Token expired (see above)
 - Permission revoked on the platform side
 - Rate-limited (will retry automatically)
-- WooCommerce only: your site's firewall (Cloudflare or a WordPress security plugin) may be blocking our requests — see [the firewall fix](/help/admin/connecting-accounts)
+- WooCommerce only: your site's firewall (Cloudflare or a WordPress security plugin) may be blocking our requests — see [the firewall fix](/help/admin/connecting-platforms)
 
 If the message doesn't make sense, contact support with the connector name and the exact error.
 

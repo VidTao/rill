@@ -1,7 +1,8 @@
 ---
 title: Profile Explorer
 audience: viewer
-order: 8
+order: 6
+group: dashboards
 status: ready
 ---
 

@@ -1,7 +1,8 @@
 ---
 title: Filters and time range
 audience: viewer
-order: 9
+order: 4
+group: start-here
 status: ready
 ---
 

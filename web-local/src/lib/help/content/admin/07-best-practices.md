@@ -1,7 +1,8 @@
 ---
 title: Best practices
 audience: admin
-order: 7
+order: 5
+group: building
 status: ready
 ---
 

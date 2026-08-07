@@ -1,7 +1,8 @@
 ---
 title: AI chat & Anthropic API key
 audience: admin
-order: 11
+order: 6
+group: workspace
 status: ready
 ---
 
