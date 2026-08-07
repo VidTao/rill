@@ -48,7 +48,10 @@
     bratraxViewerMidOnboarding,
   } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
-  import { clearEmbeddedToken } from "$lib/bratrax/shopify-embed";
+  import {
+    clearEmbeddedToken,
+    isShopifyEmbedded,
+  } from "$lib/bratrax/shopify-embed";
   import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
   import AddStoreButton from "$lib/bratrax/AddStoreButton.svelte";
   import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
@@ -175,6 +178,12 @@
   // The embedded pages carry their own "Open in Bratrax" affordance instead.
   $: onEmbedPage = $page.url.pathname.startsWith("/embed");
 
+  // Running inside the Shopify admin iframe. Distinct from onEmbedPage, which
+  // is only the single-dashboard route: this covers the onboarding screens too,
+  // which render with full chrome but are still inside Shopify's frame. Sticky
+  // for the session, so it's safe to read once rather than reactively.
+  const shopifyEmbedded = isShopifyEmbedded();
+
   // Role-based nav visibility. The DB-side enum is super_admin / admin / viewer.
   $: role = $bratraxUser?.role ?? null;
   $: isViewer = role === "viewer";
@@ -279,6 +288,7 @@
             {mode}
             externalUser={$bratraxUser}
             onLogout={handleBratraxLogout}
+            hideAssistants={shopifyEmbedded}
             onboardingLink={isViewer
               ? { href: "/onboarding", label: "Getting started" }
               : null}
@@ -338,7 +348,11 @@
                 >
                   Onboarding
                 </a>
-                <SettingsDropdown />
+                <!-- Hidden inside the Shopify iframe — see the note on the
+                     post-onboarding nav below. -->
+                {#if !shopifyEmbedded}
+                  <SettingsDropdown />
+                {/if}
                 <a
                   href="/help"
                   class="bratrax-nav-link"
@@ -364,7 +378,10 @@
                 >
                   Metric Trees
                 </a>
-                {#if isAdminOrSuper}
+                <!-- Settings is hidden inside the Shopify iframe: its
+                     destinations are full-app pages that don't belong in
+                     a ~1150px frame beside Shopify's own navigation. -->
+                {#if isAdminOrSuper && !shopifyEmbedded}
                   <SettingsDropdown />
                 {/if}
                 {#if isSuper}

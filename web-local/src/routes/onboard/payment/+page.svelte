@@ -32,9 +32,11 @@
   const POLL_INTERVAL_MS = 2000;
   // Non-embedded: LS has already bounced the browser back, so we're only
   // waiting on the webhook — ~30s is plenty. Embedded: this window starts
-  // polling the moment checkout opens in the other tab, so the clock covers
-  // the merchant actually typing in their card details.
-  $: POLL_MAX_ATTEMPTS = embedded ? 150 : 15; // ~5min vs ~30s
+  // polling the moment checkout opens in the other tab, so the clock has to
+  // cover the merchant actually paying — card entry, 3-D Secure, a bank-app
+  // round trip. 30 minutes, because timing out mid-payment shows a "couldn't
+  // confirm" screen to someone who is doing nothing wrong.
+  $: POLL_MAX_ATTEMPTS = embedded ? 900 : 15; // ~30min vs ~30s
   let pollHandle: ReturnType<typeof setInterval> | null = null;
   let pollAttempts = 0;
 
@@ -234,11 +236,14 @@
               class="font-mono text-xs uppercase tracking-wider text-bratrax-text-muted"
             >
               {#if embedded}
+                <!-- No counter here. It reads as a deadline the merchant is
+                     racing, when in fact nothing is lost if it runs out — the
+                     webhook is the source of truth and "Check again" picks the
+                     payment up whenever it lands. -->
                 Complete payment in the new tab — we'll continue automatically
               {:else}
-                Waiting for confirmation…
+                Waiting for confirmation… ({pollAttempts}/{POLL_MAX_ATTEMPTS})
               {/if}
-              ({pollAttempts}/{POLL_MAX_ATTEMPTS})
             </p>
           </div>
           {#if manualCheckoutUrl}

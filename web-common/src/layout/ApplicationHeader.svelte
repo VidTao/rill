@@ -19,6 +19,13 @@
   } | null = null;
   export let onLogout: (() => void) | null = null;
   export let onboardingLink: { href: string; label: string } | null = null;
+  /**
+   * Hide the AI and support toggles. Set by web-local when running inside the
+   * Shopify admin iframe: both open slide-over panels, which don't fit beside
+   * Shopify's own chrome in ~1150px. Defaults false, so web-admin and the
+   * normal web-local app are unchanged.
+   */
+  export let hideAssistants = false;
 
   // If externalUser has a role, show a friendly role label instead of the dev/preview mode.
   $: roleLabel =
@@ -150,11 +157,17 @@
             </svg>
           {/if}
         </button>
-        <ChatToggle />
+        {#if !hideAssistants}
+          <ChatToggle />
+        {/if}
       {/if}
       <!-- "?" support-bot toggle: unlike the AI ChatToggle it renders in every
-           mode and for every role — product help is not gated on a BYOK key. -->
-      <SupportChatToggle />
+           mode and for every role — product help is not gated on a BYOK key.
+           Both are suppressed inside the Shopify admin iframe, where they'd be
+           slide-over panels competing for ~1150px with Shopify's own chrome. -->
+      {#if !hideAssistants}
+        <SupportChatToggle />
+      {/if}
       <LocalAvatarButton {externalUser} {onLogout} {onboardingLink} />
     </div>
   </div>
