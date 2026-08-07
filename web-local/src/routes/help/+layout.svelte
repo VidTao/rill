@@ -2,7 +2,7 @@
   import { page } from "$app/stores";
   import { bratraxIsDemo, bratraxUser } from "$lib/bratrax/auth-store";
   import HelpSearch from "$lib/help/HelpSearch.svelte";
-  import { groupedPagesFor, pagesFor, type HelpPage } from "$lib/help";
+  import { groupedPagesFor, pagesFor } from "$lib/help";
   import { supportChatActions } from "@rilldata/web-common/features/chat/layouts/sidebar/support-chat-store";
 
   $: role = $bratraxUser?.role ?? null;
@@ -14,14 +14,15 @@
   // the HelpGroup docs in $lib/help.
   $: navGroups = groupedPagesFor(role, $bratraxIsDemo);
 
+  // Compared inline at each nav link (`p.slug === currentSlug`) rather than
+  // through a helper. Svelte's update guard tracks the identifiers appearing in
+  // the template expression, not what a function reads from its closure — so
+  // `class:active={isActive(p)}` left `currentSlug` out of the guard entirely
+  // and the highlight stayed on whichever page was open when the sidebar mounted.
   $: currentSlug = $page.url.pathname.replace(/^\/help\/?/, "");
 
   let searchQuery = "";
   $: searching = searchQuery.trim().length > 0;
-
-  function isActive(p: HelpPage): boolean {
-    return currentSlug === p.slug;
-  }
 </script>
 
 <div class="flex h-full w-full overflow-hidden bg-bratrax-bg">
@@ -64,7 +65,7 @@
               <li>
                 <a
                   class="nav-link"
-                  class:active={isActive(p)}
+                  class:active={p.slug === currentSlug}
                   href="/help/{p.slug}"
                 >
                   {p.title}
