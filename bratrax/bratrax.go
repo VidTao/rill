@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/rilldata/rill/runtime/pkg/observability"
@@ -19,6 +20,13 @@ type Handlers struct {
 	AuthMapper  *AuthMapper
 	ClientStore *ClientStore
 }
+
+// changelogSlugRe constrains the slugs accepted by GET /changelog/{slug}. The
+// slug is interpolated into a GitHub raw URL, so this is the path-traversal and
+// injection guard; it must match before the URL is built. Kept permissive
+// enough for the slugs the public-changelog routine generates (lowercase,
+// digits, hyphens) and nothing else.
+var changelogSlugRe = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
 
 // RegisterHandlers registers Bratrax proxy routes on the given ServeMux.
 // It wires up: observability → auth → reverse proxy, plus auth endpoints.
@@ -289,6 +297,35 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	observability.MuxHandle(mux, "GET /terms-of-service",
 		observability.Middleware("bratrax", logger,
 			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/terms/index.html")))
+	observability.MuxHandle(mux, "GET /changelog",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/changelog/index.html")))
+	observability.MuxHandle(mux, "GET /pricing",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/pricing/index.html")))
+	observability.MuxHandle(mux, "GET /integrations",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/integrations/index.html")))
+
+	// /changelog/{slug}: per-entry pages for changelog items marked notable.
+	// Unlike /vs/{slug} below, the slug set grows every time the
+	// public-changelog routine runs, so this validates the slug's shape rather
+	// than whitelisting each one — otherwise every new entry would need a Go
+	// rebuild. A well-formed slug with no page upstream proxies GitHub's 404,
+	// which fetchGithubStatic surfaces as a 502.
+	//
+	// Registered separately from "GET /changelog" above: a pattern without a
+	// trailing slash is an exact match in Go's ServeMux, so the bare path does
+	// not catch subpaths.
+	observability.MuxHandle(mux, "GET /changelog/{slug}",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			slug := r.PathValue("slug")
+			if !changelogSlugRe.MatchString(slug) {
+				http.NotFound(w, r)
+				return
+			}
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/changelog/" + slug + "/index.html")(w, r)
+		})))
 
 	// /vs/{slug}: competitor comparison pages. Whitelist known slugs so a
 	// random /vs/foobar doesn't proxy a 404 from GitHub raw and confuse

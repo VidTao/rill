@@ -97,6 +97,10 @@ export async function load({ url, depends, untrack, fetch }) {
     url.pathname.startsWith("/terms-of-service") ||
     url.pathname.startsWith("/vs/") ||
     url.pathname.startsWith("/faq") ||
+    // Also covers the per-entry pages at /changelog/<slug>.
+    url.pathname.startsWith("/changelog") ||
+    url.pathname.startsWith("/pricing") ||
+    url.pathname.startsWith("/integrations") ||
     url.pathname.startsWith("/try-demo") ||
     // Landing tab for an embedded Lemon Squeezy checkout. That tab may carry
     // no bratrax_auth cookie at all — the merchant authenticated inside the
