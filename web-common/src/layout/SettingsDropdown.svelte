@@ -51,18 +51,21 @@
     <DropdownMenu.Item href="/settings/team" class="settings-dropdown-item">
       Team settings
     </DropdownMenu.Item>
-    <DropdownMenu.Separator />
     <DropdownMenu.Item
       href="/settings/billing"
       class="settings-dropdown-item"
     >
       Billing
     </DropdownMenu.Item>
+    <DropdownMenu.Separator />
     <DropdownMenu.Item href="/settings/ai" class="settings-dropdown-item">
       AI settings
     </DropdownMenu.Item>
     <DropdownMenu.Item href="/settings/mcp" class="settings-dropdown-item">
       MCP
+    </DropdownMenu.Item>
+    <DropdownMenu.Item href="/settings/slack" class="settings-dropdown-item">
+      Slack
     </DropdownMenu.Item>
   </DropdownMenu.Content>
 </DropdownMenu.Root>
