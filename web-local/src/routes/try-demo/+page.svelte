@@ -9,7 +9,8 @@
   // — via the trusted StaticHtmlPage-reads-from-GitHub pattern, identical to the
   // apex — with the demo modal open on top, so it reads as "the modal opened
   // over the homepage". All the logic (email capture → /bratrax/demo-request →
-  // invite → auto-login) lives here in the SPA. Closing returns to the homepage.
+  // account created → /auth/handoff signs them in) lives here in the SPA.
+  // Closing returns to the homepage.
   let open = true;
 </script>
 

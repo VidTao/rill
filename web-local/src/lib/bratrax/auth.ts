@@ -194,12 +194,19 @@ export async function requestAccess(
 }
 
 // Public, unauthenticated. Submits a self-serve "Try demo" request from the
-// marketing landing page: mints a viewer invitation to the Bratrax Demo Account
-// and emails the accept link. Returns 2xx in all known cases (no enumeration
-// oracle): "sent" for a fresh/reused invite, "already_user" if the email already
-// has an account (UI should point them at login).
+// marketing landing page. Creates (or recognises) a viewer on the Bratrax Demo
+// Account and returns a single-use hand-off URL that signs them in. Returns 2xx
+// in all known cases (no enumeration oracle):
+//   "ok"           — follow `handoff_url` to land in the demo, already signed in
+//   "already_user" — the email belongs to a real account (point them at login)
+//
+// `handoff_url` must be followed with a full navigation, not a client-side
+// goto(): it's a server redirect on the Go proxy whose whole job is to set the
+// bratrax_auth cookie. The token is single-use and expires in ~2 minutes.
 export interface DemoRequestResult {
-  status: "sent" | "already_user";
+  status: "ok" | "already_user";
+  handoff_url?: string;
+  already_had_account?: boolean;
 }
 
 export async function requestDemo(

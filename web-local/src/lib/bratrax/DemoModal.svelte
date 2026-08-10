@@ -7,8 +7,9 @@
   let email = "";
   let submitting = false;
   let error = "";
-  // idle → the email form; sent → confirmation; already_user → point at login.
-  let phase: "idle" | "sent" | "already_user" = "idle";
+  // idle → the email form; already_user → point at login. The success case
+  // never renders a phase: it navigates away to the hand-off URL.
+  let phase: "idle" | "already_user" = "idle";
 
   function close() {
     open = false;
@@ -30,12 +31,26 @@
     error = "";
     try {
       const res = await requestDemo(value);
-      phase = res.status === "already_user" ? "already_user" : "sent";
+      if (res.status === "already_user") {
+        phase = "already_user";
+      } else if (res.handoff_url) {
+        // Full navigation, not goto(): the hand-off is a server redirect on the
+        // Go proxy that sets the bratrax_auth cookie before landing on the demo
+        // dashboards — a client-side route change would never reach it.
+        //
+        // Returning here deliberately leaves `submitting` true, so the button
+        // stays disabled while the browser unloads. The token is single-use; a
+        // second submit would mint a new one and waste this.
+        window.location.href = res.handoff_url;
+        return;
+      } else {
+        error = "Something went wrong. Try again.";
+      }
     } catch (e: unknown) {
-      error = e instanceof Error ? e.message : "Something went wrong. Try again.";
-    } finally {
-      submitting = false;
+      error =
+        e instanceof Error ? e.message : "Something went wrong. Try again.";
     }
+    submitting = false;
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -71,19 +86,10 @@
         on:click={close}
         aria-label="Close"
         class="absolute right-3 top-2 font-mono text-xl leading-none text-bratrax-text-muted transition-colors hover:text-bratrax-text-primary"
-      >&times;</button>
+        >&times;</button
+      >
 
-      {#if phase === "sent"}
-        <p class={eyebrow}>Check your inbox</p>
-        <h2 class={heading}>Your demo is on the way</h2>
-        <p class="text-sm font-light text-bratrax-text-body">
-          We sent an access link to
-          <strong class="text-bratrax-text-primary">{email}</strong>. Click it,
-          set a password, and you'll drop straight into a live Bratrax demo
-          account — real dashboards, synthetic data.
-        </p>
-        <button type="button" on:click={close} class="mt-6 {acidButton}">Done</button>
-      {:else if phase === "already_user"}
+      {#if phase === "already_user"}
         <p class={eyebrow}>You're already in</p>
         <h2 class={heading}>You already have an account</h2>
         <p class="text-sm font-light text-bratrax-text-body">
@@ -95,8 +101,8 @@
         <p class={eyebrow}>Try Bratrax</p>
         <h2 class={heading}>See honest attribution on a live demo</h2>
         <p class="mb-5 text-sm font-light text-bratrax-text-body">
-          Enter your email and we'll send instant viewer access to the Bratrax
-          demo account — real dashboards, synthetic data, no card.
+          Enter your email and we'll drop you straight into the Bratrax demo
+          account — real dashboards, synthetic data, no password, no card.
         </p>
 
         {#if error}
@@ -129,11 +135,13 @@
           </div>
 
           <button type="submit" disabled={submitting} class={acidButton}>
-            {submitting ? "Sending…" : "Try demo →"}
+            {submitting ? "Opening…" : "Try demo →"}
           </button>
         </form>
 
-        <p class="mt-4 text-center font-mono text-[11px] text-bratrax-text-muted">
+        <p
+          class="mt-4 text-center font-mono text-[11px] text-bratrax-text-muted"
+        >
           Already have an account?
           <a href="/login" class="text-bratrax-acid hover:underline">Sign in</a>
         </p>
