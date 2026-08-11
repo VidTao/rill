@@ -2,11 +2,8 @@
   import { page } from "$app/stores";
   import LocalAvatarButton from "@rilldata/web-common/features/authentication/LocalAvatarButton.svelte";
   import CanvasPreviewCTAs from "@rilldata/web-common/features/canvas/CanvasPreviewCTAs.svelte";
+  import HeaderChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/HeaderChatToggle.svelte";
   import SupportChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/SupportChatToggle.svelte";
-  import {
-    chatOpen,
-    sidebarActions,
-  } from "@rilldata/web-common/features/chat/layouts/sidebar/sidebar-store";
   import HeaderToggleButton from "./HeaderToggleButton.svelte";
   import { themeControl } from "@rilldata/web-common/features/themes/theme-control";
   import ExplorePreviewCTAs from "@rilldata/web-common/features/explores/ExplorePreviewCTAs.svelte";
@@ -66,6 +63,25 @@
   $: themePreference = themeControl.preference;
   $: onDeployPage = isDeployPage($page);
   $: showDeveloperChat = $developerChat && !onDeployPage;
+
+  /**
+   * Whether this route mounts an AI chat panel for the button to open.
+   *
+   * The panel is mounted per-route, not in the root layout the way the support
+   * panel is, so on a route that does not mount one the button would toggle a
+   * store nothing is listening to — it would light up as active with no panel
+   * beside it. Rather than offer a dead control, it is not drawn at all.
+   *
+   * The `(viz)` dashboard routes mount theirs too, but they arrive here as
+   * mode === "Preview" and render their AI toggle through the preview CTAs
+   * below, so only the developer and file-editor routes need naming here.
+   *
+   * Keep in sync with the mount sites: BratraxChatGate on /developer and
+   * /files/[...file], DashboardChat on the two (viz) routes.
+   */
+  $: aiPanelMounted =
+    !!route.id &&
+    (route.id.includes("/developer") || route.id.includes("/files"));
 </script>
 
 <header class:border-b={!onDeployPage} class="bg-surface-base">
@@ -161,16 +177,8 @@
             </svg>
           {/if}
         </HeaderToggleButton>
-        {#if !hideAssistants}
-          <HeaderToggleButton
-            active={$chatOpen}
-            onClick={sidebarActions.toggleChat}
-            title="Ask AI"
-            aria-label="Ask AI"
-            aria-pressed={$chatOpen}
-          >
-            AI
-          </HeaderToggleButton>
+        {#if !hideAssistants && aiPanelMounted}
+          <HeaderChatToggle />
         {/if}
       {/if}
       <!-- "?" support-bot toggle: unlike the AI toggle it renders in every

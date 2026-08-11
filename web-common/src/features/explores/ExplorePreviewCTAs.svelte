@@ -7,7 +7,7 @@
   import { useExplore } from "@rilldata/web-common/features/explores/selectors";
   import { Button } from "../../components/button";
   import { runtime } from "../../runtime-client/runtime-store";
-  import ChatToggle from "../chat/layouts/sidebar/ChatToggle.svelte";
+  import HeaderChatToggle from "../chat/layouts/sidebar/HeaderChatToggle.svelte";
   import ViewAsButton from "../dashboards/granular-access-policies/ViewAsButton.svelte";
   import {
     useDashboardPolicyCheck,
@@ -42,7 +42,7 @@
   {/if}
   <StateManagersProvider {metricsViewName} {exploreName} let:ready>
     {#if $dashboardChat}
-      <ChatToggle />
+      <HeaderChatToggle />
     {/if}
     {#if ready}
       <GlobalDimensionSearch />
