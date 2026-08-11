@@ -8,6 +8,19 @@ export interface ProductCogs {
   handling_fee: number | null;
 }
 
+export interface MarketplaceProductCogs {
+  cost_id: string;
+  platform: "amazon";
+  marketplace_id: string;
+  asin: string;
+  seller_sku: string;
+  title: string;
+  units_shipped: number;
+  unit_cost: number | null;
+  handling_cost: number | null;
+  is_configured: boolean;
+}
+
 export interface GatewayFee {
   gateway_name: string;
   percentage_fee: number;
@@ -138,10 +151,13 @@ export interface ProfitReadiness {
   profit_ready?: boolean;
   orders?: number;
   costs?: ProfitReadinessCost[];
+  combined_profit_ready?: boolean;
+  channels?: Record<string, unknown>;
 }
 
 export type CostTab =
   | "cogs"
+  | "amazon_cogs"
   | "shipping"
   | "gateway"
   | "expenses"

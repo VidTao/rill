@@ -324,6 +324,10 @@ func convertMessages(msgs []*aiv1.CompletionMessage) ([]anthropic.BetaTextBlockP
 		for _, block := range msg.Content {
 			switch block := block.BlockType.(type) {
 			case *aiv1.ContentBlock_Text:
+				// Newer models reject empty text blocks outright; see convertMessage.
+				if block.Text == "" {
+					continue
+				}
 				system = append(system, anthropic.BetaTextBlockParam{Text: block.Text})
 			default:
 				return nil, nil, fmt.Errorf("unsupported system message block type: %T", block)
@@ -347,6 +351,15 @@ func convertMessage(msg *aiv1.CompletionMessage) ([]anthropic.BetaMessageParam, 
 	for _, block := range msg.Content {
 		switch b := block.BlockType.(type) {
 		case *aiv1.ContentBlock_Text:
+			// Drop empty text blocks. The agent loop routinely produces them —
+			// an assistant turn that is pure tool_use still carries a text block,
+			// and it is empty. Older models silently ignored those; newer ones
+			// reject the whole request with 400 "messages: text content blocks
+			// must be non-empty", which fails the turn. A block with no text
+			// carries no meaning, so dropping it is lossless.
+			if b.Text == "" {
+				continue
+			}
 			result = append(result, anthropic.BetaMessageParam{
 				Role: role,
 				Content: []anthropic.BetaContentBlockParamUnion{
@@ -387,8 +400,15 @@ func convertToolCall(tc *aiv1.ToolCall) anthropic.BetaContentBlockParamUnion {
 // convertToolResult converts a Rill tool result to a Claude beta tool result block.
 func convertToolResult(tr *aiv1.ToolResult) anthropic.BetaContentBlockParamUnion {
 	block := anthropic.NewBetaToolResultBlock(tr.Id)
+	// A tool that returns nothing would otherwise produce an empty text block,
+	// which newer models reject. The result still has to be sent — it is what
+	// closes out the tool_use — so stand in a marker rather than dropping it.
+	content := tr.Content
+	if content == "" {
+		content = "(no output)"
+	}
 	block.OfToolResult.Content = []anthropic.BetaToolResultBlockParamContentUnion{
-		{OfText: &anthropic.BetaTextBlockParam{Text: tr.Content}},
+		{OfText: &anthropic.BetaTextBlockParam{Text: content}},
 	}
 	block.OfToolResult.IsError = anthropic.Bool(tr.IsError)
 	return block
@@ -412,6 +432,11 @@ func convertTools(tools []*aiv1.Tool) ([]anthropic.BetaToolUnionParam, error) {
 }
 
 // convertTool converts a single Rill tool to a Claude beta tool union param.
+// schemaSidecarKeys are JSON Schema keywords that live alongside "properties"
+// and are needed to interpret it, but have no field on BetaToolInputSchemaParam.
+// Unmarshalling drops them; ExtraFields puts them back on the wire.
+var schemaSidecarKeys = []string{"$defs", "definitions", "$schema"}
+
 func convertTool(tool *aiv1.Tool) (anthropic.BetaToolUnionParam, error) {
 	inputSchema := anthropic.BetaToolInputSchemaParam{}
 	if tool.InputSchema == "" {
@@ -421,6 +446,28 @@ func convertTool(tool *aiv1.Tool) (anthropic.BetaToolUnionParam, error) {
 	} else {
 		if err := json.Unmarshal([]byte(tool.InputSchema), &inputSchema); err != nil {
 			return anthropic.BetaToolUnionParam{}, fmt.Errorf("failed to parse schema for tool %q: %w", tool.Name, err)
+		}
+
+		// BetaToolInputSchemaParam only has fields for type/properties/required,
+		// so a schema that defines its complex types under "$defs" and refers to
+		// them with "$ref" arrives at the model with every reference dangling —
+		// no type, no properties, just a description. The model then has to guess
+		// the shape, which is why query_metrics_view kept receiving `time_range`
+		// and `where` as strings ("expected a map, got 'string'") and burned its
+		// tool-call budget retrying. ExtraFields is ignored on unmarshal but
+		// merged back in on marshal, so carry the sidecars across by hand.
+		var raw map[string]any
+		if err := json.Unmarshal([]byte(tool.InputSchema), &raw); err != nil {
+			return anthropic.BetaToolUnionParam{}, fmt.Errorf("failed to parse schema for tool %q: %w", tool.Name, err)
+		}
+		extras := make(map[string]any)
+		for _, key := range schemaSidecarKeys {
+			if v, ok := raw[key]; ok {
+				extras[key] = v
+			}
+		}
+		if len(extras) > 0 {
+			inputSchema.ExtraFields = extras
 		}
 	}
 

@@ -4,6 +4,7 @@ import { get } from "svelte/store";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
 import type {
   ProductCogs,
+  MarketplaceProductCogs,
   GatewayFee,
   ShippingProfile,
   MediaSpendScopeAccountOption,
@@ -83,6 +84,35 @@ export async function saveProductsCogs(
   }>,
 ): Promise<void> {
   await apiFetch("/bratrax/cost-settings/products-cogs", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ products }),
+  });
+}
+
+// --- Marketplace Product COGS ---
+
+export async function getMarketplaceProductsCogs(): Promise<
+  MarketplaceProductCogs[]
+> {
+  const res = await apiFetch<{ data: MarketplaceProductCogs[] }>(
+    "/bratrax/cost-settings/marketplace-products-cogs?platform=amazon&marketplace_id=ATVPDKIKX0DER",
+  );
+  return res.data;
+}
+
+export async function saveMarketplaceProductsCogs(
+  products: Array<{
+    platform: "amazon";
+    marketplace_id: string;
+    asin: string;
+    seller_sku: string;
+    title?: string;
+    unit_cost: number | null;
+    handling_cost: number | null;
+  }>,
+): Promise<void> {
+  await apiFetch("/bratrax/cost-settings/marketplace-products-cogs", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ products }),

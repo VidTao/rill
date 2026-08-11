@@ -4,6 +4,7 @@
   import type { CostTab } from "$lib/bratrax/costs/types";
   import type {
     ProductCogs,
+    MarketplaceProductCogs,
     GatewayFee,
     ExpenseRule,
     MediaSpendScopeGuidance,
@@ -21,6 +22,8 @@
     saveStoreSettings,
     getProductsCogs,
     saveProductsCogs,
+    getMarketplaceProductsCogs,
+    saveMarketplaceProductsCogs,
     getGatewayFees,
     saveGatewayFee,
     getExpenseRules,
@@ -36,6 +39,7 @@
 
   const tabs: { id: CostTab; label: string; icon: string }[] = [
     { id: "cogs", label: "Cost of Goods", icon: "📦" },
+    { id: "amazon_cogs", label: "Amazon COGS", icon: "A" },
     { id: "shipping", label: "Shipping", icon: "🚚" },
     { id: "gateway", label: "Gateway Costs", icon: "💳" },
     { id: "expenses", label: "Custom Expenses", icon: "📋" },
@@ -52,6 +56,7 @@
   // Data
   let storeSettings: StoreSettings = {};
   let products: ProductCogs[] = [];
+  let marketplaceProducts: MarketplaceProductCogs[] = [];
   let gateways: GatewayFee[] = [];
   let expenseRules: ExpenseRule[] = [];
   let mediaScopeRules: MediaSpendScopeRule[] = [];
@@ -127,30 +132,36 @@
   async function loadAll() {
     loading = true;
     try {
-      const [settings, prods, gws, rules, mediaRules] = await Promise.all([
-        getStoreSettings().catch((e) => {
-          console.error("Settings:", e);
-          return {};
-        }),
-        getProductsCogs().catch((e) => {
-          console.error("COGS:", e);
-          return [];
-        }),
-        getGatewayFees().catch((e) => {
-          console.error("Gateways:", e);
-          return [];
-        }),
-        getExpenseRules().catch((e) => {
-          console.error("Expenses:", e);
-          return [];
-        }),
-        getMediaSpendScopeRules().catch((e) => {
-          console.error("Media scope:", e);
-          return { rules: [], guidance: null, availableAccounts: [] };
-        }),
-      ]);
+      const [settings, prods, marketplaceProds, gws, rules, mediaRules] =
+        await Promise.all([
+          getStoreSettings().catch((e) => {
+            console.error("Settings:", e);
+            return {};
+          }),
+          getProductsCogs().catch((e) => {
+            console.error("COGS:", e);
+            return [];
+          }),
+          getMarketplaceProductsCogs().catch((e) => {
+            console.error("Amazon COGS:", e);
+            return [];
+          }),
+          getGatewayFees().catch((e) => {
+            console.error("Gateways:", e);
+            return [];
+          }),
+          getExpenseRules().catch((e) => {
+            console.error("Expenses:", e);
+            return [];
+          }),
+          getMediaSpendScopeRules().catch((e) => {
+            console.error("Media scope:", e);
+            return { rules: [], guidance: null, availableAccounts: [] };
+          }),
+        ]);
       storeSettings = settings;
       products = prods;
+      marketplaceProducts = marketplaceProds;
       gateways = gws;
       expenseRules = rules;
       mediaScopeRules = mediaRules.rules;
@@ -263,6 +274,33 @@
       ]);
     } catch (e) {
       showError(e instanceof Error ? e.message : "Failed to save product cost");
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function handleSaveMarketplaceProductCogs(
+    product: MarketplaceProductCogs,
+  ) {
+    saving = true;
+    try {
+      await saveMarketplaceProductsCogs([
+        {
+          platform: "amazon",
+          marketplace_id: product.marketplace_id,
+          asin: product.asin,
+          seller_sku: product.seller_sku,
+          title: product.title,
+          unit_cost: product.unit_cost,
+          handling_cost: product.handling_cost,
+        },
+      ]);
+      product.is_configured = product.unit_cost !== null;
+      showSaved("Amazon product cost saved. Dashboard refresh queued.");
+    } catch (e) {
+      showError(
+        e instanceof Error ? e.message : "Failed to save Amazon product cost",
+      );
     } finally {
       saving = false;
     }
@@ -766,6 +804,93 @@
             <!-- ================================================================ -->
             <!-- TAB: SHIPPING -->
             <!-- ================================================================ -->
+          {:else if activeTab === "amazon_cogs"}
+            <div class="space-y-4">
+              <div class="border border-bratrax-border bg-bratrax-hover p-4">
+                <div class="font-medium text-bratrax-text-headline">
+                  Amazon US SKU Costs
+                </div>
+                <div class="mt-1 text-xs text-bratrax-text-muted">
+                  Product and handling costs are matched by Amazon seller SKU.
+                  Profit stays provisional until all shipped units have a cost.
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr
+                      class="border-b border-bratrax-border font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+                    >
+                      <th class="px-3 py-2 text-left">Product</th>
+                      <th class="px-3 py-2 text-left">Seller SKU</th>
+                      <th class="px-3 py-2 text-left">ASIN</th>
+                      <th class="px-3 py-2 text-right">Unit Cost</th>
+                      <th class="px-3 py-2 text-right">Handling</th>
+                      <th class="px-3 py-2 text-right">Units Shipped</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each marketplaceProducts as product (product.cost_id)}
+                      <tr
+                        class="border-b border-bratrax-border/50 hover:bg-bratrax-hover"
+                      >
+                        <td class="px-3 py-2 text-bratrax-text-body">
+                          {product.title || product.asin}
+                        </td>
+                        <td
+                          class="px-3 py-2 font-mono text-xs text-bratrax-text-muted"
+                        >
+                          {product.seller_sku || "—"}
+                        </td>
+                        <td
+                          class="px-3 py-2 font-mono text-xs text-bratrax-text-muted"
+                        >
+                          {product.asin || "—"}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            class="w-28 border border-bratrax-border bg-bratrax-surface px-2 py-1 text-right text-sm"
+                            placeholder="$ 0"
+                            bind:value={product.unit_cost}
+                            on:blur={() =>
+                              handleSaveMarketplaceProductCogs(product)}
+                          />
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            class="w-28 border border-bratrax-border bg-bratrax-surface px-2 py-1 text-right text-sm"
+                            placeholder="$ 0"
+                            bind:value={product.handling_cost}
+                            on:blur={() =>
+                              handleSaveMarketplaceProductCogs(product)}
+                          />
+                        </td>
+                        <td class="px-3 py-2 text-right text-bratrax-text-body">
+                          {product.units_shipped || 0}
+                        </td>
+                      </tr>
+                    {/each}
+                    {#if marketplaceProducts.length === 0}
+                      <tr>
+                        <td
+                          colspan="6"
+                          class="px-3 py-10 text-center text-bratrax-text-muted"
+                        >
+                          Amazon products will appear after the first Seller
+                          sync.
+                        </td>
+                      </tr>
+                    {/if}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           {:else if activeTab === "shipping"}
             <div class="space-y-6">
               <div class="space-y-3">
