@@ -1,4 +1,5 @@
 import { getToolConfig } from "@rilldata/web-common/features/chat/core/messages/tools/tool-registry.ts";
+import { eventBus } from "@rilldata/web-common/lib/event-bus/event-bus";
 import { EventEmitter } from "@rilldata/web-common/lib/event-emitter.ts";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 import {
@@ -397,6 +398,12 @@ export class Conversation {
           error instanceof SSEHttpError ? error.statusText : undefined,
         name: error.name,
       });
+      // 402 means the prompt was refused for quota, not that anything failed.
+      // Announce it so a wrapper can replace the chat with an upsell straight
+      // away; otherwise the user sits on a transport error until they reload.
+      if (error instanceof SSEHttpError && error.status === 402) {
+        eventBus.emit("ai-quota-exhausted");
+      }
       this.streamError.set(this.formatTransportError(error));
     });
 
@@ -675,6 +682,13 @@ export class Conversation {
     // Bad request errors
     if (status === 400) {
       return "Invalid request. Please try again.";
+    }
+
+    // Quota spent. Nothing failed and retrying won't help, so don't say
+    // "try again" — the "ai-quota-exhausted" event normally replaces the whole
+    // chat before this is read, but it shows for a frame and must not lie.
+    if (status === 402) {
+      return "You've used all your available AI prompts.";
     }
 
     // Server errors (5xx)

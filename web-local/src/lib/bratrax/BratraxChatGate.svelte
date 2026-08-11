@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { getAISettings } from "$lib/bratrax/settings/api";
   import { bratraxUser } from "$lib/bratrax/auth-store";
+  import { eventBus } from "@rilldata/web-common/lib/event-bus/event-bus";
   import DeveloperChat from "@rilldata/web-common/features/chat/DeveloperChat.svelte";
   import {
     chatOpen,
@@ -27,8 +28,11 @@
   $: canManageKey =
     $bratraxUser?.role === "super_admin" || $bratraxUser?.role === "admin";
 
-  async function refreshKeyStatus() {
-    checking = true;
+  // `quiet` skips the "Checking key…" placeholder. The re-check triggered by a
+  // spent allowance runs over a chat that is already on screen, and swapping it
+  // for a spinner on the way to the CTA just adds a flash.
+  async function refreshKeyStatus(quiet = false) {
+    if (!quiet) checking = true;
     try {
       const ai = await getAISettings();
       keySet = ai.key_set;
@@ -43,21 +47,21 @@
     }
   }
 
-  onMount(refreshKeyStatus);
+  onMount(() => {
+    void refreshKeyStatus();
+
+    // The chat only re-checks when it opens, so a session that is already open
+    // when the allowance runs out would otherwise sit on a transport error
+    // until the page reloads. conversation.ts announces the 402 for us.
+    return eventBus.on("ai-quota-exhausted", () => void refreshKeyStatus(true));
+  });
 
   // When the user opens the chat after setting a key in another tab, re-check.
-  // This is also what surfaces a freshly-exhausted demo allowance: the Go proxy
-  // starts returning 402 mid-session, and reopening the chat lands on the CTA.
   $: if ($chatOpen) void refreshKeyStatus();
 
   function goToAISettings() {
     sidebarActions.closeChat();
     goto("/settings/ai");
-  }
-
-  function goToSignup() {
-    sidebarActions.closeChat();
-    goto("/signup");
   }
 </script>
 
@@ -89,15 +93,20 @@
       </h2>
       <p class="text-sm font-light text-bratrax-text-body">
         The demo account comes with {demoAI.limit} prompts on us. Create your own
-        workspace to keep going with your own Anthropic key.
+        real account to keep going with your own Anthropic key.
       </p>
-      <button
-        type="button"
-        on:click={goToSignup}
+      <!-- ?logout=1 is load-bearing: /signup bounces an authenticated visitor
+           straight to /developer, and a demo visitor still holds a live session.
+           signup/+page.ts ends the session first, then hard-reloads onto the
+           form. An anchor rather than goto() so the navigation is a real page
+           load — an SPA hop would leave the demo identity in bratraxUser,
+           because +layout.ts short-circuits /signup as a public route. -->
+      <a
+        href="/signup?logout=1"
         class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
       >
-        Create your workspace →
-      </button>
+        Create your account →
+      </a>
       <button
         type="button"
         on:click={() => sidebarActions.closeChat()}
