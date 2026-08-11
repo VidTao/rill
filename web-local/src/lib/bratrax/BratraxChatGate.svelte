@@ -63,6 +63,23 @@
     sidebarActions.closeChat();
     goto("/settings/ai");
   }
+
+  function goToSignup() {
+    // Deliberately a button + explicit navigation, NOT an <a href>. The app sets
+    // `data-sveltekit-preload-data="hover"`, so SvelteKit runs a link target's
+    // load() on hover — and signup/+page.ts's load() is side-effecting: with
+    // ?logout=1 it ends the session and redirects. As a link, merely hovering
+    // this control logged the user out. A button is not preloadable.
+    //
+    // ?logout=1 itself is load-bearing: /signup bounces an authenticated visitor
+    // to /developer, and a demo visitor still holds a live session, so without
+    // it this control silently returned them to the dashboard.
+    //
+    // location.assign rather than goto() so it is a real page load — an SPA hop
+    // would leave the demo identity in bratraxUser, because +layout.ts
+    // short-circuits /signup as a public route without touching the store.
+    window.location.assign("/signup?logout=1");
+  }
 </script>
 
 {#if !$chatOpen}
@@ -95,18 +112,13 @@
         The demo account comes with {demoAI.limit} prompts on us. Create your own
         real account to keep going with your own Anthropic key.
       </p>
-      <!-- ?logout=1 is load-bearing: /signup bounces an authenticated visitor
-           straight to /developer, and a demo visitor still holds a live session.
-           signup/+page.ts ends the session first, then hard-reloads onto the
-           form. An anchor rather than goto() so the navigation is a real page
-           load — an SPA hop would leave the demo identity in bratraxUser,
-           because +layout.ts short-circuits /signup as a public route. -->
-      <a
-        href="/signup?logout=1"
+      <button
+        type="button"
+        on:click={goToSignup}
         class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
       >
         Create your account →
-      </a>
+      </button>
       <button
         type="button"
         on:click={() => sidebarActions.closeChat()}

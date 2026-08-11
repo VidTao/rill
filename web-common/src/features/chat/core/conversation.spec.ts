@@ -1,3 +1,4 @@
+import { eventBus } from "@rilldata/web-common/lib/event-bus/event-bus";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
 import {
   getRuntimeServiceGetConversationQueryKey,
@@ -243,6 +244,56 @@ describe("Conversation", () => {
       // Assert
       expect(runtimeServiceForkConversation).not.toHaveBeenCalled();
 
+      conversation.cleanup();
+    });
+  });
+
+  describe("quota exhaustion (HTTP 402)", () => {
+    function mockSendStatus(status: number, statusText: string) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response("{}", { status, statusText })),
+      );
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("announces a spent quota so the UI can swap the chat for an upsell", async () => {
+      // Without this event a session that is already open sits on a transport
+      // error until the page is reloaded — the whole point of the signal.
+      mockSendStatus(402, "Payment Required");
+      let announced = 0;
+      const unsubscribe = eventBus.on("ai-quota-exhausted", () => announced++);
+
+      const conversation = createConversation(NEW_CONVERSATION_ID);
+      await sendMessageAndIgnoreStreamError(conversation, "Test");
+
+      expect(announced).toBe(1);
+      // and the message shown in the meantime must not claim a failure
+      expect(get(conversation.streamError)).toBe(
+        "You've used all your available AI prompts.",
+      );
+
+      unsubscribe();
+      conversation.cleanup();
+    });
+
+    it("does NOT announce for other transport failures", async () => {
+      mockSendStatus(500, "Internal Server Error");
+      let announced = 0;
+      const unsubscribe = eventBus.on("ai-quota-exhausted", () => announced++);
+
+      const conversation = createConversation(NEW_CONVERSATION_ID);
+      await sendMessageAndIgnoreStreamError(conversation, "Test");
+
+      expect(announced).toBe(0);
+      expect(get(conversation.streamError)).toContain(
+        "Server is temporarily unavailable",
+      );
+
+      unsubscribe();
       conversation.cleanup();
     });
   });
