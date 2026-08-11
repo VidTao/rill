@@ -2,8 +2,12 @@
   import { page } from "$app/stores";
   import LocalAvatarButton from "@rilldata/web-common/features/authentication/LocalAvatarButton.svelte";
   import CanvasPreviewCTAs from "@rilldata/web-common/features/canvas/CanvasPreviewCTAs.svelte";
-  import ChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/ChatToggle.svelte";
   import SupportChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/SupportChatToggle.svelte";
+  import {
+    chatOpen,
+    sidebarActions,
+  } from "@rilldata/web-common/features/chat/layouts/sidebar/sidebar-store";
+  import HeaderToggleButton from "./HeaderToggleButton.svelte";
   import { themeControl } from "@rilldata/web-common/features/themes/theme-control";
   import ExplorePreviewCTAs from "@rilldata/web-common/features/explores/ExplorePreviewCTAs.svelte";
   import { featureFlags } from "@rilldata/web-common/features/feature-flags.ts";
@@ -114,11 +118,11 @@
           <CanvasPreviewCTAs {isAdminOrSuper} />
         {/if}
       {:else if showDeveloperChat}
-        <button
-          type="button"
-          on:click={() =>
+        <!-- No active state: this switches the theme rather than opening a
+             panel, so it stays muted and acid keeps meaning "panel open". -->
+        <HeaderToggleButton
+          onClick={() =>
             themeControl.set[$themePreference === "dark" ? "light" : "dark"]()}
-          class="bratrax-theme-toggle"
           title={$themePreference === "dark"
             ? "Switch to light theme"
             : "Switch to dark theme"}
@@ -156,12 +160,20 @@
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             </svg>
           {/if}
-        </button>
+        </HeaderToggleButton>
         {#if !hideAssistants}
-          <ChatToggle />
+          <HeaderToggleButton
+            active={$chatOpen}
+            onClick={sidebarActions.toggleChat}
+            title="Ask AI"
+            aria-label="Ask AI"
+            aria-pressed={$chatOpen}
+          >
+            AI
+          </HeaderToggleButton>
         {/if}
       {/if}
-      <!-- "?" support-bot toggle: unlike the AI ChatToggle it renders in every
+      <!-- "?" support-bot toggle: unlike the AI toggle it renders in every
            mode and for every role — product help is not gated on a BYOK key.
            Both are suppressed inside the Shopify admin iframe, where they'd be
            slide-over panels competing for ~1150px with Shopify's own chrome. -->
@@ -254,29 +266,5 @@
   .role-badge.role-viewer,
   .role-badge.role-neutral {
     color: var(--color-text-muted);
-  }
-
-  .bratrax-theme-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    border: 1px solid var(--color-border-strong, var(--border));
-    color: var(--color-text-secondary, var(--fg-secondary));
-    cursor: pointer;
-    transition:
-      background-color 120ms ease,
-      color 120ms ease,
-      border-color 120ms ease;
-  }
-  .bratrax-theme-toggle:hover {
-    background: var(--color-acid-dim, rgba(212, 255, 0, 0.06));
-    color: var(--color-text, var(--fg-primary));
-  }
-  .bratrax-theme-toggle:focus-visible {
-    outline: 2px solid var(--color-acid, #d4ff00);
-    outline-offset: 2px;
   }
 </style>
