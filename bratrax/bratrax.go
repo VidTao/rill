@@ -19,6 +19,13 @@ import (
 type Handlers struct {
 	AuthMapper  *AuthMapper
 	ClientStore *ClientStore
+	// PromptStore meters demo users' AI-sidebar prompts. Exposed so the local
+	// app can hand it to InstanceRouterMiddleware, which is the only layer that
+	// sees both the user's identity and the AI request.
+	PromptStore *AIPromptStore
+	// Config is surfaced so the caller can read the demo-AI settings without
+	// re-reading the environment.
+	Config *Config
 }
 
 // changelogSlugRe constrains the slugs accepted by GET /changelog/{slug}. The
@@ -67,6 +74,7 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	}
 
 	clientStore := NewClientStore(store.DB())
+	promptStore := NewAIPromptStore(store.DB())
 
 	proxy := NewProxy(cfg.TargetURL, logger)
 	authMapper := NewAuthMapper(store, clientStore, authSvc.JWKS(), logger, cfg.IssuerURL, cfg.AudienceURL).
@@ -373,5 +381,7 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	return &Handlers{
 		AuthMapper:  authMapper,
 		ClientStore: clientStore,
+		PromptStore: promptStore,
+		Config:      cfg,
 	}, nil
 }

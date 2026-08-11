@@ -10,11 +10,18 @@
     sidebarWidth,
   } from "@rilldata/web-common/features/chat/layouts/sidebar/sidebar-store";
 
+  import type { DemoAIQuota } from "$lib/bratrax/settings/types";
+
   // Gate the chat sidebar on the BYOK Anthropic key. When no key is set, render
   // a Bratrax-styled empty state with a CTA to /settings → AI; when a key IS
   // set, mount the normal DeveloperChat.
+  //
+  // Demo visitors are a third case: they run on the platform key with a fixed
+  // lifetime prompt allowance, and can never add a key of their own (they're
+  // viewers on a shared workspace). Once spent, they get a sign-up CTA instead.
 
   let keySet: boolean | null = null;
+  let demoAI: DemoAIQuota | null = null;
   let checking = true;
 
   $: canManageKey =
@@ -25,10 +32,12 @@
     try {
       const ai = await getAISettings();
       keySet = ai.key_set;
+      demoAI = ai.demo_ai ?? null;
     } catch {
       // /settings/ai requires auth; if it fails treat as "not set" so the
       // user sees the CTA rather than a broken chat.
       keySet = false;
+      demoAI = null;
     } finally {
       checking = false;
     }
@@ -37,11 +46,18 @@
   onMount(refreshKeyStatus);
 
   // When the user opens the chat after setting a key in another tab, re-check.
+  // This is also what surfaces a freshly-exhausted demo allowance: the Go proxy
+  // starts returning 402 mid-session, and reopening the chat lands on the CTA.
   $: if ($chatOpen) void refreshKeyStatus();
 
   function goToAISettings() {
     sidebarActions.closeChat();
     goto("/settings/ai");
+  }
+
+  function goToSignup() {
+    sidebarActions.closeChat();
+    goto("/signup");
   }
 </script>
 
@@ -49,8 +65,46 @@
   <!-- Chat is closed; render nothing (matches DeveloperChat's behavior). -->
 {:else if checking || keySet === null}
   <aside class="chat-sidebar" style="--sidebar-width: {$sidebarWidth}px;">
-    <div class="grid h-full place-items-center font-mono text-xs text-bratrax-text-muted">
+    <div
+      class="grid h-full place-items-center font-mono text-xs text-bratrax-text-muted"
+    >
       Checking key…
+    </div>
+  </aside>
+{:else if demoAI?.exhausted}
+  <!-- Checked before keySet: a demo user's key_set is true (the platform key
+       serves them), so the allowance is what actually gates them. -->
+  <aside class="chat-sidebar" style="--sidebar-width: {$sidebarWidth}px;">
+    <div
+      class="flex h-full flex-col items-center justify-center gap-4 px-6 text-center"
+    >
+      <div
+        class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+      >
+        AI CHAT
+      </div>
+      <h2 class="text-xl font-black text-bratrax-text-headline">
+        You've used your {demoAI.limit} free
+        <span class="font-serif italic text-bratrax-acid">AI prompts</span>
+      </h2>
+      <p class="text-sm font-light text-bratrax-text-body">
+        The demo account comes with {demoAI.limit} prompts on us. Create your own
+        workspace to keep going with your own Anthropic key.
+      </p>
+      <button
+        type="button"
+        on:click={goToSignup}
+        class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
+      >
+        Create your workspace →
+      </button>
+      <button
+        type="button"
+        on:click={() => sidebarActions.closeChat()}
+        class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted hover:text-bratrax-text-body"
+      >
+        Close
+      </button>
     </div>
   </aside>
 {:else if keySet}
@@ -59,16 +113,22 @@
   </slot>
 {:else}
   <aside class="chat-sidebar" style="--sidebar-width: {$sidebarWidth}px;">
-    <div class="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-      <div class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70">
+    <div
+      class="flex h-full flex-col items-center justify-center gap-4 px-6 text-center"
+    >
+      <div
+        class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+      >
         AI CHAT
       </div>
       <h2 class="text-xl font-black text-bratrax-text-headline">
-        Add your <span class="font-serif italic text-bratrax-acid">Anthropic key</span>
+        Add your <span class="font-serif italic text-bratrax-acid"
+          >Anthropic key</span
+        >
       </h2>
       <p class="text-sm font-light text-bratrax-text-body">
-        Bratrax routes Claude through your own Anthropic account. Set up a key in
-        Settings → AI to enable chat.
+        Bratrax routes Claude through your own Anthropic account. Set up a key
+        in Settings → AI to enable chat.
       </p>
       {#if canManageKey}
         <button
@@ -79,7 +139,9 @@
           Open Settings → AI
         </button>
       {:else}
-        <p class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted">
+        <p
+          class="font-mono text-[10px] uppercase tracking-wider text-bratrax-text-muted"
+        >
           Ask an admin to add a key.
         </p>
       {/if}

@@ -26,7 +26,15 @@ var ErrProjectNotProvisioned = errors.New("project not provisioned")
 // Non-runtime paths and requests already targeting an explicit instance ID pass
 // through unchanged. Unauthenticated requests also pass through unchanged so the
 // runtime can return its own error.
-func InstanceRouterMiddleware(next http.Handler, authMapper *AuthMapper, ensure EnsureInstanceFn, logger *zap.Logger) http.Handler {
+//
+// It also enforces the demo-user AI prompt budget. This is the only layer that
+// can: the Rill runtime serves the AI endpoints with auth disabled, so by the
+// time a request reaches runtime/server/chat.go its claims carry no user id.
+// Here the cookie has just been resolved to a real *User.
+//
+// demoAI may be nil (single-tenant, or the platform key unset), in which case no
+// metering happens.
+func InstanceRouterMiddleware(next http.Handler, authMapper *AuthMapper, ensure EnsureInstanceFn, demoAI *DemoAIQuota, logger *zap.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Detect whether this request needs rewriting.
 		const pathPrefix = "/v1/instances/"
@@ -53,7 +61,7 @@ func InstanceRouterMiddleware(next http.Handler, authMapper *AuthMapper, ensure 
 		}
 
 		// Resolve the authenticated user's client.
-		_, client, err := authMapper.ResolveClientFromCookie(r)
+		user, client, err := authMapper.ResolveClientFromCookie(r)
 		if err != nil {
 			logger.Debug("instance router: client resolution failed", zap.Error(err))
 			writeJSONError(w, http.StatusInternalServerError, "client lookup failed")
@@ -67,6 +75,16 @@ func InstanceRouterMiddleware(next http.Handler, authMapper *AuthMapper, ensure 
 		if client == nil {
 			next.ServeHTTP(w, r)
 			return
+		}
+
+		// Demo users get a fixed lifetime budget of AI prompts on the platform
+		// key. Checked before ensure() so an exhausted request never reaches the
+		// runtime, and therefore never reaches Anthropic.
+		if demoAI.applies(r, user, client, pathTail) {
+			if !demoAI.admit(r.Context(), user, client, logger) {
+				writeJSONError(w, http.StatusPaymentRequired, "demo_ai_quota_exhausted")
+				return
+			}
 		}
 
 		// Lazily create the per-client Rill instance (no-op if it already exists).

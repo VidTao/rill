@@ -61,9 +61,20 @@ export interface InvitationPreview {
   accepted: boolean;
 }
 
+// Demo visitors share one workspace and can never add their own key, so they
+// get a lifetime allowance of prompts on the platform key instead. Present only
+// for callers on the demo workspace; absent for every real client.
+export interface DemoAIQuota {
+  limit: number;
+  used: number;
+  remaining: number;
+  exhausted: boolean;
+}
+
 export interface AISettings {
   key_set: boolean;
   key_preview: string | null;
+  demo_ai?: DemoAIQuota;
 }
 
 export interface MCPSettings {

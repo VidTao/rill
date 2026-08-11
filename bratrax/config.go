@@ -47,6 +47,29 @@ type Config struct {
 	// Flask reads as SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET.
 	ShopifyClientID     string
 	ShopifyClientSecret string
+
+	// --- Demo-user AI trial ---
+	//
+	// Demo visitors share one workspace, so they can never bring their own
+	// Anthropic key (the key is bound to the instance, and they're viewers).
+	// Instead they get a fixed number of AI-sidebar prompts on the platform's
+	// own key, then the sidebar locks behind a sign-up CTA.
+	//
+	// AnthropicAPIKey is the platform key, same value Flask reads as
+	// ANTHROPIC_API_KEY. When empty the whole feature is inert and the demo
+	// workspace falls back to its stored BYOK key like any other client.
+	AnthropicAPIKey string
+	// DemoUsersModel overrides the claude driver's default model for the demo
+	// instance only (the default is Opus, the priciest option). Empty leaves the
+	// driver default in place.
+	DemoUsersModel string
+	// DemoClientSlug is the clickhouse_db of the shared demo workspace. Must
+	// match Flask's DEMO_CLIENT_SLUG.
+	DemoClientSlug string
+	// DemoUserMaxPrompts is the lifetime AI-prompt budget per demo user. Must
+	// match Flask's DEMO_USER_MAX_PROMPTS, which only advertises the number —
+	// this is the one that's enforced.
+	DemoUserMaxPrompts int
 }
 
 // ConfigFromEnv reads Bratrax configuration from environment variables.
@@ -118,6 +141,23 @@ func ConfigFromEnv() (*Config, error) {
 		allowWoocommerce = v
 	}
 
+	demoClientSlug := os.Getenv("DEMO_CLIENT_SLUG")
+	if demoClientSlug == "" {
+		demoClientSlug = "dummy"
+	}
+
+	demoUserMaxPrompts := 10
+	if raw := os.Getenv("DEMO_USER_MAX_PROMPTS"); raw != "" {
+		v, parseErr := strconv.Atoi(raw)
+		if parseErr != nil {
+			return nil, fmt.Errorf("bratrax: invalid DEMO_USER_MAX_PROMPTS %q: %w", raw, parseErr)
+		}
+		if v < 0 {
+			return nil, fmt.Errorf("bratrax: DEMO_USER_MAX_PROMPTS must not be negative, got %d", v)
+		}
+		demoUserMaxPrompts = v
+	}
+
 	return &Config{
 		TargetURL:           u,
 		UsersDSN:            usersDSN,
@@ -129,5 +169,9 @@ func ConfigFromEnv() (*Config, error) {
 		AllowWoocommerce:    allowWoocommerce,
 		ShopifyClientID:     os.Getenv("SHOPIFY_CLIENT_ID"),
 		ShopifyClientSecret: os.Getenv("SHOPIFY_CLIENT_SECRET"),
+		AnthropicAPIKey:     os.Getenv("ANTHROPIC_API_KEY"),
+		DemoUsersModel:      os.Getenv("DEMO_USERS_MODEL"),
+		DemoClientSlug:      demoClientSlug,
+		DemoUserMaxPrompts:  demoUserMaxPrompts,
 	}, nil
 }

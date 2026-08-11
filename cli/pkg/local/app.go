@@ -531,6 +531,27 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 	// so we can wrap it with the bratrax InstanceRouterMiddleware (multi-tenant mode).
 	group.Go(func() error {
 		var bratraxHandlers *bratrax.Handlers
+
+		// applyDemoAI swaps a client's own BYOK key for the platform key on the
+		// shared demo workspace, and pins that instance to a cheaper model (the
+		// driver default is Opus, and here we pay rather than the customer). Every
+		// other client keeps its own key and the driver default.
+		//
+		// Both instance-creation paths — the browser instance router and the MCP
+		// ensure-ready — funnel through this, so a demo instance is identical no
+		// matter which one created it first. Reads bratraxHandlers lazily: it is
+		// assigned below, but these closures only run per-request.
+		applyDemoAI := func(clientDB, byokKey string) (key, model string) {
+			if bratraxHandlers == nil || bratraxHandlers.Config == nil {
+				return byokKey, ""
+			}
+			cfg := bratraxHandlers.Config
+			if cfg.AnthropicAPIKey != "" && clientDB == cfg.DemoClientSlug {
+				return cfg.AnthropicAPIKey, cfg.DemoUsersModel
+			}
+			return byokKey, ""
+		}
+
 		runtimeHandler, err := runtimeServer.HTTPHandler(ctx, func(mux *http.ServeMux) {
 			// Inject local-only endpoints on the runtime server
 			localServer.RegisterHandlers(mux, httpPort, secure, enableUI)
@@ -551,7 +572,8 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 				ensureReady = func(rctx context.Context, clientDB, key string) error {
 					// Register the instance (idempotent — returns immediately if already
 					// cached), then wait, bounded, for its controller to be ready.
-					if _, ensErr := a.EnsureInstanceForClient(rctx, clientDB, key); ensErr != nil {
+					key, model := applyDemoAI(clientDB, key)
+					if _, ensErr := a.EnsureInstanceForClient(rctx, clientDB, key, model); ensErr != nil {
 						return ensErr
 					}
 					wctx, cancel := context.WithTimeout(rctx, ensureReadyTimeout)
@@ -596,9 +618,11 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 						zap.String("clientDB", clientDB), zap.Error(lookupErr))
 					key = ""
 				}
-				return a.EnsureInstanceForClient(ctx, clientDB, key)
+				key, model := applyDemoAI(clientDB, key)
+				return a.EnsureInstanceForClient(ctx, clientDB, key, model)
 			}
-			serveHandler = bratrax.InstanceRouterMiddleware(runtimeHandler, bratraxHandlers.AuthMapper, ensure, a.BaseLogger)
+			demoAI := bratrax.NewDemoAIQuota(bratraxHandlers.PromptStore, bratraxHandlers.Config)
+			serveHandler = bratrax.InstanceRouterMiddleware(runtimeHandler, bratraxHandlers.AuthMapper, ensure, demoAI, a.BaseLogger)
 			a.Logger.Info("Multi-tenant: instance router middleware installed")
 		}
 
@@ -728,7 +752,11 @@ func IsProjectInit(projectPath string) bool {
 // instance is still created but the claude AI connector will fail at Open time
 // (driver requires api_key); the frontend pre-checks /settings/ai and renders
 // an "add your key" CTA so users don't hit that error path.
-func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAPIKey string) (string, error) {
+//
+// anthropicModel overrides the claude driver's default model. Empty leaves the
+// driver default in place, which is what every BYOK client gets; only the demo
+// workspace sets it (to a cheaper model, since the platform pays for it).
+func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAPIKey, anthropicModel string) (string, error) {
 	if !a.MultiTenant {
 		// In single-tenant mode every request goes to the default instance.
 		return DefaultInstanceID, nil
@@ -801,9 +829,13 @@ func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAP
 	// If empty, we still register the connector so the rest of the instance starts
 	// cleanly; the Claude driver will refuse Open at chat time (the frontend
 	// pre-checks GET /settings/ai and shows an "add your key" CTA before then).
-	aiConfig, err := structpb.NewStruct(map[string]any{
-		"api_key": anthropicAPIKey,
-	})
+	aiProps := map[string]any{"api_key": anthropicAPIKey}
+	// Only set when overridden, so an unset model leaves the driver's own default
+	// untouched rather than pinning every client to whatever we'd hardcode here.
+	if anthropicModel != "" {
+		aiProps["model"] = anthropicModel
+	}
+	aiConfig, err := structpb.NewStruct(aiProps)
 	if err != nil {
 		return "", err
 	}
