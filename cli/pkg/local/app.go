@@ -50,6 +50,12 @@ const (
 // BRATRAX_MCP_ENSURE_READY_TIMEOUT_SECONDS.
 const defaultMCPEnsureReadyTimeout = 8 * time.Second
 
+// defaultClaudeTemperature is the value the claude driver used to apply as its
+// own default. The driver now omits `temperature` unless a connector asks for
+// one (newer models 400 on it), so we set it explicitly here to keep clients on
+// the default model answering exactly as they did before.
+const defaultClaudeTemperature = 0.1
+
 // App encapsulates the logic associated with configuring and running the UI and the runtime in a local environment.
 // Here, a local environment means a non-authenticated, single-instance and single-project setup on localhost.
 // App encapsulates logic shared between different CLI commands, like start, init, build and source.
@@ -830,10 +836,16 @@ func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAP
 	// cleanly; the Claude driver will refuse Open at chat time (the frontend
 	// pre-checks GET /settings/ai and shows an "add your key" CTA before then).
 	aiProps := map[string]any{"api_key": anthropicAPIKey}
-	// Only set when overridden, so an unset model leaves the driver's own default
-	// untouched rather than pinning every client to whatever we'd hardcode here.
 	if anthropicModel != "" {
+		// Model overridden (demo workspace). Send no `temperature`: the newer
+		// models reject it outright with 400 "`temperature` is deprecated for
+		// this model", which would 400 every prompt.
 		aiProps["model"] = anthropicModel
+	} else {
+		// Default model. Pin the temperature the claude driver used to apply as
+		// its own default, so clients on the default model keep answering exactly
+		// as they did before that default was removed from the driver.
+		aiProps["temperature"] = defaultClaudeTemperature
 	}
 	aiConfig, err := structpb.NewStruct(aiProps)
 	if err != nil {

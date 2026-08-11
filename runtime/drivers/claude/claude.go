@@ -17,8 +17,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const defaultTemperature = 0.1
-
 func init() {
 	drivers.Register("claude", driver{})
 	drivers.RegisterAsConnector("claude", driver{})
@@ -57,8 +55,7 @@ var spec = drivers.Spec{
 			Type:        drivers.NumberPropertyType,
 			Required:    false,
 			DisplayName: "Temperature",
-			Description: "Sampling temperature to use.",
-			Default:     "0.1",
+			Description: "Sampling temperature to use. Left unset, no temperature is sent — newer models reject the parameter.",
 		},
 		{
 			Key:         "base_url",
@@ -140,12 +137,6 @@ func (c *configProperties) getMaxTokens() int {
 	return 8192 // Default max tokens
 }
 
-func (c *configProperties) getTemperature() float64 {
-	if c.Temperature != nil {
-		return *c.Temperature
-	}
-	return defaultTemperature
-}
 
 type handle struct {
 	client anthropic.Client
@@ -264,11 +255,17 @@ func (h *handle) Complete(ctx context.Context, opts *drivers.CompleteOptions) (*
 	}
 
 	params := anthropic.BetaMessageNewParams{
-		Model:       anthropic.Model(h.config.getModel()),
-		MaxTokens:   int64(h.config.getMaxTokens()),
-		Temperature: anthropic.Float(h.config.getTemperature()),
-		Messages:    msgs,
-		System:      system,
+		Model:     anthropic.Model(h.config.getModel()),
+		MaxTokens: int64(h.config.getMaxTokens()),
+		Messages:  msgs,
+		System:    system,
+	}
+
+	// Only send `temperature` when the connector actually asked for one. Newer
+	// models reject the parameter outright (400 "`temperature` is deprecated for
+	// this model"), so a driver-side default would make them unusable.
+	if h.config.Temperature != nil {
+		params.Temperature = anthropic.Float(*h.config.Temperature)
 	}
 
 	if len(betaTools) > 0 {
