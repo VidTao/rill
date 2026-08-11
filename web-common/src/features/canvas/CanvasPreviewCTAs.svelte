@@ -1,7 +1,8 @@
 <script lang="ts">
   import { featureFlags } from "../feature-flags";
   import { themeControl } from "../themes/theme-control";
-  import ChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/ChatToggle.svelte";
+  import HeaderChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/HeaderChatToggle.svelte";
+  import HeaderToggleButton from "@rilldata/web-common/layout/HeaderToggleButton.svelte";
 
   // Bratrax-fork right cluster on canvas preview: theme toggle + AI chat
   // toggle. The Edit button used to live here but moved to the canvas
@@ -19,11 +20,11 @@
   $: themePreference = themeControl.preference;
 </script>
 
-<button
-  type="button"
-  on:click={() =>
+<!-- Same cluster as the header's own theme switch, so it shares its component.
+     No active state: it switches the theme rather than opening a panel. -->
+<HeaderToggleButton
+  onClick={() =>
     themeControl.set[$themePreference === "dark" ? "light" : "dark"]()}
-  class="bratrax-theme-toggle"
   title={$themePreference === "dark"
     ? "Switch to light theme"
     : "Switch to dark theme"}
@@ -41,31 +42,8 @@
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   {/if}
-</button>
+</HeaderToggleButton>
 
 {#if $dashboardChat}
-  <ChatToggle />
+  <HeaderChatToggle />
 {/if}
-
-<style lang="postcss">
-  .bratrax-theme-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    border: 1px solid var(--color-border-strong, var(--border));
-    color: var(--color-text-secondary, var(--fg-secondary));
-    cursor: pointer;
-    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
-  }
-  .bratrax-theme-toggle:hover {
-    background: var(--color-acid-dim, rgba(212, 255, 0, 0.06));
-    color: var(--color-text, var(--fg-primary));
-  }
-  .bratrax-theme-toggle:focus-visible {
-    outline: 2px solid var(--color-acid, #D4FF00);
-    outline-offset: 2px;
-  }
-</style>
