@@ -35,29 +35,72 @@ declare global {
 
 let loadPromise: Promise<boolean> | null = null;
 
+/** How long to wait for App Bridge to publish window.shopify.idToken. */
+const APP_BRIDGE_READY_TIMEOUT_MS = 8_000;
+const APP_BRIDGE_POLL_MS = 100;
+
+/** True once App Bridge has published a usable idToken(). */
+function appBridgeReady(): boolean {
+  return typeof window.shopify?.idToken === "function";
+}
+
 /**
  * Inject App Bridge once. Resolves true when `window.shopify.idToken` is
  * usable, false on any failure — callers fall back to cookie auth rather than
  * breaking, which is the right behaviour if we somehow mis-detected the
  * embedded context.
+ *
+ * Deliberately does NOT decide the outcome at `onload`. `onload` fires when the
+ * script has finished executing, which is not when App Bridge is ready:
+ * `window.shopify` is published after it completes its handshake with the
+ * Shopify admin frame. Resolving on `onload` therefore reported failure while
+ * App Bridge was still initialising, and the failure was silent — no token, so
+ * the caller fell through to an unauthenticated request. Poll for the global
+ * instead, which is correct whether it appears synchronously or late.
  */
 function loadAppBridge(): Promise<boolean> {
   if (loadPromise) return loadPromise;
 
   loadPromise = new Promise<boolean>((resolve) => {
     if (typeof document === "undefined") return resolve(false);
-    if (typeof window.shopify?.idToken === "function") return resolve(true);
+    if (appBridgeReady()) return resolve(true);
+
+    const deadline = Date.now() + APP_BRIDGE_READY_TIMEOUT_MS;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const settle = (ok: boolean) => {
+      if (timer) clearInterval(timer);
+      if (!ok) {
+        console.warn(
+          "[bratrax] App Bridge never became ready; falling back to the bratrax bearer token",
+        );
+      }
+      resolve(ok);
+    };
+
+    const waitForGlobal = () => {
+      if (timer) return;
+      timer = setInterval(() => {
+        if (appBridgeReady()) return settle(true);
+        if (Date.now() > deadline) settle(false);
+      }, APP_BRIDGE_POLL_MS);
+    };
+
+    // A tag may already be present (e.g. added to app.html later); don't add a
+    // second one, just wait for it.
+    if (document.querySelector(`script[src="${APP_BRIDGE_SRC}"]`)) {
+      waitForGlobal();
+      return;
+    }
 
     const script = document.createElement("script");
     script.src = APP_BRIDGE_SRC;
     script.setAttribute("data-api-key", SHOPIFY_API_KEY);
-    script.onload = () =>
-      resolve(typeof window.shopify?.idToken === "function");
+    script.onload = waitForGlobal;
     script.onerror = () => {
       console.warn(
-        "[bratrax] App Bridge failed to load; falling back to cookie auth",
+        "[bratrax] App Bridge failed to load; falling back to the bratrax bearer token",
       );
-      resolve(false);
+      settle(false);
     };
     document.head.appendChild(script);
   });
@@ -98,11 +141,32 @@ export async function shopifyAuthHeader(): Promise<Record<string, string>> {
   //
   // Once the client exists either would do, but preferring this one keeps the
   // whole embedded session on a single identity.
-  const embedded = getEmbeddedToken();
-  if (embedded) return { Authorization: `Bearer ${embedded}` };
-
-  const token = await getShopifySessionToken();
+  const token = await embeddedBearer();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * The credential to authenticate an embedded request with, or null.
+ *
+ * Prefers the bratrax JWT captured from an in-iframe login, falling back to a
+ * Shopify App Bridge session token. Both are accepted by the Go proxy — the
+ * bratrax one via the pre-existing `Authorization: Bearer` path, the Shopify
+ * one via resolveShopifySession.
+ *
+ * Shared by shopifyAuthHeader (the fetch interceptor) and
+ * startRuntimeSessionSync (the Rill runtime client) so both surfaces
+ * authenticate with the same identity. They diverged before: the runtime client
+ * called getShopifySessionToken() directly and therefore never saw the bratrax
+ * token, so whenever App Bridge failed to produce one the runtime went out
+ * unauthenticated, resolved no client, and read the empty "default" instance —
+ * leaving the embedded dashboard stuck on "Hang tight! We're building your
+ * dashboard…" forever, because the canvas it wanted only exists in the
+ * client's instance.
+ */
+async function embeddedBearer(): Promise<string | null> {
+  const embedded = getEmbeddedToken();
+  if (embedded) return embedded;
+  return await getShopifySessionToken();
 }
 
 // --------------------------------------------------------------------------
@@ -215,7 +279,7 @@ export async function startRuntimeSessionSync(
   );
 
   const push = async (): Promise<boolean> => {
-    const token = await getShopifySessionToken();
+    const token = await embeddedBearer();
     if (!token) return false;
     // setRuntime skips the update when nothing changed, so re-pushing the same
     // token is cheap; a new token bumps receivedAt and invalidates as needed.

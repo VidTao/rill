@@ -18,6 +18,10 @@
 
   type VerifyState = "pending" | "running" | "refreshing" | "done" | "error";
 
+  // The dashboard onboarding lands on. Also the only dashboard exposed inside
+  // the Shopify admin — see routes/embed/canvas/[name].
+  const LANDING_CANVAS = "campaign_deep_dive";
+
   let status: OnboardStatus | null = null;
   let error = "";
   let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -455,31 +459,39 @@
       if (verifyInterval) clearInterval(verifyInterval);
       verifyInterval = null;
 
-      // Pick the first Canvas dashboard and route to its preview at
-      // /canvas/<name>. Land users on the dashboard view they'll actually
-      // use day-to-day — the file editor used to be the post-onboarding
-      // target, which was an artifact of the pre-nav-restructure world.
-      // Demo canvases (margin_scorecard etc.) get filtered out so a
-      // warming-up runtime never lands the user on a Rill bundled-example.
-      // Explore-kind resources still fall back to the file view because
-      // there's no /explore/<name> Bratrax-fork preview route.
-      const firstCanvas = resources.find((r) => {
+      // Route to a Canvas dashboard's preview at /canvas/<name>. Land users on
+      // the dashboard view they'll actually use day-to-day — the file editor
+      // used to be the post-onboarding target, which was an artifact of the
+      // pre-nav-restructure world. Demo canvases (margin_scorecard etc.) get
+      // filtered out so a warming-up runtime never lands the user on a Rill
+      // bundled-example. Explore-kind resources still fall back to the file
+      // view because there's no /explore/<name> Bratrax-fork preview route.
+      const candidates = resources.filter((r) => {
         const kind = r.meta?.name?.kind;
         const name = r.meta?.name?.name;
         return kind === ResourceKind.Canvas && !isRillDemoCanvas(name);
       });
-      const firstCanvasName = firstCanvas?.meta?.name?.name;
+      // Prefer campaign_deep_dive by name rather than trusting list order.
+      // It is the agreed landing dashboard — and the only one exposed in the
+      // Shopify admin — but ListResources gives no ordering guarantee, so
+      // "first Canvas" could be product_performance or customer_analytics on
+      // any given reconcile. Falls back to the first non-demo Canvas for
+      // templates that don't ship campaign_deep_dive.
+      const preferred = candidates.find(
+        (r) => r.meta?.name?.name === LANDING_CANVAS,
+      );
+      const targetCanvasName = (preferred ?? candidates[0])?.meta?.name?.name;
 
       let target: string;
-      if (firstCanvasName) {
+      if (targetCanvasName) {
         // Embedded merchants land on the single-dashboard view instead of the
         // full app shell — inside the Shopify admin iframe our own header,
         // dashboard tabs and switcher would be a second chrome competing with
         // Shopify's own, in ~1150px. /embed/canvas carries an "Open in
         // Bratrax" button for anyone who wants the full thing.
         target = isShopifyEmbedded()
-          ? `/embed/canvas/${firstCanvasName}`
-          : `/canvas/${firstCanvasName}`;
+          ? `/embed/canvas/${targetCanvasName}`
+          : `/canvas/${targetCanvasName}`;
       } else {
         // Fallback: surface any Explore dashboard via the file editor (no
         // preview route exists for those in the Bratrax fork).
