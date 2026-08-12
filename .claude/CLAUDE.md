@@ -87,3 +87,23 @@ Frontend conventions are being formalized in `.claude/rules/frontend.md` (coming
 - **Monorepo**: Uses npm workspaces (frontend) and Go modules (backend)
 - **Path aliases**: `@rilldata/web-*` imports configured in tsconfig.json
 - **Embedded dashboards**: Explore and Canvas dashboards can be embedded in customer apps via iframe. When changing dashboard components, consider whether the change also affects the embed surface.
+
+### Bratrax fork: runtime auth in the Shopify admin iframe
+
+Any route that queries the Rill runtime **must** `await startRuntimeSessionSync()`
+in its `load` (see `web-local/src/routes/embed/canvas/[name]/+page.ts`).
+
+`installEmbeddedAuthFetch()` — the global `window.fetch` interceptor in
+`hooks.client.ts` — deliberately does **not** cover the runtime client, which has
+its own transport and reads its token only from `runtime.jwt`. Inside the Shopify
+admin iframe there is no `bratrax_auth` cookie, so a route that forgets this sends
+runtime queries with no `Authorization` header at all.
+
+That does not error. `InstanceRouterMiddleware` simply doesn't rewrite
+`/v1/instances/default/*`, and the request succeeds against the empty `default`
+instance — which holds Rill's bundled demo project. The tells are
+`margin_scorecard` appearing, or a canvas stuck forever on "Hang tight! We're
+building your dashboard…" (a canvas that doesn't exist is indistinguishable from
+one still reconciling: both give no `validSpec` and no `reconcileError`).
+
+Full writeup: `bratrax/docs/shopify-app-store/10-RUNTIME-AUTH-AND-INSTANCES.md`.
