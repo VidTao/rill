@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
@@ -48,13 +50,50 @@ func NewEmbedHandoffService(db *sqlx.DB, auth *AuthService, logger *zap.Logger, 
 	return &EmbedHandoffService{db: db, auth: auth, logger: logger, secureCookie: secureCookie}
 }
 
-// HandleHandoff handles GET /auth/handoff?t=<token>.
+// safeNextPath validates the optional `next` destination.
+//
+// Returns "" for anything that isn't a plain same-origin path, so a hand-off
+// link can never be turned into an open redirect. Rejects absolute URLs (they
+// parse with a Scheme or Host) and protocol-relative "//evil.com", which parses
+// with an empty Scheme and so would otherwise slip through.
+func safeNextPath(raw string) string {
+	if raw == "" || !strings.HasPrefix(raw, "/") {
+		return ""
+	}
+	// Reject anything that reads as protocol-relative. "//evil.com" is the
+	// obvious form; "/\evil.com" is the one that gets missed — url.Parse treats
+	// the backslash as a path character and reports no Host, but browsers
+	// normalise "/\" to "//" and leave the origin. Backslashes have no business
+	// in a path we generate, so refuse them outright.
+	if strings.HasPrefix(raw, "//") || strings.Contains(raw, `\`) {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "" || u.Host != "" {
+		return ""
+	}
+	return raw
+}
+
+// HandleHandoff handles GET /auth/handoff?t=<token>&next=<path>.
 //
 // Always redirects rather than returning JSON — a human is following this link
 // from a new browser tab. A bad or expired token sends them to /login, which is
 // the useful destination anyway: they can sign in normally from there.
+//
+// `next` exists because the embedded app has more than one reason to open a
+// top-level tab, and each wants a different landing page. "Open in Bratrax"
+// wants the dashboard (the default). Redirect-OAuth wants
+// /onboard/oauth-launch, since the provider refuses to render in the iframe and
+// the new tab it opens has no session of its own — the login cookie is
+// SameSite=Lax, so the browser never stored it while the merchant was signing
+// in inside the frame.
 func (s *EmbedHandoffService) HandleHandoff(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("t")
+	next := safeNextPath(r.URL.Query().Get("next"))
+	if next == "" {
+		next = handoffRedirectPath
+	}
 	if token == "" {
 		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 		return
@@ -94,8 +133,8 @@ func (s *EmbedHandoffService) HandleHandoff(w http.ResponseWriter, r *http.Reque
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	s.logger.Info("embed hand-off completed", zap.Int("user_id", user.ID))
-	http.Redirect(w, r, handoffRedirectPath, http.StatusTemporaryRedirect)
+	s.logger.Info("embed hand-off completed", zap.Int("user_id", user.ID), zap.String("next", next))
+	http.Redirect(w, r, next, http.StatusTemporaryRedirect)
 }
 
 // consumeToken atomically claims an unused, unexpired token and returns its

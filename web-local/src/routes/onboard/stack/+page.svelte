@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { get } from "svelte/store";
@@ -20,8 +20,23 @@
   import OutbrainLoginModal from "../../connectors/OutbrainLoginModal.svelte";
   import BloomreachCredentialModal from "../../connectors/BloomreachCredentialModal.svelte";
   import AmazonRegionModal from "$lib/bratrax/onboarding/AmazonRegionModal.svelte";
-  import { getOAuthConfig } from "$lib/bratrax/onboarding/api";
+  import {
+    createEmbedHandoff,
+    getOAuthConfig,
+  } from "$lib/bratrax/onboarding/api";
+  import {
+    isShopifyEmbedded,
+    reserveTopLevelTab,
+  } from "$lib/bratrax/shopify-embed";
   import { trackConnectedSources } from "$lib/bratrax/analytics";
+
+  // Running inside the Shopify admin iframe. Sticky for the session, so reading
+  // it once is safe. Drives the redirect-OAuth breakout below.
+  const embedded = isShopifyEmbedded();
+  // True in the tab that /onboard/oauth-launch opened. Set there, read here
+  // after the provider's callback lands, so this tab tells the merchant to go
+  // back to Shopify instead of continuing onboarding in a stray tab.
+  let isOAuthPopupTab = false;
 
   // ---------------------------------------------------------------------------
   // Onboarding-time tracking-template flows (paused — pending team alignment)
@@ -352,6 +367,54 @@
     error = "";
     loading = platform.id;
 
+    // Inside the Shopify admin iframe, navigating in place fails: the provider
+    // refuses to be framed (Microsoft answers X-Frame-Options: DENY, hence
+    // "login.microsoftonline.com refused to connect"). Break out to a top-level
+    // tab via /onboard/oauth-launch, which establishes that tab's own
+    // sessionStorage before leaving — the callback state-matching below needs
+    // it and sessionStorage does not cross tabs. See that route's comment.
+    if (embedded && platform.authUrlPath) {
+      // Reserve the tab synchronously: the click's popup grant does not survive
+      // the await below, and this must run before it.
+      const tab = reserveTopLevelTab();
+      if (!tab.ok) {
+        error = `Allow pop-ups for this page, then connect ${platform.name} again.`;
+        loading = "";
+        return;
+      }
+
+      const q = new URLSearchParams({
+        platform: platform.id,
+        authPath: platform.authUrlPath,
+      });
+      if (extraQuery) q.set("extra", extraQuery);
+      const launchPath = `/onboard/oauth-launch?${q}`;
+
+      try {
+        // The new tab has NO session of its own. The login cookie is
+        // SameSite=Lax, so the browser never even stored it while the merchant
+        // signed in inside the iframe — their session is the bearer token in
+        // this tab's sessionStorage, which doesn't cross tabs. Opening the
+        // launcher directly just lands on /login.
+        //
+        // So go through the hand-off: mint a single-use token, let
+        // /auth/handoff set a real cookie in the new tab, and have it forward to
+        // the launcher. Same bridge "Open in Bratrax" uses.
+        const { url } = await createEmbedHandoff();
+        tab.navigate(`${url}&next=${encodeURIComponent(launchPath)}`);
+      } catch (e) {
+        tab.close();
+        error = e instanceof Error ? e.message : String(e);
+        loading = "";
+        return;
+      }
+
+      // The connection completes in that tab. Watch the server for it so the
+      // card turns green here without the merchant doing anything.
+      awaitExternalConnect(platform);
+      return;
+    }
+
     try {
       const host = get(runtime).host;
       const res = await fetch(`${host}${platform.authUrlPath}${extraQuery}`, {
@@ -375,6 +438,37 @@
       error = e instanceof Error ? e.message : String(e);
       loading = "";
     }
+  }
+
+  // Poll for a connection being completed in the popped tab. Stops as soon as
+  // the platform shows up in connected_platforms, or after ~10 min — generous
+  // because the merchant may have to log in to the provider and pick accounts.
+  // Timing out costs nothing: refreshFromServer runs on focus anyway, and the
+  // card is green on the next load regardless.
+  let externalConnectPoll: ReturnType<typeof setInterval> | null = null;
+
+  function awaitExternalConnect(platform: Platform) {
+    if (externalConnectPoll) clearInterval(externalConnectPoll);
+    let attempts = 0;
+    externalConnectPoll = setInterval(async () => {
+      attempts++;
+      try {
+        await refreshFromServer();
+        if (isConnected(platform.id)) {
+          clearInterval(externalConnectPoll!);
+          externalConnectPoll = null;
+          loading = "";
+          return;
+        }
+      } catch {
+        // Transient — keep watching.
+      }
+      if (attempts >= 200) {
+        clearInterval(externalConnectPoll!);
+        externalConnectPoll = null;
+        loading = "";
+      }
+    }, 3000);
   }
 
   function handleSelectionToggle(platform: Platform) {
@@ -599,6 +693,15 @@
   }
 
   onMount(async () => {
+    // 0⁻. Are we the tab /onboard/oauth-launch opened? Read before any awaits
+    //     so the banner renders on the first paint rather than flashing the
+    //     full build-your-stack UI first.
+    try {
+      isOAuthPopupTab = sessionStorage.getItem("oauth_popup_tab") === "1";
+    } catch {
+      /* storage unavailable */
+    }
+
     // 0. Detect "OAuth-callback dispatcher" mode synchronously, before any
     //    awaits. If the URL has an OAuth-callback param AND the originating
     //    page wants us to bounce somewhere else, hide the build-your-stack UI
@@ -2094,9 +2197,40 @@
       activating = false;
     }
   }
+
+  onDestroy(() => {
+    if (externalConnectPoll) clearInterval(externalConnectPoll);
+  });
 </script>
 
-{#if isOAuthBounce}
+{#if isOAuthPopupTab && !isOAuthBounce}
+  <!-- This tab was opened by /onboard/oauth-launch purely so the provider had
+       a top-level window to render its login in. The connection is finished and
+       recorded server-side; the merchant's real session is the Shopify admin tab
+       behind this one, which is polling and will turn the card green itself. So
+       this tab has one job: say so, and get out of the way. -->
+  <div class="flex h-screen w-screen items-center justify-center bg-bratrax-bg">
+    <div
+      class="w-full max-w-md border border-bratrax-border bg-bratrax-surface p-8 text-center"
+    >
+      <p
+        class="mb-2 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-acid"
+      >
+        Connected
+      </p>
+      <h1 class="text-2xl font-black text-bratrax-text-headline">
+        You're all set
+      </h1>
+      <p class="mt-3 text-sm font-light text-bratrax-text-body">
+        Head back to the Bratrax tab in your Shopify admin — it's already
+        picking this up. You can close this window.
+      </p>
+      <p class="mt-4 font-mono text-[10px] text-bratrax-text-muted">
+        Safe to close this tab.
+      </p>
+    </div>
+  </div>
+{:else if isOAuthBounce}
   <div class="flex h-screen w-screen items-center justify-center bg-bratrax-bg">
     <div class="text-center">
       <div

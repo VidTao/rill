@@ -173,7 +173,14 @@ export async function load({ url, depends, untrack, fetch }) {
   const isAlwaysAllowed =
     url.pathname.startsWith("/settings") ||
     url.pathname.startsWith("/help") ||
-    url.pathname.startsWith("/embed");
+    url.pathname.startsWith("/embed") ||
+    // Transient launcher for redirect-OAuth from inside the Shopify iframe. It
+    // is not a funnel step — it has no `step` value, so it deliberately does
+    // NOT go in ONBOARD_ROUTE_ORDER. Without this exemption the resume guard
+    // sees getOnboardRouteIndex() === -1 and redirects it straight to the
+    // user's current step, so the launcher never runs and the provider never
+    // opens. See routes/onboard/oauth-launch/+page.svelte.
+    url.pathname.startsWith("/onboard/oauth-launch");
 
   try {
     const me = await onboardMe();
