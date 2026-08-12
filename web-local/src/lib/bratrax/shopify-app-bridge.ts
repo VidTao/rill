@@ -106,6 +106,72 @@ export async function shopifyAuthHeader(): Promise<Record<string, string>> {
 }
 
 // --------------------------------------------------------------------------
+// Global fetch interceptor
+// --------------------------------------------------------------------------
+// The app has eleven separate fetch helpers (connectors, costs, settings,
+// superadmins, metric-trees, multi-client, support-bot, sync-status, workshop,
+// onboarding, auth) plus ad-hoc fetches in individual routes. Every one of them
+// passes `credentials: "include"` and nothing else, which is correct everywhere
+// except inside the Shopify admin iframe — where bratrax_auth is SameSite=Lax
+// and never sent, so the request arrives unauthenticated and the proxy answers
+// "authentication required".
+//
+// Patching them individually has already been done four times (apiFetch,
+// auth/me, login, logout) and each fix only covered the path that happened to
+// be exercised. One interceptor covers all of them, including helpers added
+// later.
+//
+// Deliberately narrow:
+//   * only installed when embedded
+//   * only touches same-origin /bratrax/* and /shopify/install/* requests
+//   * never overwrites an Authorization header a caller already set
+// The Rill runtime client is not covered here on purpose — it authenticates
+// through runtime.jwt (see startRuntimeSessionSync below), and its transport
+// sets its own Authorization header.
+
+let fetchPatched = false;
+
+export function installEmbeddedAuthFetch(): void {
+  if (fetchPatched || typeof window === "undefined") return;
+  if (!isShopifyEmbedded()) return;
+  fetchPatched = true;
+
+  const original = window.fetch.bind(window);
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    let path = "";
+    try {
+      const raw =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      const url = new URL(raw, window.location.origin);
+      if (url.origin === window.location.origin) path = url.pathname;
+    } catch {
+      /* unparseable — leave it alone */
+    }
+
+    const ours =
+      path.startsWith("/bratrax/") || path.startsWith("/shopify/install");
+    if (!ours) return original(input, init);
+
+    // Respect a header the caller set explicitly.
+    const existing = new Headers(
+      init?.headers ?? (input instanceof Request ? input.headers : undefined),
+    );
+    if (existing.has("Authorization")) return original(input, init);
+
+    const auth = await shopifyAuthHeader();
+    if (!auth.Authorization) return original(input, init);
+
+    existing.set("Authorization", auth.Authorization);
+    return original(input, { ...init, headers: existing });
+  };
+}
+
+// --------------------------------------------------------------------------
 // Rill runtime client
 // --------------------------------------------------------------------------
 // The dashboard's data comes from the Rill runtime client, which does NOT go
