@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from "$app/stores";
+  import BratraxLogo from "./BratraxLogo.svelte";
   import LocalAvatarButton from "@rilldata/web-common/features/authentication/LocalAvatarButton.svelte";
   import CanvasPreviewCTAs from "@rilldata/web-common/features/canvas/CanvasPreviewCTAs.svelte";
   import HeaderChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/HeaderChatToggle.svelte";
@@ -86,18 +87,7 @@
 
 <header class:border-b={!onDeployPage} class="bg-surface-base">
   {#if !onDeployPage}
-    <a href="/" class="bratrax-logo-link">
-      <img
-        src="/img/bratrax/bratrax-logo-dark.svg"
-        alt="Bratrax"
-        class="bratrax-logo bratrax-logo-light-mode"
-      />
-      <img
-        src="/img/bratrax/bratrax-logo-light.svg"
-        alt="Bratrax"
-        class="bratrax-logo bratrax-logo-dark-mode"
-      />
-    </a>
+    <BratraxLogo />
 
     <span class="role-badge {roleClass}">{roleLabel ?? mode}</span>
   {/if}
@@ -222,29 +212,8 @@
     gap: 22px;
   }
 
-  .bratrax-logo-link {
-    @apply flex items-center;
-  }
-
-  .bratrax-logo {
-    height: 1.5rem; /* 24px */
-    width: auto;
-    display: block;
-  }
-
-  /* Light mode (default): show the dark-text logo, hide the light-text one */
-  .bratrax-logo-dark-mode {
-    display: none;
-  }
-
-  /* Dark mode: show the light-text logo, hide the dark-text one */
-  :global(.dark) .bratrax-logo-light-mode {
-    display: none;
-  }
-
-  :global(.dark) .bratrax-logo-dark-mode {
-    display: block;
-  }
+  /* Logo markup and styles live in BratraxLogo.svelte — Svelte scopes CSS per
+     component, so they had to move together. */
 
   /* Role badge: same neutral chip background across roles, label color
      differs per role (NAV_RESTRUCTURE_HANDOFF.MD §"Visual notes"). */
