@@ -66,7 +66,7 @@
        analytics are one click away. -->
   <p class="embed-header-message">
     <span class="embed-header-tick" aria-hidden="true"></span>
-    Customers, products, email —
+    Dashboards, customers, products and store settings —
     <strong>see it all in Bratrax.</strong>
   </p>
 
