@@ -21,7 +21,7 @@ func TestGithubStaticCacheServesFromCacheWithinTTL(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newGithubStaticCache(time.Minute, 2*time.Second)
+	c := newGithubStaticCache(time.Minute, 0, 2*time.Second)
 	for i := 0; i < 5; i++ {
 		body, stale, err := c.Get(srv.URL)
 		if err != nil || stale || string(body) != "page" {
@@ -47,7 +47,7 @@ func TestGithubStaticCacheServesStaleWhenUpstreamFails(t *testing.T) {
 	defer srv.Close()
 
 	// Zero TTL so every call is a refresh attempt — the worst case.
-	c := newGithubStaticCache(0, 2*time.Second)
+	c := newGithubStaticCache(0, 0, 2*time.Second)
 
 	if _, _, err := c.Get(srv.URL); err != nil {
 		t.Fatalf("warm-up fetch failed: %v", err)
@@ -74,7 +74,7 @@ func TestGithubStaticCacheErrorsWhenColdAndUpstreamFails(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, _, err := newGithubStaticCache(time.Minute, 2*time.Second).Get(srv.URL); err == nil {
+	if _, _, err := newGithubStaticCache(time.Minute, 0, 2*time.Second).Get(srv.URL); err == nil {
 		t.Fatal("expected an error when cold and upstream fails")
 	}
 }
@@ -88,7 +88,7 @@ func TestGithubStaticCacheTreatsNotFoundAsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newGithubStaticCache(time.Minute, 2*time.Second)
+	c := newGithubStaticCache(time.Minute, 0, 2*time.Second)
 	if _, _, err := c.Get(srv.URL); err == nil {
 		t.Fatal("expected 404 to surface as an error")
 	}
@@ -108,7 +108,7 @@ func TestGithubStaticCacheSingleFlightsConcurrentColdRequests(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newGithubStaticCache(time.Minute, 2*time.Second)
+	c := newGithubStaticCache(time.Minute, 0, 2*time.Second)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
@@ -127,6 +127,90 @@ func TestGithubStaticCacheSingleFlightsConcurrentColdRequests(t *testing.T) {
 	}
 }
 
+// The backoff is the part that stops us prolonging an upstream outage. Caching
+// only successes left every request making its own doomed fetch, so our own
+// traffic kept the rate-limit bucket empty. These two tests pin the fix.
+
+func TestGithubStaticCacheBacksOffWhenColdAndFailing(t *testing.T) {
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	c := newGithubStaticCache(time.Minute, time.Minute, 2*time.Second)
+	for i := 0; i < 10; i++ {
+		if _, _, err := c.Get(srv.URL); err == nil {
+			t.Fatalf("call %d: expected an error while cold and failing", i)
+		}
+	}
+	if got := atomic.LoadInt32(&hits); got != 1 {
+		t.Fatalf("expected 10 requests during an outage to make 1 upstream fetch, got %d", got)
+	}
+}
+
+// Warm but past its TTL is the sneakier case: the stale fallback only engages
+// after the fetch has already been attempted, so without a backoff the upstream
+// still sees one request per pageview even though visitors are served fine.
+func TestGithubStaticCacheBacksOffWhenWarmAndFailing(t *testing.T) {
+	var hits int32
+	var fail atomic.Bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		if fail.Load() {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_, _ = w.Write([]byte("good"))
+	}))
+	defer srv.Close()
+
+	// ttl=0 so every call wants a refresh; errorTTL should suppress them anyway.
+	c := newGithubStaticCache(0, time.Minute, 2*time.Second)
+	if _, _, err := c.Get(srv.URL); err != nil {
+		t.Fatalf("warm-up failed: %v", err)
+	}
+	fail.Store(true)
+
+	for i := 0; i < 10; i++ {
+		body, stale, err := c.Get(srv.URL)
+		if err != nil || !stale || string(body) != "good" {
+			t.Fatalf("call %d: got (%q, stale=%v, err=%v); want stale good body", i, body, stale, err)
+		}
+	}
+	// 1 warm-up + 1 failed refresh; the other 9 must be suppressed.
+	if got := atomic.LoadInt32(&hits); got != 2 {
+		t.Fatalf("expected 2 upstream fetches total, got %d", got)
+	}
+}
+
+// Recovery must not be blocked by the backoff once it expires.
+func TestGithubStaticCacheRecoversAfterBackoffExpires(t *testing.T) {
+	var fail atomic.Bool
+	fail.Store(true)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if fail.Load() {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_, _ = w.Write([]byte("recovered"))
+	}))
+	defer srv.Close()
+
+	c := newGithubStaticCache(time.Minute, 20*time.Millisecond, 2*time.Second)
+	if _, _, err := c.Get(srv.URL); err == nil {
+		t.Fatal("expected initial failure")
+	}
+	fail.Store(false)
+	time.Sleep(40 * time.Millisecond) // let the backoff lapse
+
+	body, stale, err := c.Get(srv.URL)
+	if err != nil || stale || string(body) != "recovered" {
+		t.Fatalf("got (%q, stale=%v, err=%v); want a fresh recovered body", body, stale, err)
+	}
+}
+
 // Distinct URLs must not block each other — the per-URL lock is held across the
 // HTTP call, so a shared lock would serialise every marketing page behind one
 // slow fetch.
@@ -137,7 +221,7 @@ func TestGithubStaticCacheDoesNotSerialiseDistinctURLs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newGithubStaticCache(time.Minute, 2*time.Second)
+	c := newGithubStaticCache(time.Minute, 0, 2*time.Second)
 
 	start := time.Now()
 	var wg sync.WaitGroup

@@ -1,12 +1,19 @@
 package bratrax
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"sync"
 	"time"
 )
+
+// errGithubBackoff is returned when a URL failed recently and nothing is cached
+// for it, so we deliberately skipped the upstream request. Distinct from a live
+// fetch error purely so the caller can log it differently — the response to the
+// visitor is the same 502 either way.
+var errGithubBackoff = errors.New("github fetch skipped: backing off after a recent failure")
 
 // Cache for the marketing HTML (and sitemap/robots) authored in the
 // bratrax-wip static repo and fetched from raw.githubusercontent.com.
@@ -34,13 +41,24 @@ import (
 //     the precise shape that trips a rate limit. One in-flight fetch per URL,
 //     and the rest wait for it.
 //
+//  3. FAILURE BACKOFF. Caching only successes is not enough, and getting this
+//     wrong prolongs the very outage the cache is meant to survive. Without a
+//     backoff, a failing upstream means EVERY request attempts its own fetch —
+//     when cold there is nothing to serve, and when warm-but-past-TTL the stale
+//     fallback only kicks in after the request has already been made. Either
+//     way request volume never drops, so our own traffic (plus crawlers across
+//     eight pages) keeps a rate-limit bucket pinned empty and the outage
+//     self-sustains. After a failure we stop asking for errorTTL, which caps
+//     upstream load at one request per URL per errorTTL while degraded.
+//
 // Deliberately NOT a bounded/evicting cache: the key space is the fixed set of
 // marketing pages plus changelog and /vs slugs. It is small, and every entry is
 // worth keeping forever precisely because a kept entry is what survives an
 // outage. Eviction would reintroduce the failure mode it exists to prevent.
 type githubStaticCache struct {
-	ttl    time.Duration
-	client *http.Client
+	ttl      time.Duration
+	errorTTL time.Duration
+	client   *http.Client
 
 	mu      sync.Mutex
 	entries map[string]*githubStaticEntry
@@ -54,13 +72,15 @@ type githubStaticEntry struct {
 	mu        sync.Mutex
 	body      []byte
 	fetchedAt time.Time
+	failedAt  time.Time
 }
 
-func newGithubStaticCache(ttl time.Duration, timeout time.Duration) *githubStaticCache {
+func newGithubStaticCache(ttl, errorTTL, timeout time.Duration) *githubStaticCache {
 	return &githubStaticCache{
-		ttl:     ttl,
-		client:  &http.Client{Timeout: timeout},
-		entries: make(map[string]*githubStaticEntry),
+		ttl:      ttl,
+		errorTTL: errorTTL,
+		client:   &http.Client{Timeout: timeout},
+		entries:  make(map[string]*githubStaticEntry),
 	}
 }
 
@@ -84,8 +104,18 @@ func (c *githubStaticCache) Get(rawURL string) ([]byte, bool, error) {
 		return entry.body, false, nil
 	}
 
+	// Recently failed — don't ask again yet. This is what keeps us from
+	// hammering a throttled upstream once per request and prolonging the outage.
+	if !entry.failedAt.IsZero() && time.Since(entry.failedAt) < c.errorTTL {
+		if entry.body != nil {
+			return entry.body, true, nil
+		}
+		return nil, false, errGithubBackoff
+	}
+
 	body, err := c.fetch(rawURL)
 	if err != nil {
+		entry.failedAt = time.Now()
 		if entry.body != nil {
 			return entry.body, true, nil
 		}
@@ -94,6 +124,7 @@ func (c *githubStaticCache) Get(rawURL string) ([]byte, bool, error) {
 
 	entry.body = body
 	entry.fetchedAt = time.Now()
+	entry.failedAt = time.Time{}
 	return body, false, nil
 }
 

@@ -225,7 +225,12 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	// 5 min TTL: the static repo is edited by hand a few times a week, so this
 	// is far fresher than needed while cutting GitHub requests to at most
 	// 12/hour per page.
-	githubStatic := newGithubStaticCache(5*time.Minute, 8*time.Second)
+	//
+	// 60s error TTL: while GitHub is failing we ask at most once a minute per
+	// page instead of once per request. That is the difference between riding
+	// out a rate limit and helping sustain it. Recovery is therefore detected
+	// within a minute, which is fine for a marketing page.
+	githubStatic := newGithubStaticCache(5*time.Minute, 60*time.Second, 8*time.Second)
 	fetchGithubStatic := func(rawURL string) ([]byte, error) {
 		body, stale, err := githubStatic.Get(rawURL)
 		if err != nil {
