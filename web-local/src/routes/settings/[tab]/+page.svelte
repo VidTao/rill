@@ -878,14 +878,28 @@
               </p>
             {/if}
             <div class="mt-3 flex items-center gap-2">
+              <!--
+                Shopify-billed workspaces must be sent to Shopify's hosted plan
+                page, not the Lemon Squeezy portal: no LS customer record exists
+                for them, so join.bratrax.com/billing is a dead end. That page is
+                also what satisfies App Store requirement 1.2.3 — merchants must
+                be able to change plan without contacting support.
+              -->
               <a
-                href="https://join.bratrax.com/billing"
+                href={billing.manage_url ?? "https://join.bratrax.com/billing"}
                 target="_blank"
                 rel="noopener"
                 class="border border-bratrax-acid bg-bratrax-acid/10 px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-acid hover:bg-bratrax-acid/20"
               >
                 Manage Subscription
               </a>
+              {#if billing.billing_provider === "shopify"}
+                <span
+                  class="font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted"
+                >
+                  Billed by Shopify
+                </span>
+              {/if}
             </div>
           </div>
         </div>

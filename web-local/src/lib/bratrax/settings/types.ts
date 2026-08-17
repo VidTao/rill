@@ -44,6 +44,15 @@ export interface BillingSummary {
   interval: string;
   status: string;
   current_period_end: string | null;
+  /** Which rail this workspace pays on — see rill_clients.billing_provider. */
+  billing_provider?: "lemon_squeezy" | "shopify";
+  /**
+   * Where the merchant manages their own subscription. Non-null only for the
+   * Shopify rail, where it is the hosted plan page and therefore also the
+   * self-serve upgrade/downgrade path App Store requirement 1.2.3 demands.
+   * Lemon Squeezy's portal is a fixed URL, so that branch keeps it hardcoded.
+   */
+  manage_url?: string | null;
 }
 
 export interface InvitationPreview {

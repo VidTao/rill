@@ -436,6 +436,18 @@ export interface PaymentCheckoutResult {
   checkout_url?: string;
   already_paid?: boolean;
   error?: string;
+  /**
+   * Which billing rail produced `checkout_url`, from
+   * `rill_clients.billing_provider`. App Store merchants must be billed through
+   * Shopify (App Store requirement 1.2.1); everyone else stays on Lemon
+   * Squeezy.
+   *
+   * The caller does not branch on this to *fetch* the URL — both rails return
+   * it in the same field — only to decide how to open it. Shopify's plan page
+   * is inside the admin the merchant is already in, so it replaces the
+   * top-level window instead of opening a tab.
+   */
+  billing_provider?: "lemon_squeezy" | "shopify";
 }
 
 /**

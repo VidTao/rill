@@ -150,6 +150,20 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	observability.MuxHandle(mux, "POST /shopify/install/account",
 		observability.Middleware("bratrax", logger, proxy))
 
+	// Shopify App Pricing return landing. Shopify App Pricing sends no webhooks
+	// (APP_SUBSCRIPTIONS_UPDATE was retired 2026-04-28), so this redirect —
+	// carrying ?shop= and ?plan_handle= — is the only push notification the app
+	// gets when a merchant approves a plan. Public because they arrive straight
+	// from admin.shopify.com with no bratrax_auth cookie.
+	//
+	// Unlike the install routes above there is no hmac to verify: Shopify does
+	// not sign this redirect. That is safe because the handler grants nothing —
+	// it reads the live subscription from Shopify's Admin API using the shop's
+	// own stored token and writes whatever Shopify reports. A forged call costs
+	// one API read and rewrites the state that already held.
+	observability.MuxHandle(mux, "GET /shopify/billing/return",
+		observability.Middleware("bratrax", logger, proxy))
+
 	// "Open in Bratrax" hand-off. A merchant inside the Shopify admin iframe is
 	// authenticated by an App Bridge session token and therefore has no
 	// bratrax_auth cookie on this origin, so a new tab would land on /login.

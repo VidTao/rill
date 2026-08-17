@@ -10,6 +10,7 @@
   } from "$lib/bratrax/onboarding/api";
   import {
     isShopifyEmbedded,
+    navigateTopLevel,
     reserveTopLevelTab,
   } from "$lib/bratrax/shopify-embed";
 
@@ -106,6 +107,22 @@
       if (!result.checkout_url) {
         tab?.close();
         error = result.error || "Could not start checkout. Please try again.";
+        return;
+      }
+
+      // Shopify App Pricing: the plan page lives inside the Shopify admin this
+      // merchant is already looking at, so it must replace the TOP-LEVEL window
+      // rather than open a tab. A new tab would render Shopify's admin a second
+      // time alongside the one they came from, and an iframe navigation would
+      // try to nest the admin inside itself, which Shopify refuses to frame.
+      //
+      // Nothing polls afterwards because this window does not survive: Shopify
+      // returns them to /shopify/billing/return, which reconciles the
+      // subscription and bounces them back into the embedded app at whatever
+      // step they now belong on.
+      if (result.billing_provider === "shopify") {
+        tab?.close();
+        navigateTopLevel(result.checkout_url);
         return;
       }
 

@@ -86,6 +86,34 @@ export function openTopLevel(url: string): boolean {
   return false;
 }
 
+/**
+ * Replace the top-level window, rather than opening a tab beside it.
+ *
+ * Use this for destinations that live inside the Shopify admin itself — the
+ * App Pricing plan-selection page being the one that matters. A new tab would
+ * render the admin a second time next to the one the merchant came from, and
+ * loading it in the iframe would nest the admin inside itself, which Shopify
+ * refuses to be framed into.
+ *
+ * Like openTopLevel this must be called synchronously from a click handler:
+ * a cross-origin child may only navigate its top window with user activation,
+ * which does not survive an await.
+ *
+ * Falls back to navigating this frame when `window.top` is unreachable. That
+ * only happens outside an iframe, where the two are the same window anyway.
+ */
+export function navigateTopLevel(url: string): void {
+  try {
+    if (window.top) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch {
+    /* cross-origin access denied — fall through */
+  }
+  window.location.href = url;
+}
+
 // --------------------------------------------------------------------------
 // Embedded bearer token
 // --------------------------------------------------------------------------
