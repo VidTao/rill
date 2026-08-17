@@ -3,7 +3,6 @@ package bratrax
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -218,17 +217,28 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	// GitHub repo updates production without a rebuild. Crawlers fetch these
 	// as raw bytes (not via a browser), so unlike the HTML marketing pages
 	// these can't be iframed client-side — the proxy has to live server-side.
-	githubFetcher := &http.Client{Timeout: 8 * time.Second}
+	// Cached + single-flighted, and serves the last known-good body when GitHub
+	// fails. See github_static.go for why — in short, this used to fetch on
+	// every page view and ordinary traffic could exhaust GitHub's per-IP rate
+	// limit, taking the whole public site (homepage included) to 502.
+	//
+	// 5 min TTL: the static repo is edited by hand a few times a week, so this
+	// is far fresher than needed while cutting GitHub requests to at most
+	// 12/hour per page.
+	githubStatic := newGithubStaticCache(5*time.Minute, 8*time.Second)
 	fetchGithubStatic := func(rawURL string) ([]byte, error) {
-		resp, getErr := githubFetcher.Get(rawURL)
-		if getErr != nil {
-			return nil, getErr
+		body, stale, err := githubStatic.Get(rawURL)
+		if err != nil {
+			return nil, err
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("github raw returned HTTP %d", resp.StatusCode)
+		if stale {
+			// Served from cache past its TTL because GitHub is unreachable or
+			// throttling. Visitors see the right page; this is the only signal
+			// that the upstream is unhealthy, so it is a warning, not a debug.
+			logger.Warn("serving stale marketing content; github fetch failed",
+				zap.String("github_url", rawURL))
 		}
-		return io.ReadAll(resp.Body)
+		return body, nil
 	}
 	observability.MuxHandle(mux, "GET /sitemap.xml",
 		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
