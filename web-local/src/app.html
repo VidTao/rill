@@ -59,7 +59,33 @@
           window.dataLayer.push(arguments);
         };
         gtag("js", new Date());
-        gtag("config", ID, debug ? { debug_mode: true } : {});
+
+        // Keep single-use tokens out of page_location.
+        //
+        // Four links we email carry a token in the URL: /accept-invite/<token>,
+        // /join/<token>, /reset-password?t=<token> and /auth/handoff?t=<token>.
+        // GA4 records the full URL on every page_view, so without this the token
+        // lands in Google Analytics, readable by anyone with property access
+        // before the recipient has clicked it.
+        //
+        // This has to happen HERE rather than in lib/bratrax/analytics.ts. The
+        // config call below fires the first page_view synchronously, long before
+        // SvelteKit hydrates — by the time any app code could intervene the hit
+        // has already been sent.
+        //
+        // Only set page_location when something was actually redacted. Passing it
+        // unconditionally would make this snippet the source of truth for every
+        // URL GA4 ever sees, which is a much larger surface than the problem.
+        var cfg = debug ? { debug_mode: true } : {};
+        var _path = location.pathname.replace(
+          /^\/(accept-invite|join)\/[^/]+/,
+          "/$1/redacted",
+        );
+        var _search = location.search.replace(/([?&])t=[^&]*/, "$1t=redacted");
+        if (_path !== location.pathname || _search !== location.search) {
+          cfg.page_location = location.origin + _path + _search + location.hash;
+        }
+        gtag("config", ID, cfg);
 
         var s = document.createElement("script");
         s.async = true;
