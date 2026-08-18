@@ -127,6 +127,77 @@ func TestGithubStaticCacheSingleFlightsConcurrentColdRequests(t *testing.T) {
 	}
 }
 
+// The raw -> Contents API conversion. The escaping is the subtle part: PathEscape
+// would turn "faq/index.html" into "faq%2Findex.html" and the API would 404,
+// silently disabling the fallback exactly when it is needed.
+func TestGithubContentsAPIURL(t *testing.T) {
+	const base = "https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/"
+
+	got, ok := githubContentsAPIURL(base + "faq/index.html")
+	if !ok {
+		t.Fatal("expected the standard raw URL shape to convert")
+	}
+	want := "https://api.github.com/repos/yuolel/bratrax-wip/contents/faq/index.html?ref=bratrax-com-static"
+	if got != want {
+		t.Fatalf("got  %s\nwant %s", got, want)
+	}
+
+	// Nested path (the /changelog/{slug} and /vs/{slug} shape).
+	got, _ = githubContentsAPIURL(base + "vs/hyros/index.html")
+	if want := "https://api.github.com/repos/yuolel/bratrax-wip/contents/vs/hyros/index.html?ref=bratrax-com-static"; got != want {
+		t.Fatalf("nested path:\ngot  %s\nwant %s", got, want)
+	}
+
+	// Anything not matching the expected shape must opt out rather than
+	// produce a nonsense request.
+	for _, bad := range []string{
+		"https://example.com/foo/bar",
+		"https://raw.githubusercontent.com/owner/repo/main/file.html", // no refs/heads
+		"not a url",
+	} {
+		if _, ok := githubContentsAPIURL(bad); ok {
+			t.Fatalf("expected %q to be rejected", bad)
+		}
+	}
+}
+
+// Cold + raw failing must fall through to the Contents API. This is the path
+// that actually restores the site during a raw-endpoint outage.
+func TestGithubStaticCacheFallsBackToContentsAPIWhenCold(t *testing.T) {
+	var apiHits int32
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&apiHits, 1)
+		if r.Header.Get("Accept") != "application/vnd.github.raw" {
+			t.Errorf("missing raw Accept header; would get a base64 JSON envelope")
+		}
+		_, _ = w.Write([]byte("from-api"))
+	}))
+	defer api.Close()
+
+	raw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer raw.Close()
+
+	c := newGithubStaticCache(time.Minute, time.Minute, 2*time.Second)
+	c.apiURLFor = func(string) (string, bool) { return api.URL, true }
+
+	body, stale, err := c.Get(raw.URL)
+	if err != nil || stale || string(body) != "from-api" {
+		t.Fatalf("got (%q, stale=%v, err=%v); want the API body", body, stale, err)
+	}
+
+	// Now warm: further calls must be served from cache, not re-hit the scarce API.
+	for i := 0; i < 5; i++ {
+		if _, _, err := c.Get(raw.URL); err != nil {
+			t.Fatalf("call %d after warm: %v", i, err)
+		}
+	}
+	if got := atomic.LoadInt32(&apiHits); got != 1 {
+		t.Fatalf("API must be a cold-start rescue only; got %d hits", got)
+	}
+}
+
 // The backoff is the part that stops us prolonging an upstream outage. Caching
 // only successes left every request making its own doomed fetch, so our own
 // traffic kept the rate-limit bucket empty. These two tests pin the fix.

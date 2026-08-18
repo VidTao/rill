@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -18,7 +21,7 @@ var errGithubBackoff = errors.New("github fetch skipped: backing off after a rec
 // Cache for the marketing HTML (and sitemap/robots) authored in the
 // bratrax-wip static repo and fetched from raw.githubusercontent.com.
 //
-// WHY THIS EXISTS
+// # WHY THIS EXISTS
 //
 // raw.githubusercontent.com rate-limits unauthenticated requests per source IP,
 // and the handlers used to fetch on EVERY page view with no caching. On
@@ -60,6 +63,11 @@ type githubStaticCache struct {
 	errorTTL time.Duration
 	client   *http.Client
 
+	// Derives the Contents API URL for a raw URL. A field rather than a direct
+	// call to githubContentsAPIURL so tests can point the fallback at a local
+	// server; production never reassigns it.
+	apiURLFor func(rawURL string) (string, bool)
+
 	mu      sync.Mutex
 	entries map[string]*githubStaticEntry
 }
@@ -77,10 +85,11 @@ type githubStaticEntry struct {
 
 func newGithubStaticCache(ttl, errorTTL, timeout time.Duration) *githubStaticCache {
 	return &githubStaticCache{
-		ttl:      ttl,
-		errorTTL: errorTTL,
-		client:   &http.Client{Timeout: timeout},
-		entries:  make(map[string]*githubStaticEntry),
+		ttl:       ttl,
+		errorTTL:  errorTTL,
+		client:    &http.Client{Timeout: timeout},
+		apiURLFor: githubContentsAPIURL,
+		entries:   make(map[string]*githubStaticEntry),
 	}
 }
 
@@ -114,6 +123,27 @@ func (c *githubStaticCache) Get(rawURL string) ([]byte, bool, error) {
 	}
 
 	body, err := c.fetch(rawURL)
+	if err != nil && entry.body == nil {
+		// Cold and raw is failing — the one case nothing above can rescue, and
+		// the one that takes the site down. Try the Contents API, which is a
+		// SEPARATE rate-limit bucket: on 2026-08-17 it answered 200 throughout
+		// the raw endpoint's 429.
+		//
+		// Only attempted when cold, and that restraint is the whole design.
+		// Unauthenticated the API allows just 60 requests/hour — far tighter
+		// than raw — so it cannot carry ongoing traffic. It doesn't need to:
+		// one success makes the entry warm, after which stale-on-error covers
+		// every later failure. That caps API use at roughly one call per page
+		// per process, which fits the quota many times over.
+		if apiURL, ok := c.apiURLFor(rawURL); ok {
+			if apiBody, apiErr := c.fetchAPI(apiURL); apiErr == nil {
+				entry.body = apiBody
+				entry.fetchedAt = time.Now()
+				entry.failedAt = time.Time{}
+				return apiBody, false, nil
+			}
+		}
+	}
 	if err != nil {
 		entry.failedAt = time.Now()
 		if entry.body != nil {
@@ -147,6 +177,61 @@ func (c *githubStaticCache) fetch(rawURL string) ([]byte, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("github raw returned HTTP %d", resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// rawGithubURLRe matches the one URL shape every call site uses:
+//
+//	https://raw.githubusercontent.com/<owner>/<repo>/refs/heads/<branch>/<path>
+//
+// Captures owner/repo, branch and path so the same file can be requested from
+// the Contents API instead.
+var rawGithubURLRe = regexp.MustCompile(
+	`^https://raw\.githubusercontent\.com/([^/]+/[^/]+)/refs/heads/([^/]+)/(.+)$`)
+
+// githubContentsAPIURL converts a raw.githubusercontent.com URL into the
+// equivalent Contents API URL. Returns false for anything that doesn't match the
+// expected shape, so an unrecognised URL simply skips the fallback rather than
+// producing a nonsense request.
+func githubContentsAPIURL(rawURL string) (string, bool) {
+	m := rawGithubURLRe.FindStringSubmatch(rawURL)
+	if m == nil {
+		return "", false
+	}
+	// EscapedPath, NOT PathEscape: the latter escapes the separators too, so
+	// "faq/index.html" becomes "faq%2Findex.html" and the API 404s. This escapes
+	// each segment while leaving the slashes intact.
+	escapedPath := (&url.URL{Path: m[3]}).EscapedPath()
+	return fmt.Sprintf("https://api.github.com/repos/%s/contents/%s?ref=%s",
+		m[1], escapedPath, url.QueryEscape(m[2])), true
+}
+
+// fetchAPI retrieves file contents through the GitHub Contents API.
+//
+// The `Accept: application/vnd.github.raw` header asks for the file bytes
+// directly; without it the API returns a JSON envelope with base64 content,
+// which would need decoding and would silently be served as HTML.
+//
+// GITHUB_TOKEN is honoured if present, purely to lift the unauthenticated
+// 60/hour limit to 5000. Entirely optional — the cold-start-only usage above
+// fits inside 60/hour on its own.
+func (c *githubStaticCache) fetchAPI(apiURL string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github.raw")
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github contents api returned HTTP %d", resp.StatusCode)
 	}
 	return io.ReadAll(resp.Body)
 }

@@ -8,6 +8,9 @@ import (
 	"regexp"
 	"time"
 
+	// The marketing handlers fall back to the SPA when GitHub is unreachable,
+	// which needs the same embedded frontend the CLI serves as its catch-all.
+	"github.com/rilldata/rill/cli/pkg/web"
 	"github.com/rilldata/rill/runtime/pkg/observability"
 	"go.uber.org/zap"
 )
@@ -290,11 +293,26 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 		return func(w http.ResponseWriter, r *http.Request) {
 			body, fetchErr := fetchGithubStatic(githubURL)
 			if fetchErr != nil {
-				logger.Warn("marketing page fetch failed",
+				// Hand off to the SPA instead of 502ing. Every one of these
+				// paths also has a SvelteKit route rendering the same GitHub
+				// HTML via StaticHtmlPage — i.e. fetched by the VISITOR's
+				// browser, from the visitor's IP, with the visitor's own rate
+				// limit. So when our server IP is throttled, the client path
+				// still works and the page renders.
+				//
+				// This is the only reason 2026-08-17's incident took the whole
+				// public site down: server-side rendering was added for crawlable
+				// meta tags, but with no fallback it converted an upstream
+				// hiccup into a hard outage. Degrading to client-side rendering
+				// costs per-page <meta>/<title> for crawlers until the cache
+				// warms — a real cost, and an obviously smaller one than the
+				// homepage being unreachable. Same trade the robots.txt handler
+				// above already makes.
+				logger.Warn("marketing page fetch failed; falling back to client-side render",
 					zap.String("path", r.URL.Path),
 					zap.String("github_url", githubURL),
 					zap.Error(fetchErr))
-				http.Error(w, "page temporarily unavailable", http.StatusBadGateway)
+				web.StaticHandler().ServeHTTP(w, r)
 				return
 			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
