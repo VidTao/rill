@@ -47,6 +47,15 @@ export interface OnboardMeResult {
   shopify_embed_enabled: boolean;
   is_paid_subscriber: boolean;
   subscription_status: string | null;
+  /**
+   * Which billing rail this client pays on. App Store installs are billed by
+   * Shopify (App Store requirement 1.2.1); everyone else by Lemon Squeezy.
+   *
+   * Optional so a response from an older Flask build parses as `undefined`,
+   * which callers should read as Lemon Squeezy — the default for every client
+   * that predates the second rail.
+   */
+  billing_provider?: "lemon_squeezy" | "shopify";
   step: string;
   connected_platforms: PlatformConnection[];
   stack_selections: Record<string, unknown>;

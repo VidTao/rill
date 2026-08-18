@@ -21,6 +21,14 @@
   let companyName = "";
   let busy = false;
 
+  // Which checkout this merchant is actually going to see. Read from
+  // /onboard/me on mount rather than from the checkout response, which only
+  // arrives after the click — too late to label the button or set expectations
+  // about whose payment page is about to open. Defaults to Lemon Squeezy so an
+  // older Flask build (no billing_provider field) reads as it always did.
+  let billingProvider: "lemon_squeezy" | "shopify" = "lemon_squeezy";
+  $: isShopifyBilling = billingProvider === "shopify";
+
   // Embedded (Shopify admin iframe) callers can't navigate to Lemon Squeezy in
   // place — LS won't render in a nested iframe. Checkout opens in a new tab and
   // this window stays put, polling, until the webhook flips is_paid.
@@ -165,6 +173,7 @@
     }
 
     companyName = me.company_name || "";
+    billingProvider = me.billing_provider ?? "lemon_squeezy";
 
     // Already a paying subscriber → skip directly to wherever they actually
     // are. Not /onboard/store unconditionally: an App Store merchant arrives
@@ -305,9 +314,16 @@
       {:else if mode === "intro"}
         <div class="flex flex-col gap-3">
           <p class="text-sm text-bratrax-text-body">
-            You'll complete payment on Lemon Squeezy's secure checkout page.
-            After paying, we'll bring you back here automatically and unlock the
-            rest of onboarding.
+            {#if isShopifyBilling}
+              You'll choose your plan in your Shopify admin, and it will be
+              billed to your Shopify account alongside your other apps. Once you
+              approve it we'll bring you straight back here and unlock the rest
+              of onboarding.
+            {:else}
+              You'll complete payment on Lemon Squeezy's secure checkout page.
+              After paying, we'll bring you back here automatically and unlock
+              the rest of onboarding.
+            {/if}
           </p>
           <button
             type="button"
@@ -315,7 +331,11 @@
             disabled={busy}
             class="mt-3 bg-bratrax-acid px-6 py-3 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-bg transition-opacity hover:opacity-90 disabled:opacity-40"
           >
-            {busy ? "Opening checkout…" : "Continue to payment →"}
+            {#if busy}
+              {isShopifyBilling ? "Opening Shopify…" : "Opening checkout…"}
+            {:else}
+              {isShopifyBilling ? "Choose your plan →" : "Continue to payment →"}
+            {/if}
           </button>
         </div>
       {/if}
