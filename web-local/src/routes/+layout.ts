@@ -96,6 +96,8 @@ export async function load({ url, depends, untrack, fetch }) {
     url.pathname.startsWith("/privacy-policy") ||
     url.pathname.startsWith("/terms-of-service") ||
     url.pathname.startsWith("/data-processing-agreement") ||
+    url.pathname.startsWith("/subprocessors") ||
+    url.pathname.startsWith("/security") ||
     url.pathname.startsWith("/vs/") ||
     url.pathname.startsWith("/faq") ||
     // Also covers the per-entry pages at /changelog/<slug>.
