@@ -95,6 +95,12 @@ export async function load({ url, depends, untrack, fetch }) {
     url.pathname.startsWith("/reset-password") ||
     url.pathname.startsWith("/privacy-policy") ||
     url.pathname.startsWith("/terms-of-service") ||
+    // Compliance pages. Public by definition — security reviewers and
+    // prospects read these before they have an account, so gating them would
+    // bounce exactly the audience they exist for to /login.
+    url.pathname.startsWith("/subprocessors") ||
+    url.pathname.startsWith("/security") ||
+    url.pathname.startsWith("/data-processing-agreement") ||
     url.pathname.startsWith("/vs/") ||
     url.pathname.startsWith("/faq") ||
     // Also covers the per-entry pages at /changelog/<slug>.

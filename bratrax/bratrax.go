@@ -362,6 +362,47 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 		observability.Middleware("bratrax", logger,
 			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/integrations/index.html")))
 
+	// Compliance pages, referenced from the Privacy Policy / DPA and by security
+	// reviewers, so they need to be real crawlable documents at stable URLs.
+	//
+	// Note /data-processing-agreement is served from the repo's "dpa" directory —
+	// the public URL is spelled out for readability while the source path stays
+	// short. The two do not have to match, but the mismatch is easy to typo.
+	observability.MuxHandle(mux, "GET /subprocessors",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/subprocessors/index.html")))
+	observability.MuxHandle(mux, "GET /security",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/security/index.html")))
+	observability.MuxHandle(mux, "GET /data-processing-agreement",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/dpa/index.html")))
+
+	// Per-integration landing page. /integrations/slack is the canonical URL, but
+	// the source lives at the repo root as "slack/index.html" — same URL/source
+	// mismatch as /data-processing-agreement above.
+	//
+	// Registered without a trailing slash, which in Go's ServeMux is an exact
+	// match, so this does NOT shadow "GET /integrations" or catch any other
+	// /integrations/* path.
+	observability.MuxHandle(mux, "GET /integrations/slack",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/slack/index.html")))
+
+	// /slack is the short vanity URL that appears in the Slack app listing and
+	// marketing copy; /integrations/slack is canonical. A 301 consolidates link
+	// equity on the canonical URL rather than leaving crawlers with two pages of
+	// identical content.
+	//
+	// Exact match again, so /slack/events and /slack/oauth_redirect are
+	// untouched. Those are Slack's webhook + OAuth endpoints and they are served
+	// on api.bratrax.com, not here — but keeping this exact avoids any chance of
+	// a future host-consolidation quietly redirecting Slack's callbacks.
+	observability.MuxHandle(mux, "GET /slack",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/integrations/slack", http.StatusMovedPermanently)
+		})))
+
 	// /changelog/{slug}: per-entry pages for changelog items marked notable.
 	// Unlike /vs/{slug} below, the slug set grows every time the
 	// public-changelog routine runs, so this validates the slug's shape rather
