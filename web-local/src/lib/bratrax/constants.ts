@@ -24,4 +24,4 @@ export const WAITLIST_TYPEFORM_URL = "https://form.typeform.com/to/NEugqBiK";
  * the per-install app handle in Liquid block types, but the admin URL uses
  * this stable one.
  */
-export const SHOPIFY_APP_HANDLE = "platform-connector-2";
+export const SHOPIFY_APP_HANDLE = "bratrax";
