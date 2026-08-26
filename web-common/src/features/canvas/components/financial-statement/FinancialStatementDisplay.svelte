@@ -237,15 +237,25 @@
   {/if}
 </div>
 
-<style>
+<style lang="postcss">
+  /* Colours here are semantic tokens only — `.dark` on <html> reassigns the
+     underlying CSS variables, so both themes come from one set of rules. This
+     widget used to hardcode ~25 hex values plus a partial :global(.dark) block,
+     which is why dark theme had a white grain toggle and invisible profit rows.
+     See bratrax-theme.css lines 1-23 for the token strategy.
+
+     Deliberately NOT converted: the `font-size` declarations below. Section 15
+     of bratrax-theme.css floors every Tailwind text class at 14px !important,
+     so `@apply text-xs` would enlarge the whole table and break column fit.
+     Raw font-size bypasses that floor, which is the behaviour this table wants. */
   .statement-shell {
+    @apply text-fg-primary;
     height: 100%;
     min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     padding: 0 16px 16px;
-    color: var(--color-foreground, #1f2933);
   }
   .statement-toolbar {
     display: flex;
@@ -260,7 +270,7 @@
     gap: 2px;
   }
   .eyebrow {
-    color: #6b7280;
+    @apply text-fg-muted;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.12em;
@@ -270,35 +280,46 @@
     font-size: 13px;
     font-weight: 650;
   }
+  /* Segmented control: recessed track, raised active segment.
+     The track is --surface-background and the segment --surface-card so the lift
+     survives BOTH themes. Do not reach for --surface-subtle here: in dark it and
+     --surface-card both resolve to #141414, so the active segment would be
+     invisible against its own track. */
   .grain-toggle {
+    @apply border border-border bg-surface-background;
     display: inline-flex;
     padding: 3px;
-    border: 1px solid #d8dee6;
     border-radius: 8px;
-    background: #f5f7f9;
   }
   .grain-toggle button {
+    @apply text-fg-secondary;
     border: 0;
     border-radius: 6px;
     background: transparent;
-    color: #5f6b76;
     cursor: pointer;
     font-size: 12px;
     font-weight: 600;
     padding: 5px 10px;
   }
+  .grain-toggle button:hover:not(.active) {
+    @apply text-fg-primary;
+  }
+  /* --fg-accent, not --fg-primary: near-black on the light theme's white segment,
+     acid on dark. Two near-black surfaces can't carry the active state on their
+     own, so the accent does it — the fork's "acid only when active" convention
+     (HeaderToggleButton.svelte, commit 86cd70c5b). */
   .grain-toggle button.active {
-    background: #fff;
-    color: #153b2b;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    @apply bg-surface-card text-fg-accent;
+    /* currentColor at low alpha so the lift reads on a cream track and on a
+       near-black one; a fixed rgba(15,23,42,…) only worked on the former. */
+    box-shadow: 0 1px 3px color-mix(in oklab, currentColor 18%, transparent);
   }
   .table-wrap {
+    @apply border border-border bg-surface-card;
     flex: 1;
     min-height: 0;
     overflow: auto;
-    border: 1px solid #dce2e8;
     border-radius: 8px;
-    background: #fff;
   }
   table {
     border-collapse: separate;
@@ -308,43 +329,44 @@
   }
   th,
   td {
-    border-bottom: 1px solid #edf0f3;
+    @apply border-b border-border;
     padding: 9px 14px;
     text-align: right;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
+  /* Every sticky cell restates an opaque background token. bratrax-theme.css
+     section 5: a body-level graph-paper overlay sits behind everything, so a
+     sticky cell without one lets the grid show through as it scrolls. */
   thead th {
+    @apply bg-surface-background text-fg-secondary;
     position: sticky;
     top: 0;
     z-index: 3;
-    background: #f6f8f9;
-    color: #56616c;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.02em;
   }
   th[scope="row"],
   .line-heading {
+    @apply bg-surface-card;
     position: sticky;
     left: 0;
     z-index: 2;
     min-width: 190px;
-    background: #fff;
     text-align: left;
     font-weight: 500;
   }
   .line-heading {
+    @apply bg-surface-background;
     z-index: 4;
-    background: #f6f8f9;
   }
   .total-heading,
   .total-cell {
+    @apply border-l border-border bg-surface-muted;
     position: sticky;
     right: 0;
     z-index: 2;
-    border-left: 1px solid #dce2e8;
-    background: #f8faf9;
     font-weight: 700;
   }
   .total-heading {
@@ -352,51 +374,29 @@
   }
   tr.subtotal th,
   tr.subtotal td {
-    border-top: 1px solid #bfc8d1;
-    background: #f8faf9;
+    @apply border-t border-border bg-surface-muted;
     font-weight: 700;
   }
   tr.subtotal th[scope="row"] {
-    background: #f8faf9;
+    @apply bg-surface-muted;
   }
+  /* Green means profit in both themes, but the hue has to invert — the light
+     value is invisible on the dark subtotal surface. See --color-profit. */
   tr.profit th,
   tr.profit td {
-    color: #153b2b;
+    color: var(--color-profit);
   }
   tbody tr:last-child th,
   tbody tr:last-child td {
     border-bottom: 0;
   }
   .state {
+    @apply text-fg-muted;
     flex: 1;
     display: grid;
     place-items: center;
-    color: #6b7280;
   }
   .state.error {
-    color: #a33a2b;
-  }
-  :global(.dark) .statement-shell {
-    color: #e5e7eb;
-  }
-  :global(.dark) .table-wrap,
-  :global(.dark) th[scope="row"] {
-    background: #111827;
-  }
-  :global(.dark) thead th,
-  :global(.dark) .line-heading {
-    background: #1f2937;
-    color: #d1d5db;
-  }
-  :global(.dark) th,
-  :global(.dark) td {
-    border-color: #334155;
-  }
-  :global(.dark) .total-heading,
-  :global(.dark) .total-cell,
-  :global(.dark) tr.subtotal th,
-  :global(.dark) tr.subtotal td,
-  :global(.dark) tr.subtotal th[scope="row"] {
-    background: #17221d;
+    @apply text-destructive;
   }
 </style>

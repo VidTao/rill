@@ -110,6 +110,11 @@
   /* Dormant gray for the CRM "Expired" state — gray-on-cream stripe/pill. */
   --color-gray:        #8A847A;
 
+  /* Profit figures in accounting tables (P&L bottom lines). Deep green reads as
+     "profit" on cream; the dark variant has to invert or it vanishes — see the
+     dark block. NOT --fg-accent, which resolves to full acid in dark. */
+  --color-profit:      #153b2b;
+
   /* Divergent overrides for light theme */
   --chart-div-neg-1:   #FFA8A0;
   --chart-div-neutral: #C8C2B6;
@@ -212,6 +217,12 @@
 
   /* Dormant gray for the CRM "Expired" state — visible stripe on near-black. */
   --color-gray:        #4a4a4a;
+
+  /* Profit figures — inverted from light's deep green. The light value (#153b2b)
+     on the dark subtotal surface is ~1.3:1, i.e. invisible; this mint is ~9:1.
+     Calmer than --chart-div-pos-1 (#7CFFCB) on purpose: it colours whole rows of
+     figures, not a single chart series. */
+  --color-profit:      #6EE7B7;
 
   /* Divergent — dark variants (defaults from :root apply) */
 
