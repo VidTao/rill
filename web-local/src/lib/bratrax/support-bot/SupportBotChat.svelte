@@ -187,19 +187,26 @@
             readonly
             value={draft.body}
           />
+          <!-- Copy leads, mailto follows. Inside the Shopify admin iframe a
+               mailto: navigation is the least reliable step in the whole flow —
+               the frame may simply swallow it — whereas the clipboard works
+               everywhere the panel does. target="_blank" gives the link its
+               best chance at escaping the frame when it is used. -->
           <div class="flex gap-2">
-            <a
-              class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
-              href={mailtoHref(draft)}
-            >
-              Open in email app
-            </a>
             <button
-              class="btn-bratrax btn-neutral btn-compact"
+              class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
               on:click={copyDraft}
             >
               {copied ? "Copied!" : "Copy to clipboard"}
             </button>
+            <a
+              class="btn-bratrax btn-neutral btn-compact"
+              href={mailtoHref(draft)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open in email app
+            </a>
           </div>
         </div>
       {/if}

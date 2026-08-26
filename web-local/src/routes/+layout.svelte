@@ -430,11 +430,22 @@
              mounted here once instead of inside every page layout; it collapses
              to `display: none` when closed, leaving this row a no-op.
 
-             Suppressed on /embed/*: the panel's only toggle is the "?" button
-             in the header, which we don't render there, so it could never be
-             closed again — and a 420px column inside the ~1150px Shopify admin
-             iframe would leave nothing for the page. -->
-        <div class="flex min-h-0 flex-1 flex-row">
+             On /embed/* it renders as an overlay instead (see `overlay` below).
+             It used to be suppressed there for two reasons, both now handled:
+             EmbedHeader renders its own "?" toggle, so the panel can be closed
+             again, and overlaying costs zero layout width, so a 420px column no
+             longer starves the canvas in Shopify's ~1150px column.
+
+             The mount condition takes `onEmbedPage` as an alternative to
+             $bratraxUser rather than an extra restriction: inside the iframe the
+             merchant is authenticated by a Shopify session token, and
+             bratraxGetMe only ever attaches the sessionStorage JWT, so
+             $bratraxUser can be null on a cold embedded load even though the
+             support-bot's own fetch authenticates fine. Gating on it there would
+             leave the "?" inert on first paint. -->
+        <!-- `relative` is the anchor for the overlay variant of the panel; it is
+             inert for the in-flow one. -->
+        <div class="relative flex min-h-0 flex-1 flex-row">
           <div class="flex min-h-0 min-w-0 flex-1 flex-col">
             {#if $bratraxViewerMidOnboarding && !onHelpPage}
               <MidOnboardingViewer />
@@ -443,8 +454,8 @@
             {/if}
           </div>
 
-          {#if $bratraxUser && !onEmbedPage}
-            <SupportChatSidebar />
+          {#if $bratraxUser || onEmbedPage}
+            <SupportChatSidebar overlay={onEmbedPage} />
           {/if}
         </div>
       </div>

@@ -6,6 +6,14 @@
   } from "@rilldata/web-common/features/chat/layouts/sidebar/support-chat-store";
   import SupportBotChat from "./SupportBotChat.svelte";
 
+  /**
+   * Float over the page instead of taking a column from it. Set on /embed/*,
+   * where the whole viewport is Shopify's ~1150px content column and a 420px
+   * in-flow panel would leave the canvas unusable. Anchors to the `relative`
+   * flex row in web-local/src/routes/+layout.svelte.
+   */
+  export let overlay = false;
+
   // Only one right-hand sidebar at a time: the AI chat opening closes this
   // panel (the reverse lives in supportChatActions). The panel stays mounted
   // while hidden so the conversation survives open/close toggles.
@@ -15,6 +23,7 @@
 <aside
   class="support-sidebar"
   class:open={$supportChatOpen}
+  class:overlay
   aria-label="Ask support"
 >
   <div class="panel-header">
@@ -68,6 +77,19 @@
   }
   .support-sidebar.open {
     display: flex;
+  }
+
+  /* Overlay variant (embed). Out of flow, so opening it never reflows the
+     canvas — which is the point: a dashboard that re-lays-out every time you
+     ask a question is worse than no help button. The shadow is what sells it
+     as floating rather than as a column that failed to push. */
+  .support-sidebar.overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: auto;
+    box-shadow: -8px 0 24px rgb(0 0 0 / 28%);
   }
 
   /* Below the widest phone the app is usable on, a 420px column would leave
