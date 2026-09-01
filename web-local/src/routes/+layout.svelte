@@ -57,6 +57,7 @@
   import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
   import ChecklistBanner from "$lib/bratrax/onboarding/ChecklistBanner.svelte";
   import ContinueSetupPill from "$lib/bratrax/onboarding/ContinueSetupPill.svelte";
+  import ReconnectPill from "$lib/bratrax/onboarding/ReconnectPill.svelte";
   import WelcomeCard from "$lib/bratrax/onboarding/WelcomeCard.svelte";
   import MidOnboardingViewer from "$lib/bratrax/onboarding/MidOnboardingViewer.svelte";
   import SupportChatSidebar from "$lib/bratrax/support-bot/SupportChatSidebar.svelte";
@@ -303,9 +304,14 @@
             </svelte:fragment>
 
             <svelte:fragment slot="continue-setup">
-              <!-- Pill self-gates on role + checklist state; safe to mount
-                   unconditionally — renders nothing for super-admin/viewer or
-                   when the checklist is dismissed/empty. -->
+              <!-- Both pills self-gate on role + state; safe to mount
+                   unconditionally — they render nothing when they shouldn't. -->
+              <!-- Dead connector token. Deliberately first: a broken pipeline
+                   outranks unfinished setup, and in practice the two rarely
+                   co-occur (this needs a connector that was once working). -->
+              <ReconnectPill />
+              <!-- Renders nothing for super-admin/viewer or when the checklist
+                   is dismissed/empty. -->
               <ContinueSetupPill />
             </svelte:fragment>
 

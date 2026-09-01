@@ -139,6 +139,37 @@ const CRED_KEY_TO_PLATFORM: Record<string, string> = {
 };
 
 /**
+ * Human labels for the canonical platform IDs, kept in step with the `name`
+ * fields of the platform registry in routes/connectors/+page.svelte (that
+ * registry is component-local, so it can't be imported).
+ *
+ * Used by surfaces outside /connectors that only hold a platform ID and need to
+ * name it — today the ReconnectPill in the global header. Unknown IDs fall back
+ * to the raw ID, so a connector added to the backend before this map is a
+ * cosmetic gap, never a crash.
+ */
+export const PLATFORM_DISPLAY_NAMES: Record<string, string> = {
+  shopify: "Shopify",
+  woocommerce: "WooCommerce",
+  google_ads: "Google Ads",
+  facebook_ads: "Facebook Ads",
+  tiktok_ads: "TikTok Ads",
+  bing_ads: "Microsoft Bing Ads",
+  pinterest_ads: "Pinterest",
+  klaviyo: "Klaviyo",
+  bloomreach: "Bloomreach",
+  taboola: "Taboola",
+  outbrain: "Outbrain",
+  amazon_ads: "Amazon Ads",
+  amazon_sp: "Amazon Seller Central",
+  funnelish: "Funnelish",
+};
+
+export function platformDisplayName(id: string): string {
+  return PLATFORM_DISPLAY_NAMES[id] ?? id;
+}
+
+/**
  * Derives the list of connected platform IDs from the stack_selections
  * column. Each OAuth handler writes a `{platform}_credentials` key when
  * the user authorises that platform, so the presence of a key is the
@@ -150,6 +181,34 @@ export function connectedFromStackSelections(
   if (!stackSelections) return [];
   return Object.keys(stackSelections)
     .map((k) => CRED_KEY_TO_PLATFORM[k])
+    .filter((v): v is string => Boolean(v));
+}
+
+/**
+ * Derives the list of connected platform IDs whose stored token has gone bad
+ * and needs the merchant to reconnect.
+ *
+ * A direct-extract script that hits a platform auth error (expired / revoked
+ * token) sets `needs_reconnect: true` inside that platform's
+ * `{platform}_credentials` object; a successful reconnect or a later clean
+ * extract run clears it. See scripts/direct_extract/notify.py
+ * (set_connector_needs_reconnect) and server/onboarding.py
+ * (_set_needs_reconnect).
+ *
+ * Reuses CRED_KEY_TO_PLATFORM, so this is generic across every connector: a
+ * platform that starts setting the flag shows up here — and therefore in the
+ * /connectors row state and the header CTA — with no frontend change at all.
+ */
+export function needsReconnectFromStackSelections(
+  stackSelections: Record<string, unknown> | null | undefined,
+): string[] {
+  if (!stackSelections) return [];
+  return Object.entries(stackSelections)
+    .filter(
+      ([, v]) =>
+        (v as { needs_reconnect?: unknown } | null)?.needs_reconnect === true,
+    )
+    .map(([k]) => CRED_KEY_TO_PLATFORM[k])
     .filter((v): v is string => Boolean(v));
 }
 

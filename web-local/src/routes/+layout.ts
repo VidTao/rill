@@ -12,11 +12,13 @@ import {
   bratraxShowWelcomeCard,
   bratraxViewerMidOnboarding,
   bratraxIsDemo,
+  bratraxNeedsReconnect,
 } from "$lib/bratrax/auth-store";
 import {
   onboardMe,
   getOnboardResumeRoute,
   getOnboardRouteIndex,
+  needsReconnectFromStackSelections,
 } from "$lib/bratrax/onboarding/api";
 import { getChecklist } from "$lib/bratrax/onboarding/checklist";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient.js";
@@ -202,6 +204,15 @@ export async function load({ url, depends, untrack, fetch }) {
     // Demo-workspace flag — gates demo-only help content. `me` is null for
     // super-admins and cross-client users, which correctly reads as not-demo.
     bratraxIsDemo.set(!!me?.is_demo);
+
+    // Connectors whose token has died and need the merchant to reconnect —
+    // drives the blinking header CTA (ReconnectPill). Derived from the
+    // stack_selections we already have in hand, so it costs no extra request.
+    // Recomputed on every navigation because `load` re-runs; `me` being null
+    // (super-admin / cross-client) correctly yields [].
+    bratraxNeedsReconnect.set(
+      needsReconnectFromStackSelections(me?.stack_selections),
+    );
 
     // Fully-onboarded users typing /onboard/* directly: bounce to the
     // workspace landing. Without this they'd land on stale onboarding

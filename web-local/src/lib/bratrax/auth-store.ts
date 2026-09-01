@@ -25,3 +25,9 @@ export const bratraxViewerMidOnboarding = writable<boolean>(false);
 // be noise in a paying customer's help sidebar. Defaults false so nobody
 // sees demo-only content before the guard resolves.
 export const bratraxIsDemo = writable<boolean>(false);
+// Platform IDs whose stored OAuth token has gone bad and needs the merchant to
+// reconnect (e.g. ["facebook_ads"]). Set by the root layout guard from the
+// /onboard/me it already fetches on every navigation, so the header CTA costs
+// no extra request. Defaults [] — the layout swallows /onboard/me failures, and
+// a transient error must not accuse a healthy connector of being broken.
+export const bratraxNeedsReconnect = writable<string[]>([]);

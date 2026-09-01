@@ -7,6 +7,7 @@
     onboardMe,
     onboardDisconnect,
     connectedFromStackSelections,
+    needsReconnectFromStackSelections,
     getOAuthConfig,
     verifyEmbedStatus,
   } from "$lib/bratrax/onboarding/api";
@@ -233,6 +234,11 @@
   // State
   // ---------------------------------------------------------------------------
   let connectedPlatforms: Set<string> = new Set();
+  // Connectors whose stored token has gone bad (an extract script hit a
+  // platform auth error and set needs_reconnect on their credentials). Populated
+  // generically from stack_selections, so a newly-flagging platform needs no
+  // change here. Cleared server-side on a successful reconnect.
+  let needsReconnect: Set<string> = new Set();
   let stackSelections: Record<string, any> = {};
   let connectedAt: Record<string, string> = {};
   let clientId = "";
@@ -378,6 +384,11 @@
     for (const p of connectedFromStackSelections(stackSelections)) next.add(p);
     connectedPlatforms = next;
     connectedAt = dates;
+    // Connectors whose token died — an extract script set needs_reconnect on
+    // their credentials. Drives the third row state below.
+    needsReconnect = new Set(
+      needsReconnectFromStackSelections(stackSelections),
+    );
 
     // GA4 `data_source_connected` — post-onboarding connects land here rather
     // than on /onboard/stack. See trackConnectedSources(); a client with no
@@ -479,6 +490,14 @@
     if (id === "external_pages") return hasExternalBuilder;
     return connectedPlatforms.has(id);
   };
+
+  // Third row state: connected, but the token is dead. Requires isConnected so a
+  // stale flag on a since-disconnected platform can't render a "Needs
+  // reconnect" row for something that shows as not connected — the flag lives
+  // inside {platform}_credentials, and disconnect deletes that whole key, so
+  // this is belt-and-braces rather than a live case.
+  $: needsReconnectFor = (id: string): boolean =>
+    isConnected(id) && needsReconnect.has(id);
 
   // ---------------------------------------------------------------------------
   // OAuth init handlers (mirror /onboard/stack — only difference: return-to
@@ -1064,6 +1083,56 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Reconnect (needs_reconnect state)
+  // ---------------------------------------------------------------------------
+  /**
+   * Replace a dead connection with a fresh one: drop the stored credentials,
+   * then run the platform's normal connect flow.
+   *
+   * Disconnecting first is REQUIRED, not just tidy. Every connect entry point
+   * early-returns when the platform already reads as connected
+   * (handleFacebookConnect, handleOAuthConnect, handleShopifyConnect,
+   * handleWooCommerceConnect all open with `if (isConnected(...)) return;`), so
+   * without this the click would be a silent no-op.
+   *
+   * It also keeps connected_platforms honest: _record_platform_connection is
+   * append-only (`if platform not in existing`), so an in-place reconnect
+   * refreshes the token in stack_selections but leaves the array entry's
+   * account_id / account_name / connected_at frozen at their original values —
+   * and /bratrax/sync-status reads its account list from that array. Removing
+   * the entry means the reconnect re-appends it with the newly-selected
+   * accounts.
+   *
+   * Trade-off: abandoning the provider popup leaves the row at "Not connected"
+   * with a Connect button. That's the honest state — the old token was dead.
+   *
+   * Platform-agnostic: works for any connector that starts setting the flag.
+   */
+  async function handleReconnect(platform: Platform) {
+    if (!clientId) return;
+    error = "";
+    loading = platform.id;
+    try {
+      const target =
+        platform.id === "external_pages" && connectedBuilderName
+          ? connectedBuilderName
+          : platform.id;
+      await onboardDisconnect(clientId, target);
+      // Await the refresh so connectedPlatforms is up to date before
+      // handleCardConnect evaluates its isConnected guard.
+      await refreshFromServer();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      loading = "";
+      return;
+    }
+    // Clear the spinner before handing off: the connect flow owns `loading`
+    // from here, and for redirect-OAuth platforms it navigates away entirely.
+    loading = "";
+    handleCardConnect(platform);
+  }
+
+  // ---------------------------------------------------------------------------
   // View accounts modal
   // ---------------------------------------------------------------------------
   function handleView(platform: Platform) {
@@ -1354,14 +1423,30 @@
     <div class="connector-list-card">
       {#each visiblePlatforms as platform}
         {@const connected = isConnected(platform.id)}
-        <div class="connector-row" class:row-disconnected={!connected}>
+        {@const stale = needsReconnectFor(platform.id)}
+        <div
+          class="connector-row"
+          class:row-disconnected={!connected}
+          class:row-needs-reconnect={stale}
+        >
           <span
             class="connector-icon"
             style="background-color: {platform.color}"
           ></span>
           <div class="connector-mid">
             <span class="connector-name">{platform.name}</span>
-            {#if connected}
+            {#if stale}
+              <!-- Deliberately no ConnectorPill and no "Last sync" here: a
+                   backfill percentage or a recent sync time next to a dead
+                   token reads as reassurance, which is the opposite of what
+                   this row means. -->
+              <span class="bratrax-status-pill bratrax-status-pill--danger">
+                Needs reconnect
+              </span>
+              <span class="connector-status-warning">
+                We can no longer reach your account — reconnect to resume data.
+              </span>
+            {:else if connected}
               {@const sync = syncBySource.get(platform.id)}
               <ConnectorPill fillPercentage={sync?.progressPct} />
               {#if sync}
@@ -1377,7 +1462,19 @@
             {/if}
           </div>
           <div class="connector-actions">
-            {#if connected}
+            {#if stale}
+              <!-- Single action by design. "View accounts" would show the
+                   accounts of a connection that no longer works, and
+                   "Disconnect" is just the slow path to the same place
+                   Reconnect goes through anyway. -->
+              <button
+                on:click={() => handleReconnect(platform)}
+                disabled={loading === platform.id}
+                class="btn-bratrax btn-primary btn-compact"
+              >
+                {loading === platform.id ? "Reconnecting…" : "Reconnect →"}
+              </button>
+            {:else if connected}
               <button
                 on:click={() =>
                   platform.type === "snippet_install"
@@ -1757,6 +1854,14 @@
     background: rgba(255, 196, 117, 0.05);
   }
 
+  /* Dead token. Stronger tint than .row-disconnected plus a danger edge — a
+     never-connected connector is a to-do, this one is actively losing data.
+     Both classes can be present in theory; this rule follows so it wins. */
+  .row-needs-reconnect {
+    background: rgba(230, 50, 38, 0.06);
+    box-shadow: inset 2px 0 0 0 var(--bratrax-tomato);
+  }
+
   .connector-icon {
     width: 20px;
     height: 20px;
@@ -1806,6 +1911,16 @@
     font-size: 11px;
     letter-spacing: 0.4px;
     color: var(--color-text-muted);
+  }
+
+  /* Explanatory line under the "Needs reconnect" pill. Sentence case and not
+     uppercase-tracked, unlike the status labels above — it's a sentence to
+     read, not a status to scan. */
+  .connector-status-warning {
+    font-family: "Space Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+    color: var(--bratrax-tomato);
   }
 
   .connector-actions {
