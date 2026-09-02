@@ -389,6 +389,12 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 		observability.Middleware("bratrax", logger,
 			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/slack/index.html")))
 
+	// Same shape for Shopify, except the source path mirrors the public URL:
+	// it lives at "integrations/shopify/index.html" in the static repo.
+	observability.MuxHandle(mux, "GET /integrations/shopify",
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/integrations/shopify/index.html")))
+
 	// /slack is the short vanity URL that appears in the Slack app listing and
 	// marketing copy; /integrations/slack is canonical. A 301 consolidates link
 	// equity on the canonical URL rather than leaving crawlers with two pages of
@@ -401,6 +407,16 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	observability.MuxHandle(mux, "GET /slack",
 		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/integrations/slack", http.StatusMovedPermanently)
+		})))
+
+	// /shopify is the same kind of vanity URL, redirecting to the canonical
+	// /integrations/shopify. Exact match once more, so the Shopify App Store
+	// install and billing endpoints registered above under /shopify/install and
+	// /shopify/billing — plus the /shopify/connect page served by the SPA — are
+	// all untouched.
+	observability.MuxHandle(mux, "GET /shopify",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/integrations/shopify", http.StatusMovedPermanently)
 		})))
 
 	// /changelog/{slug}: per-entry pages for changelog items marked notable.
