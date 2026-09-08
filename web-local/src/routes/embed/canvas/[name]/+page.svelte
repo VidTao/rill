@@ -32,7 +32,12 @@
     <EmbedHeader />
     <div class="canvas-area">
       <CanvasProvider {canvasName} {instanceId}>
-        <CanvasDashboardEmbed {canvasName} />
+        <!-- navigationEnabled={false} drops the hover "open in explore" icon
+             from every widget. There is no browser back button inside the
+             Shopify admin iframe, so following that link is a one-way trip
+             out of the embedded app: the merchant lands on a standalone
+             explore dashboard with no way back to the canvas. -->
+        <CanvasDashboardEmbed {canvasName} navigationEnabled={false} />
       </CanvasProvider>
     </div>
   </div>

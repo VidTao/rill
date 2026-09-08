@@ -36,50 +36,58 @@
   $: exploreComponent = showExplore
     ? (component as BaseCanvasComponent<ComponentWithMetricsView>)
     : null;
+
+  // The wrapper below is a bordered card, so rendering it with nothing inside
+  // leaves a hairline artifact in the widget's corner on hover. Only mount it
+  // when one of the two branches actually has content — i.e. never when a
+  // read-only canvas has navigationEnabled={false}, as the Shopify embed does.
+  $: hasActions = editable || !!exploreComponent;
 </script>
 
-<div
-  class:!flex={dropdownOpen}
-  class="group-hover:flex p-0 overflow-hidden bg-surface-card gap-x-1 items-center justify-center hidden toolbar top-0 right-0 shadow-sm z-[1000] absolute w-fit border-l border-b pointer-events-auto rounded-bl-sm rounded-tr-sm"
->
-  {#if editable}
-    <!-- Editable mode: Show dropdown with explore option -->
-    <DropdownMenu.Root
-      bind:open={dropdownOpen}
-      portal=".dashboard-theme-boundary"
-    >
-      <DropdownMenu.Trigger
-        class="size-7 grid place-content-center bg-surface-card hover:brightness-[85%] active:brightness-75"
+{#if hasActions}
+  <div
+    class:!flex={dropdownOpen}
+    class="group-hover:flex p-0 overflow-hidden bg-surface-card gap-x-1 items-center justify-center hidden toolbar top-0 right-0 shadow-sm z-[1000] absolute w-fit border-l border-b pointer-events-auto rounded-bl-sm rounded-tr-sm"
+  >
+    {#if editable}
+      <!-- Editable mode: Show dropdown with explore option -->
+      <DropdownMenu.Root
+        bind:open={dropdownOpen}
+        portal=".dashboard-theme-boundary"
       >
-        <ThreeDot size="16px" />
-      </DropdownMenu.Trigger>
-
-      <DropdownMenu.Content
-        align="end"
-        sideOffset={8}
-        alignOffset={-4}
-        class="w-40"
-      >
-        <DropdownMenu.Item on:click={onDuplicate}>
-          <Copy size="14px" />
-          Duplicate
-        </DropdownMenu.Item>
-        {#if showExplore && exploreComponent}
-          <DropdownMenu.Separator />
-          <ExploreLink component={exploreComponent} mode="dropdown-item" />
-        {/if}
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item
-          on:click={onDelete}
-          class="text-red-600 data-[highlighted]:text-red-600"
+        <DropdownMenu.Trigger
+          class="size-7 grid place-content-center bg-surface-card hover:brightness-[85%] active:brightness-75"
         >
-          <Trash size="14px" />
-          Delete
-        </DropdownMenu.Item>
-      </DropdownMenu.Content>
-    </DropdownMenu.Root>
-  {:else if showExplore && exploreComponent}
-    <!-- Non-editable mode: Show explore icon button -->
-    <ExploreLink component={exploreComponent} mode="icon-button" />
-  {/if}
-</div>
+          <ThreeDot size="16px" />
+        </DropdownMenu.Trigger>
+
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={8}
+          alignOffset={-4}
+          class="w-40"
+        >
+          <DropdownMenu.Item on:click={onDuplicate}>
+            <Copy size="14px" />
+            Duplicate
+          </DropdownMenu.Item>
+          {#if exploreComponent}
+            <DropdownMenu.Separator />
+            <ExploreLink component={exploreComponent} mode="dropdown-item" />
+          {/if}
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item
+            on:click={onDelete}
+            class="text-red-600 data-[highlighted]:text-red-600"
+          >
+            <Trash size="14px" />
+            Delete
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Root>
+    {:else if exploreComponent}
+      <!-- Non-editable mode: Show explore icon button -->
+      <ExploreLink component={exploreComponent} mode="icon-button" />
+    {/if}
+  </div>
+{/if}
