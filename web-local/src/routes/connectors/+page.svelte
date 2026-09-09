@@ -757,6 +757,11 @@
   ): Array<{ id: string; name: string }> {
     const flat: Array<{ id: string; name: string }> = [];
     googleManagerMap = {};
+    // The backend returns one tree per accessible seed customer, so a leaf that
+    // is reachable BOTH directly and via its MCC arrives twice. Without this
+    // guard it renders twice in the picker and is stored twice, which makes
+    // every extract query that account N times.
+    const seen = new Set<string>();
     function walk(list: GoogleAdAccountNode[]) {
       for (const acc of list) {
         const id = String(acc.customer_id);
@@ -764,7 +769,8 @@
           !!acc.is_manager_account ||
           !!(acc.children && acc.children.length > 0);
         // Manager (MCC) accounts can't serve metrics — never selectable.
-        if (!isManager) {
+        if (!isManager && !seen.has(id)) {
+          seen.add(id);
           flat.push({ id, name: acc.name || acc.descriptive_name || id });
         }
         if (acc.manager_account_id) {

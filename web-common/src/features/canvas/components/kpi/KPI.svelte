@@ -197,7 +197,7 @@
         </h2>
 
         <div
-          class="big-number h-9 grid place-content-center"
+          class="big-number min-h-9 leading-8 grid place-content-center"
           class:hovered-value={hoveredPoints?.[0]?.value != null}
           role="button"
           tabindex="0"

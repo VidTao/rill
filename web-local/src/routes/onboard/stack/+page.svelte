@@ -1447,6 +1447,13 @@
   ): Array<{ id: string; name: string; group: string }> {
     const flat: Array<{ id: string; name: string; group: string }> = [];
     googleManagerMap = {};
+    // The backend returns one tree per accessible seed customer, so a leaf that
+    // is reachable BOTH directly and via its MCC arrives twice — once under the
+    // MCC's group, once as a standalone root. Without this guard it renders
+    // twice in the picker and is stored twice, which makes every extract query
+    // that account N times. Keep the first occurrence: seeds are walked in
+    // accessible-customer order, and the MCC tree carries the group name.
+    const seen = new Set<string>();
     // A manager node (has children) becomes its own group header — children
     // inherit its name. A leaf inherits whatever parent we walked in with.
     // Standalone top-level accounts (no parent, no children) get "" and
@@ -1462,7 +1469,10 @@
         // Manager (MCC) accounts can't serve metrics (REQUESTED_METRICS_FOR_MANAGER),
         // so they're group headers only — never selectable extraction targets.
         // Selecting an MCC leaves the client Google-dark (no leaf account stored).
-        if (!isManager) flat.push({ id, name, group });
+        if (!isManager && !seen.has(id)) {
+          seen.add(id);
+          flat.push({ id, name, group });
+        }
         if (acc.manager_account_id) {
           googleManagerMap[id] = String(acc.manager_account_id);
         }
