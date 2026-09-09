@@ -4,6 +4,7 @@ import type {
   AccountInfo,
   AISettings,
   BillingSummary,
+  BrandDomains,
   InvitationPreview,
   InviteResult,
   MCPSettings,
@@ -48,6 +49,31 @@ export function updateAccount(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+}
+
+// ----- Brand domains ---------------------------------------------------------
+//
+// Extra registrable domains the merchant owns whose names do not share a core
+// with brand_domain -- advertorials, bridge/funnel domains, custom checkouts.
+// The attribution self-referral guard matches by registrable core, so it cannot
+// infer these; declaring one stops the merchant's own page being credited as a
+// Referral and stealing the paid touchpoint.
+//
+// Read at COMPILE time, so a save triggers a background compile+deploy for that
+// client. Poll getBrandDomains() for apply_status while it runs.
+
+export function getBrandDomains(): Promise<BrandDomains> {
+  return apiFetch<BrandDomains>("/bratrax/settings/brand-domains");
+}
+
+export function updateBrandDomains(
+  brand_domains: string[],
+): Promise<BrandDomains> {
+  return apiFetch<BrandDomains>("/bratrax/settings/brand-domains", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ brand_domains }),
   });
 }
 

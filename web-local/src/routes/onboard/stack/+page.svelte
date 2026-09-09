@@ -16,6 +16,7 @@
   import FbUrlTagsConfirmModal from "../../connectors/FbUrlTagsConfirmModal.svelte";
   import ExternalPagesBuilderPickerModal from "../../connectors/ExternalPagesBuilderPickerModal.svelte";
   import FunnelishInstallModal from "../../connectors/FunnelishInstallModal.svelte";
+  import CustomPagesInstallModal from "../../connectors/CustomPagesInstallModal.svelte";
   import TaboolaCredentialModal from "../../connectors/TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "../../connectors/OutbrainLoginModal.svelte";
   import BloomreachCredentialModal from "../../connectors/BloomreachCredentialModal.svelte";
@@ -311,11 +312,15 @@
   // Funnelish first; ClickFunnels / GoHighLevel / Other are placeholders).
   let showBuilderPickerModal = false;
   let showFunnelishModal = false;
+  let showCustomPagesModal = false;
 
   // Set of builder ids that map to the "external_pages" umbrella. Keep this
   // in sync with ExternalPagesBuilderPickerModal — adding a new builder
   // requires updating both this set and the picker's `available` list.
-  const externalBuilderIds = new Set(["funnelish"]);
+  // Backend platform ids, not the picker's BuilderIds: "other" connects as
+  // "custom_pages", deliberately distinct from "external_pages"/"funnelish"
+  // so _determine_stack does not scaffold onto the Funnelish stack.
+  const externalBuilderIds = new Set(["funnelish", "custom_pages"]);
   $: hasExternalBuilder = [...connectedPlatforms].some((p) =>
     externalBuilderIds.has(p),
   );
@@ -2169,11 +2174,18 @@
     showBuilderPickerModal = false;
     if (e.detail.builder === "funnelish") {
       showFunnelishModal = true;
+    } else if (e.detail.builder === "other") {
+      showCustomPagesModal = true;
     }
   }
 
   async function handleFunnelishInstalled() {
     showFunnelishModal = false;
+    await refreshFromServer();
+  }
+
+  async function handleCustomPagesInstalled() {
+    showCustomPagesModal = false;
     await refreshFromServer();
   }
 
@@ -2439,6 +2451,17 @@
     connectedAt={connectedAt["funnelish"] || ""}
     on:installed={handleFunnelishInstalled}
     on:close={() => (showFunnelishModal = false)}
+  />
+{/if}
+
+{#if showCustomPagesModal}
+  <CustomPagesInstallModal
+    {clientId}
+    {shopifyShopDomain}
+    connected={connectedPlatforms.has("custom_pages")}
+    connectedAt={connectedAt["custom_pages"] || ""}
+    on:installed={handleCustomPagesInstalled}
+    on:close={() => (showCustomPagesModal = false)}
   />
 {/if}
 

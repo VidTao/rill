@@ -7,6 +7,31 @@ export interface AccountInfo {
   role: Role;
 }
 
+export interface BrandDomainsApplyStatus {
+  state:
+    | "unknown"
+    | "queued"
+    | "compiling"
+    | "deploying"
+    | "refreshing"
+    | "applied"
+    | "failed"
+    | "skipped_locked";
+  step?: string | null;
+  error?: string | null;
+}
+
+export interface BrandDomains {
+  /** Derived from the connected store; not editable here. */
+  brand_domain: string;
+  brand_domains: string[];
+  apply_status?: BrandDomainsApplyStatus;
+  /** PUT only: true when the value was saved but the client is not yet activated. */
+  pending_activation?: boolean;
+  /** PUT only: true when a compile+deploy was kicked off. */
+  applied?: boolean;
+}
+
 export interface TeamMember {
   id: number;
   email: string;

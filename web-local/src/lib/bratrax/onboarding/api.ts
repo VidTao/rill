@@ -136,6 +136,7 @@ const CRED_KEY_TO_PLATFORM: Record<string, string> = {
   taboola_credentials: "taboola",
   outbrain_credentials: "outbrain",
   funnelish_credentials: "funnelish",
+  custom_pages_credentials: "custom_pages",
 };
 
 /**
@@ -163,6 +164,7 @@ export const PLATFORM_DISPLAY_NAMES: Record<string, string> = {
   amazon_ads: "Amazon Ads",
   amazon_sp: "Amazon Seller Central",
   funnelish: "Funnelish",
+  custom_pages: "Custom Landing Pages",
 };
 
 export function platformDisplayName(id: string): string {

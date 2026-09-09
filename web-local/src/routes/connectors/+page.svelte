@@ -15,6 +15,7 @@
   import AccountSelectionModal from "./AccountSelectionModal.svelte";
   import ExternalPagesBuilderPickerModal from "./ExternalPagesBuilderPickerModal.svelte";
   import FunnelishInstallModal from "./FunnelishInstallModal.svelte";
+  import CustomPagesInstallModal from "./CustomPagesInstallModal.svelte";
   import TaboolaCredentialModal from "./TaboolaCredentialModal.svelte";
   import OutbrainLoginModal from "./OutbrainLoginModal.svelte";
   import BloomreachCredentialModal from "./BloomreachCredentialModal.svelte";
@@ -317,6 +318,7 @@
   // Amazon SP-API needs its region chosen before the redirect.
   let showAmazonRegionModal = false;
   let showFunnelishModal = false;
+  let showCustomPagesModal = false;
 
   // Credential-modal state for Taboola / Outbrain. Each modal owns its
   // own visibility + error/loading flags so the parent can keep the modal
@@ -340,10 +342,19 @@
 
   // Builder ids that map to the "external_pages" umbrella. Keep in sync with
   // ExternalPagesBuilderPickerModal's `available` list.
-  const externalBuilderIds = new Set(["funnelish"]);
+  //
+  // NOTE these are the ids the BACKEND stores in connected_platforms, which are
+  // not the picker's BuilderIds: the picker's "other" connects as
+  // "custom_pages". That id must stay distinct from "external_pages" /
+  // "funnelish" because _determine_stack treats both of those as "Funnelish
+  // selected" and would scaffold the client onto the Funnelish stack.
+  const externalBuilderIds = new Set(["funnelish", "custom_pages"]);
   $: hasExternalBuilder = [...connectedPlatforms].some((p) =>
     externalBuilderIds.has(p),
   );
+  // One card, so a client running two builders resolves to whichever comes
+  // first — "View snippet" and Disconnect then act on that one. Acceptable
+  // while the card is a single umbrella row.
   $: connectedBuilderName = hasExternalBuilder
     ? [...connectedPlatforms].find((p) => externalBuilderIds.has(p))
     : "";
@@ -1265,6 +1276,8 @@
     error = "";
     if (connectedBuilderName === "funnelish") {
       showFunnelishModal = true;
+    } else if (connectedBuilderName === "custom_pages") {
+      showCustomPagesModal = true;
     } else {
       showBuilderPickerModal = true;
     }
@@ -1274,11 +1287,18 @@
     showBuilderPickerModal = false;
     if (e.detail.builder === "funnelish") {
       showFunnelishModal = true;
+    } else if (e.detail.builder === "other") {
+      showCustomPagesModal = true;
     }
   }
 
   async function handleFunnelishInstalled() {
     showFunnelishModal = false;
+    await refreshFromServer();
+  }
+
+  async function handleCustomPagesInstalled() {
+    showCustomPagesModal = false;
     await refreshFromServer();
   }
 
@@ -1760,6 +1780,17 @@
     connectedAt={connectedAt["funnelish"] || ""}
     on:installed={handleFunnelishInstalled}
     on:close={() => (showFunnelishModal = false)}
+  />
+{/if}
+
+{#if showCustomPagesModal}
+  <CustomPagesInstallModal
+    {clientId}
+    {shopifyShopDomain}
+    connected={connectedPlatforms.has("custom_pages")}
+    connectedAt={connectedAt["custom_pages"] || ""}
+    on:installed={handleCustomPagesInstalled}
+    on:close={() => (showCustomPagesModal = false)}
   />
 {/if}
 

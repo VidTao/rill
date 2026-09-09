@@ -2,9 +2,17 @@
   import { createEventDispatcher } from "svelte";
 
   // Sub-picker shown when the user picks "I have external landing pages".
-  // Each entry maps to a builder-specific install pixel. Funnelish is the
-  // only active option for v1; the rest are visible-but-disabled to set
-  // expectations while we add their pixels.
+  // Each entry maps to a builder-specific install pixel.
+  //
+  // ClickFunnels and GoHighLevel stay disabled deliberately: they are not just
+  // missing a pixel, their legacy connectors write to bratrax_write_keys /
+  // bratrax_user_platform_credentials, which were dropped in the 2026-05-22
+  // Meltano cleanup, and ClickFunnels' /webhooks/data-transfer target was
+  // removed 2026-05-16. Shipping either means porting it onto
+  // /onboard/<platform>/connect + stack_selections first.
+  //
+  // `available` is the single source of the disabled state — it drives the
+  // click guard, the native disabled attribute and the "Soon" badge together.
   export type BuilderId = "funnelish" | "clickfunnels" | "ghl" | "other";
 
   interface Builder {
@@ -36,8 +44,8 @@
     {
       id: "other",
       name: "Custom / Other",
-      note: "Coming soon.",
-      available: false,
+      note: "Any advertorial, bridge, or custom checkout page. Generic pixel + link decoration.",
+      available: true,
     },
   ];
 

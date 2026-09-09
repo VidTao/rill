@@ -36,6 +36,7 @@
     TeamData,
     TeamMember,
   } from "$lib/bratrax/settings/types";
+  import BrandDomainsEditor from "$lib/bratrax/BrandDomainsEditor.svelte";
 
   type TabId = "account" | "team" | "billing" | "ai" | "mcp" | "slack";
 
@@ -711,6 +712,19 @@
       {:else}
         <p class="font-mono text-xs text-bratrax-text-muted">Loading…</p>
       {/if}
+
+      <!-- Brand domains: extra domains the merchant owns, so their own
+           advertorial / bridge pages are not credited as a Referral. Same
+           shared editor the Custom / Other install modal embeds, so both
+           write through PUT /bratrax/settings/brand-domains. -->
+      <div class="mt-8 border-t border-bratrax-border pt-6">
+        <h2
+          class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+        >
+          Your other domains
+        </h2>
+        <BrandDomainsEditor embedded={true} />
+      </div>
     {/if}
 
     <!-- Team tab -->
