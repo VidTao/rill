@@ -12,6 +12,7 @@ import {
   bratraxShowWelcomeCard,
   bratraxViewerMidOnboarding,
   bratraxIsDemo,
+  bratraxAllowMultiStore,
   bratraxNeedsReconnect,
 } from "$lib/bratrax/auth-store";
 import {
@@ -204,6 +205,11 @@ export async function load({ url, depends, untrack, fetch }) {
     // Demo-workspace flag — gates demo-only help content. `me` is null for
     // super-admins and cross-client users, which correctly reads as not-demo.
     bratraxIsDemo.set(!!me?.is_demo);
+
+    // Self-service multi-store switch. Lets the header offer "Add store" to a
+    // client with no multi_client_id yet; the button promotes on click. `me` is
+    // null for super-admins, who get the switcher via their own path anyway.
+    bratraxAllowMultiStore.set(!!me?.allow_multi_store);
 
     // Connectors whose token has died and need the merchant to reconnect —
     // drives the blinking header CTA (ReconnectPill). Derived from the

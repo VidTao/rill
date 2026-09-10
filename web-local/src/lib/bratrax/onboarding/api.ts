@@ -44,6 +44,9 @@ export interface OnboardMeResult {
   // clickhouse_db against DEMO_CLIENT_SLUG). Optional so a response from an
   // older Flask build parses as `undefined` → falsy → not-demo.
   is_demo?: boolean;
+  // ALLOW_SHOPIFY_MULTI_STORE on the Flask side — gates the self-service
+  // "Add store" button for clients who are not multi-store yet.
+  allow_multi_store?: boolean;
   shopify_embed_enabled: boolean;
   is_paid_subscriber: boolean;
   subscription_status: string | null;

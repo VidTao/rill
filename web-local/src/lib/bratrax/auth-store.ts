@@ -25,6 +25,13 @@ export const bratraxViewerMidOnboarding = writable<boolean>(false);
 // be noise in a paying customer's help sidebar. Defaults false so nobody
 // sees demo-only content before the guard resolves.
 export const bratraxIsDemo = writable<boolean>(false);
+// True when self-service multi-store is enabled (from /onboard/me's
+// `allow_multi_store`, driven by ALLOW_SHOPIFY_MULTI_STORE on the Flask side).
+// Lets the "Add store" button render for a client who has no multi_client_id
+// yet — the button promotes them on click. Defaults false so a transient
+// /onboard/me failure hides the button rather than offering an action the
+// backend would refuse with a 403.
+export const bratraxAllowMultiStore = writable<boolean>(false);
 // Platform IDs whose stored OAuth token has gone bad and needs the merchant to
 // reconnect (e.g. ["facebook_ads"]). Set by the root layout guard from the
 // /onboard/me it already fetches on every navigation, so the header CTA costs

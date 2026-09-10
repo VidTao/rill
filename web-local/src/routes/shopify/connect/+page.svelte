@@ -195,8 +195,16 @@
         company_name: shopLabel,
       });
       await call("/bratrax/auth/switch-client", { client_id: store.client_id });
+      // adopt MUST name the new sub-store explicitly. switch-client above only
+      // sets the bratrax_active_client cookie, and this page always runs inside
+      // the Shopify admin iframe, where that cookie cannot be stored at all
+      // (SameSite=Lax) — so the server's idea of "active client" is still the
+      // merchant's original store. Without this argument the new shop gets
+      // adopted onto the original client, and the next app/uninstalled webhook
+      // for this shop disconnects Shopify on that original store.
       await call("/bratrax/onboard/shopify/adopt", {
         shopify_install_token: installToken,
+        client_id: store.client_id,
       });
       await goto("/onboard/payment");
     } catch (e) {

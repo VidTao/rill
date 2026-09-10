@@ -46,6 +46,8 @@
     bratraxOnboardResumeRoute,
     bratraxShowWelcomeCard,
     bratraxViewerMidOnboarding,
+    bratraxAllowMultiStore,
+    bratraxIsDemo,
   } from "$lib/bratrax/auth-store";
   import { bratraxLogout } from "$lib/bratrax/auth";
   import {
@@ -195,6 +197,17 @@
   // returned list to their sibling sub-stores.
   $: isMultiStore = !!$bratraxUser?.multi_client_id;
 
+  // "Add store" is offered more widely than the switcher: a single-store client
+  // has nothing to switch between, but must still be able to START a second
+  // store — otherwise self-service multi-store is unreachable, since the only
+  // other routes in are the Shopify second-shop install and a super_admin.
+  // AddStoreButton promotes before adding, so a caller with no parent is fine.
+  // Never on the shared demo workspace: it is one client many people sign into,
+  // and a store added there would provision a real client + ClickHouse
+  // databases off a sandbox everyone can reach. Enforced server-side too.
+  $: canAddStore =
+    (isMultiStore || $bratraxAllowMultiStore) && !$bratraxIsDemo;
+
   // First-canvas lookup powers the DASHBOARDS tab href so clicks go straight
   // to /canvas/<name>, skipping the /developer detour. Falls back to /developer
   // when the list is empty (it renders the "No dashboards yet" placeholder).
@@ -298,7 +311,7 @@
               {#if isSuper || isMultiStore}
                 <ClientSwitcher />
               {/if}
-              {#if isMultiStore && !isViewer && !onOnboardPage}
+              {#if canAddStore && !isViewer && !onOnboardPage}
                 <AddStoreButton />
               {/if}
             </svelte:fragment>

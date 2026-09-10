@@ -1,14 +1,18 @@
 <script lang="ts">
   import { portal } from "@rilldata/web-common/lib/actions/portal";
-  import { bratraxAddStore } from "./multiClient";
+  import { bratraxAddStore, bratraxPromoteSelf } from "./multiClient";
   import { bratraxSwitchClient } from "./auth";
 
-  // Header button — visible only when the parent layout has determined the
-  // current user belongs to a multi-client. Click opens a styled modal asking
-  // for the new store's display name, then provisions it via
-  // /bratrax/multi-client/add-store, switches the active-client cookie to the
-  // new sub-store, and hard-reloads into /onboard/store (the route guard
-  // handles the rest).
+  // Header button. The parent layout shows it either when the user already
+  // belongs to a multi-client, or when self-service multi-store is enabled
+  // (ALLOW_SHOPIFY_MULTI_STORE) — a single-store client has to be able to
+  // start their second store from here, since the only other ways to get a
+  // parent are the Shopify second-shop install and a super_admin.
+  //
+  // Click opens a styled modal asking for the new store's display name, then
+  // promotes the account if needed, provisions the sub-store via
+  // /bratrax/multi-client/add-store, switches the active-client cookie to it,
+  // and hard-reloads into /onboard/store (the route guard handles the rest).
 
   let modalOpen = false;
   let storeName = "";
@@ -39,6 +43,10 @@
     busy = true;
     error = "";
     try {
+      // Unconditional and idempotent: a no-op returning the existing parent
+      // for an already-multi-store account, and the step that makes add-store
+      // legal at all for a single-store one (it rejects a NULL parent).
+      await bratraxPromoteSelf();
       const result = await bratraxAddStore(trimmed);
       // Flip the active-client cookie so the next page load loads the new
       // sub-store. The switch endpoint validates the target shares the
