@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	// The marketing handlers fall back to the SPA when GitHub is unreachable,
@@ -14,6 +15,34 @@ import (
 	"github.com/rilldata/rill/runtime/pkg/observability"
 	"go.uber.org/zap"
 )
+
+// dsnPasswordRE matches the password field of a libpq keyword/value DSN. The
+// value is either single quoted (libpq allows embedded spaces that way) or runs
+// to the next whitespace. sslpassword is included because it protects the client
+// key and is just as sensitive.
+var dsnPasswordRE = regexp.MustCompile(`(?i)\b(password|sslpassword)\s*=\s*('(?:[^']|'')*'|[^\s]*)`)
+
+// redactDSN strips credentials from a Postgres DSN so it is safe to log.
+//
+// It handles both forms Postgres accepts, which is the whole point: the previous
+// implementation ran url.Parse and cleared parsed.User, which works for URI form
+// (postgres://user:pass@host/db) but is a silent no-op for libpq keyword/value
+// form (host=... password=... dbname=...). url.Parse does not fail on the latter
+// — it just finds no userinfo — so the password was logged verbatim, merely
+// percent escaped. The production DSN in /etc/rill.env is keyword/value form,
+// so in practice the password reached the log on every startup.
+func redactDSN(dsn string) string {
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		parsed, err := url.Parse(dsn)
+		if err != nil {
+			// Do not echo back something we failed to understand.
+			return "[unparseable dsn redacted]"
+		}
+		parsed.User = nil
+		return parsed.String()
+	}
+	return dsnPasswordRE.ReplaceAllString(dsn, "${1}=[redacted]")
+}
 
 // Handlers carries the constructed bratrax components so that callers (e.g. the
 // CLI's local app) can register additional middleware (such as the instance router)
@@ -471,15 +500,9 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	proxyHandler := observability.Middleware("bratrax", logger, authMapper.Middleware(proxy))
 	observability.MuxHandle(mux, "/bratrax/", proxyHandler)
 
-	// Log DSN with credentials redacted
-	redactedDSN := cfg.UsersDSN
-	if parsed, parseErr := url.Parse(cfg.UsersDSN); parseErr == nil {
-		parsed.User = nil
-		redactedDSN = parsed.String()
-	}
 	logger.Info("bratrax proxy registered",
 		zap.String("target", cfg.TargetURL.String()),
-		zap.String("users_dsn", redactedDSN),
+		zap.String("users_dsn", redactDSN(cfg.UsersDSN)),
 	)
 
 	return &Handlers{
