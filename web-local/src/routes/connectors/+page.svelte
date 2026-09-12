@@ -502,13 +502,23 @@
     return connectedPlatforms.has(id);
   };
 
-  // Third row state: connected, but the token is dead. Requires isConnected so a
-  // stale flag on a since-disconnected platform can't render a "Needs
-  // reconnect" row for something that shows as not connected — the flag lives
-  // inside {platform}_credentials, and disconnect deletes that whole key, so
-  // this is belt-and-braces rather than a live case.
-  $: needsReconnectFor = (id: string): boolean =>
-    isConnected(id) && needsReconnect.has(id);
+  // Third row state: the stored credential is dead and the merchant must
+  // re-authorise. `needs_reconnect` in the DB is the single source of truth —
+  // deliberately NOT gated on isConnected().
+  //
+  // It used to require isConnected() on the reasoning that disconnect deletes
+  // the whole {platform}_credentials key, so a flag could never outlive the
+  // connection. Revoking a token server-side breaks that assumption: the
+  // Shopify app/uninstalled webhook strips the platform from
+  // connected_platforms AND drops its credentials, which silently suppressed
+  // the pill for the connector merchants most needed to fix. A platform whose
+  // access we have deliberately killed must still be able to say so.
+  //
+  // Safe because the flag only exists inside a {platform}_credentials blob, so
+  // writing it is itself enough to make the row render, with or without a
+  // token; and handleReconnect() disconnects before connecting, which is a
+  // no-op when the platform isn't currently connected.
+  $: needsReconnectFor = (id: string): boolean => needsReconnect.has(id);
 
   // ---------------------------------------------------------------------------
   // OAuth init handlers (mirror /onboard/stack — only difference: return-to
