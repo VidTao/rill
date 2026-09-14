@@ -89,7 +89,13 @@
       await bratraxSwitchClient(id);
       // Hard reload so Rill stores re-init for the new instance (per-client
       // DuckDB cache, metrics views, dashboards). Same effect as fresh login.
-      window.location.href = "/";
+      //
+      // Land on /developer rather than "/". Both end up at the same dashboard
+      // — the apex redirects here anyway — but "/" is the one URL whose
+      // response depends on the session, so it is the one URL a stale browser
+      // cache can answer with the logged-out marketing page. Going straight to
+      // /developer keeps a switch off that path entirely.
+      window.location.href = "/developer";
     } catch (e: any) {
       switching = false;
       open = false;

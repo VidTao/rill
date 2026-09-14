@@ -318,7 +318,12 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	// at the same paths remain as the fallback for in-app SPA navigation;
 	// direct visits hit these handlers first because the mux's explicit
 	// patterns take precedence over the SPA's catch-all.
-	serveGithubHTML := func(githubURL string) http.HandlerFunc {
+	//
+	// cacheControl is explicit per call site because these handlers are not all
+	// alike: most serve one document to everyone, but the apex picks its
+	// response from the visitor's session and so must never be stored. See the
+	// apex handler below for what caching a per-visitor response cost us.
+	serveGithubHTMLCached := func(githubURL, cacheControl string) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			body, fetchErr := fetchGithubStatic(githubURL)
 			if fetchErr != nil {
@@ -341,15 +346,22 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 					zap.String("path", r.URL.Path),
 					zap.String("github_url", githubURL),
 					zap.Error(fetchErr))
+				w.Header().Set("Cache-Control", cacheControl)
 				web.StaticHandler().ServeHTTP(w, r)
 				return
 			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Header().Set("Cache-Control", "public, max-age=300")
+			w.Header().Set("Cache-Control", cacheControl)
 			if _, writeErr := w.Write(body); writeErr != nil {
 				logger.Debug("marketing page write failed", zap.Error(writeErr))
 			}
 		}
+	}
+
+	// The auth-independent marketing pages: one document for every visitor, so
+	// a shared 5-minute cache is safe and keeps us inside GitHub's rate limit.
+	serveGithubHTML := func(githubURL string) http.HandlerFunc {
+		return serveGithubHTMLCached(githubURL, "public, max-age=300")
 	}
 
 	// Apex: authed users go to /developer, everyone else gets the marketing
@@ -357,19 +369,55 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	// the old apex handler enforced before being moved to +layout.ts in C25
 	// — keeping it server-side now so unauthed crawlers see proper meta tags
 	// without the iframe sandbox swallowing them.
+	//
+	// BOTH branches must be uncacheable: the response is chosen from the
+	// visitor's session, and "/" is the one URL whose answer flips between two
+	// visits by the same browser. Between 2026-05-12 and 2026-09-14 the
+	// anonymous branch inherited serveGithubHTML's "public, max-age=300", so a
+	// single logged-out view of "/" parked the marketing page in the browser
+	// cache for five minutes. The client switcher navigates to "/" after a
+	// successful switch, and that navigation was answered from cache without
+	// ever reaching this handler — dropping a signed-in super_admin onto the
+	// public marketing site. The reload that followed replaced the cached entry
+	// with the no-store redirect below, which is why it always looked like an
+	// unreproducible one-off. Do not reintroduce a shared cache policy here.
 	observability.MuxHandle(mux, "GET /{$}",
 		observability.Middleware("bratrax", logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			toDeveloper := func() {
+				w.Header().Set("Cache-Control", "no-store")
+				http.Redirect(w, r, "/developer", http.StatusFound)
+			}
+
 			user, _, authErr := authMapper.ResolveClientFromCookie(r)
 			if authErr != nil {
-				logger.Debug("apex auth resolution error", zap.Error(authErr))
+				// Postgres wouldn't answer, so we cannot tell whether this
+				// visitor is signed in. Serving the marketing page here would
+				// silently log out a real user — and note that
+				// ResolveClientFromCookie returns a non-nil user alongside a
+				// client-lookup error, which the previous `user = nil` threw
+				// away. A session cookie is enough to treat them as probably
+				// authed and let the SPA re-check: /developer bounces to
+				// /login?redirect= if the session really is invalid. A visitor
+				// with no cookie is definitely anonymous and still gets a
+				// crawlable homepage, so a DB blip can't take marketing down.
+				//
+				// Warn, not Debug: production runs at InfoLevel, so a Debug
+				// line here would make this failure mode invisible.
+				logger.Warn("apex auth resolution failed", zap.Error(authErr))
+				if _, cookieErr := r.Cookie(bratraxCookieName); cookieErr == nil {
+					toDeveloper()
+					return
+				}
 				user = nil
 			}
 			if user != nil {
-				w.Header().Set("Cache-Control", "no-store")
-				http.Redirect(w, r, "/developer", http.StatusFound)
+				toDeveloper()
 				return
 			}
-			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/index.html")(w, r)
+			serveGithubHTMLCached(
+				"https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/index.html",
+				"private, no-store",
+			)(w, r)
 		})))
 
 	observability.MuxHandle(mux, "GET /faq",
