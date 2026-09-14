@@ -8,6 +8,7 @@ import type {
   InvitationPreview,
   InviteResult,
   MCPSettings,
+  OrderExclusions,
   Role,
   SlackInstallLink,
   SlackSettings,
@@ -74,6 +75,31 @@ export function updateBrandDomains(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ brand_domains }),
+  });
+}
+
+// ----- Excluded order tags ---------------------------------------------------
+//
+// Merchant order tags that take an order out of scope for reporting, for a
+// store that sells DTC and wholesale through one storefront. Matching is
+// exact-token and case-insensitive against Shopify's comma-separated tags, and
+// removes the order from dim_orders plus its line items and transactions -- so
+// every attributed sale and refund it carries goes with it.
+//
+// Read at COMPILE time, so a save triggers a background compile+deploy for that
+// client. Poll getOrderExclusions() for apply_status while it runs.
+
+export function getOrderExclusions(): Promise<OrderExclusions> {
+  return apiFetch<OrderExclusions>("/bratrax/settings/order-exclusions");
+}
+
+export function updateOrderExclusions(
+  excluded_order_tags: string[],
+): Promise<OrderExclusions> {
+  return apiFetch<OrderExclusions>("/bratrax/settings/order-exclusions", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ excluded_order_tags }),
   });
 }
 

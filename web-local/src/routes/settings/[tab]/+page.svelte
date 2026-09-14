@@ -37,6 +37,7 @@
     TeamMember,
   } from "$lib/bratrax/settings/types";
   import BrandDomainsEditor from "$lib/bratrax/BrandDomainsEditor.svelte";
+  import OrderExclusionsEditor from "$lib/bratrax/OrderExclusionsEditor.svelte";
 
   type TabId = "account" | "team" | "billing" | "ai" | "mcp" | "slack";
 
@@ -724,6 +725,19 @@
           Your other domains
         </h2>
         <BrandDomainsEditor embedded={true} />
+      </div>
+
+      <!-- Excluded order tags: for a store selling DTC and wholesale through
+           one storefront. Sits beside brand domains because both are merchant
+           declarations the compiler cannot infer, and both save through a
+           background compile+deploy. -->
+      <div class="mt-8 border-t border-bratrax-border pt-6">
+        <h2
+          class="mb-3 font-mono text-[11px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+        >
+          Exclude orders by tag
+        </h2>
+        <OrderExclusionsEditor embedded={true} />
       </div>
     {/if}
 

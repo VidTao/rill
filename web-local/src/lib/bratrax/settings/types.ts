@@ -32,6 +32,21 @@ export interface BrandDomains {
   applied?: boolean;
 }
 
+export interface OrderExclusions {
+  /**
+   * Merchant order tags that take an order out of scope for reporting -- the
+   * wholesale/B2B side of a storefront that also sells DTC. Stored with the
+   * merchant's own capitalisation; matching folds case at compile time.
+   */
+  excluded_order_tags: string[];
+  /** Reuses the brand-domains shape: same compile+deploy pipeline underneath. */
+  apply_status?: BrandDomainsApplyStatus;
+  /** PUT only: true when the value was saved but the client is not yet activated. */
+  pending_activation?: boolean;
+  /** PUT only: true when a compile+deploy was kicked off. */
+  applied?: boolean;
+}
+
 export interface TeamMember {
   id: number;
   email: string;
