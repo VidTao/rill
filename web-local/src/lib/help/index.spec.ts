@@ -1,61 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canAccess, HELP_PAGES, pagesFor, splitHelpBody } from "./index";
 
-describe("splitHelpBody loom fences", () => {
-  it("reads a bare video id, the form most articles still use", () => {
-    const segments = splitHelpBody("intro\n\n```loom\nabc123\n```\n\nafter");
-    expect(segments).toEqual([
-      { kind: "markdown", value: "intro" },
-      { kind: "loom", id: "abc123" },
-      { kind: "markdown", value: "after" },
-    ]);
-  });
-
-  it("reads a labelled fence, so the title can be the disclosure control", () => {
-    const segments = splitHelpBody(
-      "```loom\nid: abc123\nlabel: Store Performance\nduration: 1:46\n```",
-    );
-    expect(segments).toEqual([
-      {
-        kind: "loom",
-        id: "abc123",
-        label: "Store Performance",
-        duration: "1:46",
-      },
-    ]);
-  });
-
-  it("keeps a label containing a colon intact", () => {
-    const [segment] = splitHelpBody(
-      "```loom\nid: abc123\nlabel: Attribution: last-touch\n```",
-    );
-    expect(segment).toEqual({
-      kind: "loom",
-      id: "abc123",
-      label: "Attribution: last-touch",
-      duration: undefined,
-    });
-  });
-
-  it("drops a fence with no id rather than rendering a broken player", () => {
-    expect(splitHelpBody("```loom\n\n```")).toEqual([]);
-    expect(splitHelpBody("```loom\nlabel: orphan\n```")).toEqual([]);
-  });
-
-  it("keeps several fences and the prose between them in order", () => {
-    const segments = splitHelpBody(
-      "a\n\n```loom\none\n```\n\nb\n\n```loom\nid: two\nlabel: Two\n```",
-    );
-    expect(segments.map((s) => s.kind)).toEqual([
-      "markdown",
-      "loom",
-      "markdown",
-      "loom",
-    ]);
-    expect(segments[3]).toMatchObject({ id: "two", label: "Two" });
-  });
-});
-
 describe("splitHelpBody youtube fences", () => {
   it("reads a bare video id", () => {
     const segments = splitHelpBody("intro\n\n```youtube\ndQw4w9WgXcQ\n```\n\nafter");
@@ -86,18 +31,34 @@ describe("splitHelpBody youtube fences", () => {
     expect(segment).toEqual({ kind: "youtube", id: "CFD3-zAEkHk" });
   });
 
+  it("keeps a label containing a colon intact", () => {
+    const [segment] = splitHelpBody(
+      "```youtube\nid: abc123\nlabel: Attribution: last-touch\n```",
+    );
+    expect(segment).toEqual({
+      kind: "youtube",
+      id: "abc123",
+      label: "Attribution: last-touch",
+      duration: undefined,
+    });
+  });
+
   it("drops a fence with no id rather than rendering a broken player", () => {
     expect(splitHelpBody("```youtube\n\n```")).toEqual([]);
     expect(splitHelpBody("```youtube\nlabel: orphan\n```")).toEqual([]);
   });
 
-  it("recognizes loom and youtube fences side by side during the migration", () => {
+  it("keeps several fences and the prose between them in order", () => {
     const segments = splitHelpBody(
-      "```loom\nid: legacy\nlabel: Old\n```\n\n```youtube\nid: fresh\nlabel: New\n```",
+      "a\n\n```youtube\none\n```\n\nb\n\n```youtube\nid: two\nlabel: Two\n```",
     );
-    expect(segments.map((s) => s.kind)).toEqual(["loom", "youtube"]);
-    expect(segments[0]).toMatchObject({ id: "legacy" });
-    expect(segments[1]).toMatchObject({ id: "fresh" });
+    expect(segments.map((s) => s.kind)).toEqual([
+      "markdown",
+      "youtube",
+      "markdown",
+      "youtube",
+    ]);
+    expect(segments[3]).toMatchObject({ id: "two", label: "Two" });
   });
 });
 

@@ -13,9 +13,9 @@ hide_for_demo: true
 # Your first hour: guided video tour
 
 New to Bratrax? This guided path takes you around the whole app in about
-20 minutes of short videos. Each step has three parts: **watch** a 1–2 minute
-walkthrough, **try** one thing yourself, and **go deeper** when you want the
-full picture. Do it in order, or jump to what you need.
+20 minutes of short videos. Most steps have three parts: a short
+**walkthrough** to watch, one thing to **try** yourself, and a **go deeper**
+link when you want the full picture. Do it in order, or jump to what you need.
 
 Steps marked **(admins)** are for workspace admins — if you're a viewer, skip
 straight to step 4.
@@ -33,12 +33,6 @@ in dashboards that reconcile with your store, not with a pixel's opinion.
 
 ## 2. Connect your data (admins)
 
-```loom
-id: d3631b9edef54f58abed0cef24de3dfb
-label: Tab — Connectors
-duration: 0:49
-```
-
 Every platform you don't connect is data Bratrax can't show. The Connectors
 page lists your sources (Shopify, Google, Meta, TikTok, Klaviyo, Taboola,
 Outbrain, ...), per-account sync status, and the tracking templates for your
@@ -49,12 +43,6 @@ ad platforms.
 - **Go deeper:** [Connecting platforms](/help/admin/connecting-platforms)
 
 ## 3. Set up your costs (admins)
-
-```loom
-id: a0040b60800e4b66b4bc6df0d503afbe
-label: Tab — Cost Settings
-duration: 1:21
-```
 
 Profit metrics are only as good as the costs you feed them: COGS (pulled from
 Shopify automatically), shipping, payment-gateway fees, custom expenses, and —
@@ -67,10 +55,9 @@ if several stores share one ad account — your media-spend split.
 
 ## 4. Your daily health check
 
-```loom
-id: a8f9b4964a8e4c6baf6df6c71cd65a96
+```youtube
+id: Al_kvQ_xTNo
 label: Store Performance
-duration: 1:46
 ```
 
 The one dashboard to open every morning. Is the business up or down? Revenue,
@@ -81,10 +68,9 @@ returns, spend, MER, blended ROAS, new-vs-returning mix, subscription health.
 
 ## 5. Where your sales come from
 
-```loom
-id: c3a62d5c20d245aab5f86f578a5a851e
+```youtube
+id: CFD3-zAEkHk
 label: Attribution
-duration: 1:34
 ```
 
 The attribution dashboard drills from channel → source → campaign → ad set →
@@ -100,10 +86,9 @@ purchase.
 
 ## 6. What's selling
 
-```loom
-id: 9e8e37c1a3ec4c7a8966a2ac82e1e47c
+```youtube
+id: L5D4LtKd7kM
 label: Products
-duration: 1:17
 ```
 
 Product and SKU-level truth: net sales, units, discounts, top products, and a
@@ -114,10 +99,9 @@ full product/variant/SKU breakdown.
 
 ## 7. Your customers and subscriptions
 
-```loom
-id: ccd23ffea3b34320b2637286045f4821
-label: Customer Analytics
-duration: 1:42
+```youtube
+id: M2uY6yfmhVs
+label: Subscriber churn & MRR
 ```
 
 Customer base, LTV, cohorts, retention, MRR, and where your subscribers
@@ -129,10 +113,9 @@ actually come from — down to the campaign and ad set.
 
 ## 8. Email & SMS
 
-```loom
-id: 5094aa525d134bf4b3056f9cfd87edf2
+```youtube
+id: yCvXbhdIWF8
 label: Email & SMS
-duration: 1:29
 ```
 
 Klaviyo campaigns and flows: sends, opens, clicks, unsubscribes, list health,
@@ -144,15 +127,13 @@ and the lifetime revenue impact of your email/SMS program.
 
 ## 9. Meet your whole audience — not just buyers
 
-```loom
-id: 05bc62dcba1f4cce8e6e08d2b2ca5bf1
-label: Profile Explorer
-duration: 1:37
+```youtube
+id: hxXpd-MTuY0
+label: Retargeting & win-back audiences
 ```
-```loom
-id: f67431e8682f41a389b7e0e9ef3e3505
-label: Commerce Profile Graph
-duration: 2:13
+```youtube
+id: kM8Ybvm_iPM
+label: Customer LTV by channel
 ```
 
 Bratrax builds a profile for everyone it can see — customers, known leads,
@@ -167,12 +148,6 @@ anonymous, winback, ...), and recommends what to do with each group.
 
 ## 10. Ask the AI
 
-```loom
-id: 846726e08bd6449382a2520807cbeaec
-label: How to use AI inside Bratrax
-duration: 0:48
-```
-
 The dashboards answer the common questions; the AI answers the custom ones —
 cohort cuts, comparisons, "why did this move." In-app chat uses your own
 Anthropic API key (Settings → AI). If you already pay for a Claude
@@ -185,10 +160,9 @@ same data at no extra cost.
 
 ## 11. Make it yours
 
-```loom
-id: 58f3efa9a75e483892ebe484a6c59afa
-label: Customizing charts
-duration: 1:28
+```youtube
+id: pP0aEPqx0e4
+label: Customizing your dashboard
 ```
 
 Every dashboard is editable: change filters, date ranges, and attribution
@@ -197,28 +171,7 @@ models; add or modify charts; pick dimensions and metrics.
 - **Try:** add one chart to any dashboard (edit → + → pick a chart type).
 - **Go deeper:** [Dashboards](/help/admin/dashboards)
 
-## 12. Level up: Metric Trees
-
-```loom
-id: f7aad7273a09467fbb60b17e916a1ee0
-label: Metric Trees
-duration: 1:56
-```
-
-Turn your top-line KPI into a living decision tree — drivers, owned levers,
-and experiments, all wired to live data. Best once your data has settled in.
-
-- **Try:** seed the **paid acquisition** template and follow the
-  biggest-moving branch.
-- **Go deeper:** [Metric Trees](/help/admin/metric-trees)
-
-## 13. When you're stuck
-
-```loom
-id: fa947b32df364ecbbfb2d72208162d9e
-label: Tab — Help
-duration: 1:48
-```
+## 12. When you're stuck
 
 The help section covers every dashboard, metric, and setup step — searchable.
 Beyond that: in-app AI chat, the Bratrax Slack (fastest for bugs, via

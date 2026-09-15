@@ -49,10 +49,9 @@ whole store on one screen: revenue, ad spend, MER, blended ROAS, returns,
 new-vs-returning mix, subscription health. It's the one a founder or CFO opens
 every morning.
 
-```loom
-id: a8f9b4964a8e4c6baf6df6c71cd65a96
+```youtube
+id: Al_kvQ_xTNo
 label: Store Performance
-duration: 1:46
 ```
 
 - **Try:** find **MER** and **blended ROAS** in the tiles, then look at the
@@ -73,10 +72,9 @@ get that customer's real path from first touch to purchase — every ad, email,
 and visit, in order. That evidence trail is what separates a number you can act
 on from a number a pixel guessed at.
 
-```loom
-id: c3a62d5c20d245aab5f86f578a5a851e
+```youtube
+id: CFD3-zAEkHk
 label: Attribution
-duration: 1:34
 ```
 
 - **Try:** sort the table by spend to find the biggest channel, click it to
@@ -92,10 +90,9 @@ duration: 1:34
 units, discounts, top performers and the long tail, down to per-SKU and variant
 detail.
 
-```loom
-id: 9e8e37c1a3ec4c7a8966a2ac82e1e47c
+```youtube
+id: L5D4LtKd7kM
 label: Products
-duration: 1:17
 ```
 
 - **Try:** sort by net revenue to find the top SKU, then click a product to
@@ -108,10 +105,9 @@ duration: 1:17
 retention, LTV by segment, MRR and subscriber health — and which channels
 actually acquire valuable subscribers, not just cheap ones.
 
-```loom
-id: ccd23ffea3b34320b2637286045f4821
-label: Customer Analytics
-duration: 1:42
+```youtube
+id: M2uY6yfmhVs
+label: Subscriber churn & MRR
 ```
 
 - **Try:** sort subscriber acquisition by **subscriber LTV** rather than volume,
@@ -124,10 +120,9 @@ duration: 1:42
 flows, sends and opens and unsubscribes, list health, and the lifetime revenue
 the programme drives.
 
-```loom
-id: 5094aa525d134bf4b3056f9cfd87edf2
+```youtube
+id: yCvXbhdIWF8
 label: Email & SMS
-duration: 1:29
 ```
 
 - **Try:** sort campaigns by attributed sales, then glance at list health for
@@ -145,16 +140,14 @@ grouped into segments, each with a recommended action.
 is the same picture in aggregate: how much of the audience is reachable, and
 where the best customers come from.
 
-```loom
-id: 05bc62dcba1f4cce8e6e08d2b2ca5bf1
-label: Profile Explorer
-duration: 1:37
+```youtube
+id: hxXpd-MTuY0
+label: Retargeting & win-back audiences
 ```
 
-```loom
-id: f67431e8682f41a389b7e0e9ef3e3505
-label: Commerce Profile Graph
-duration: 2:13
+```youtube
+id: kM8Ybvm_iPM
+label: Customer LTV by channel
 ```
 
 - **Try:** in Profile Explorer, expand a segment to see the individual profiles
@@ -183,8 +176,8 @@ before you decide anything.
 That link signs you out of the demo — this shared account is the only thing you
 lose, and the tour is here whenever you want it back.
 
-The full product tour — including the admin side (connecting platforms, cost
-settings, metric trees) — is at
+The full product tour — including the admin side (connecting platforms and
+cost settings) — is at
 [Your first hour: guided video tour](/help/start-here).
 
 ## Questions

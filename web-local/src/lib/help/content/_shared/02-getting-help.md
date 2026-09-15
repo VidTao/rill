@@ -10,12 +10,6 @@ status: ready
 
 ## What's the fastest way to get support?
 
-```loom
-id: fa947b32df364ecbbfb2d72208162d9e
-label: Tab — Help
-duration: 1:48
-```
-
 Three options, ranked by speed:
 
 1. **In-app chat** — use the chat icon while you're working in Bratrax. Fastest for product questions. Note: in-app chat requires you to have your Anthropic API key connected under Settings → AI. If you haven't set that up yet, use Slack or email instead.

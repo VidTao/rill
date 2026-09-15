@@ -4,7 +4,6 @@
   import { bratraxIsDemo, bratraxUser } from "$lib/bratrax/auth-store";
   import { canAccess, getHelpPage, splitHelpBody } from "$lib/help";
   import Markdown from "@rilldata/web-common/components/markdown/Markdown.svelte";
-  import LoomEmbed from "$lib/help/LoomEmbed.svelte";
   import YouTubeEmbed from "$lib/help/YouTubeEmbed.svelte";
 
   $: slug = $page.params.slug ?? "";
@@ -18,7 +17,6 @@
   // still reading takes the handshake off that path; the connection is then
   // reused by every later video on the page. Only emitted for articles that have
   // one, so the rest of the help center opens no idle sockets.
-  $: hasLoom = segments.some((s) => s.kind === "loom");
   $: hasYouTube = segments.some((s) => s.kind === "youtube");
 
   // If a viewer hits an admin-only page — or anyone outside the demo
@@ -29,10 +27,6 @@
 </script>
 
 <svelte:head>
-  {#if hasLoom}
-    <link rel="preconnect" href="https://www.loom.com" />
-    <link rel="preconnect" href="https://cdn.loom.com" />
-  {/if}
   {#if hasYouTube}
     <link rel="preconnect" href="https://www.youtube-nocookie.com" />
     <link rel="preconnect" href="https://i.ytimg.com" />
@@ -62,12 +56,6 @@
     {#each segments as segment}
       {#if segment.kind === "youtube"}
         <YouTubeEmbed
-          id={segment.id}
-          label={segment.label ?? ""}
-          duration={segment.duration ?? ""}
-        />
-      {:else if segment.kind === "loom"}
-        <LoomEmbed
           id={segment.id}
           label={segment.label ?? ""}
           duration={segment.duration ?? ""}
