@@ -56,6 +56,51 @@ describe("splitHelpBody loom fences", () => {
   });
 });
 
+describe("splitHelpBody youtube fences", () => {
+  it("reads a bare video id", () => {
+    const segments = splitHelpBody("intro\n\n```youtube\ndQw4w9WgXcQ\n```\n\nafter");
+    expect(segments).toEqual([
+      { kind: "markdown", value: "intro" },
+      { kind: "youtube", id: "dQw4w9WgXcQ" },
+      { kind: "markdown", value: "after" },
+    ]);
+  });
+
+  it("reads a labelled fence, so the title can be the disclosure control", () => {
+    const segments = splitHelpBody(
+      "```youtube\nid: Al_kvQ_xTNo\nlabel: Store Performance\nduration: 1:46\n```",
+    );
+    expect(segments).toEqual([
+      {
+        kind: "youtube",
+        id: "Al_kvQ_xTNo",
+        label: "Store Performance",
+        duration: "1:46",
+      },
+    ]);
+  });
+
+  it("keeps an id that contains a hyphen intact (YouTube ids often do)", () => {
+    // A bare id like "CFD3-zAEkHk" must not be mistaken for a "key: value" line.
+    const [segment] = splitHelpBody("```youtube\nCFD3-zAEkHk\n```");
+    expect(segment).toEqual({ kind: "youtube", id: "CFD3-zAEkHk" });
+  });
+
+  it("drops a fence with no id rather than rendering a broken player", () => {
+    expect(splitHelpBody("```youtube\n\n```")).toEqual([]);
+    expect(splitHelpBody("```youtube\nlabel: orphan\n```")).toEqual([]);
+  });
+
+  it("recognizes loom and youtube fences side by side during the migration", () => {
+    const segments = splitHelpBody(
+      "```loom\nid: legacy\nlabel: Old\n```\n\n```youtube\nid: fresh\nlabel: New\n```",
+    );
+    expect(segments.map((s) => s.kind)).toEqual(["loom", "youtube"]);
+    expect(segments[0]).toMatchObject({ id: "legacy" });
+    expect(segments[1]).toMatchObject({ id: "fresh" });
+  });
+});
+
 describe("sidebar visibility", () => {
   const ROLES = ["viewer", "admin", "super_admin", null] as const;
 

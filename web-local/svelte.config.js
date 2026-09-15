@@ -11,10 +11,15 @@ const config = {
     adapter: adapter({
       fallback: "index.html",
     }),
-    // TODO: enable CSP after addressing error in Pylon and Codemirror
+    // TODO: enable CSP after addressing error in Pylon and Codemirror.
+    // When it is enabled, `frame-src` must allow the help-center video host
+    // (walkthroughs are embedded from YouTube's privacy-enhanced domain).
+    // The production nginx CSP needs the same `frame-src` entry — that is where
+    // CSP is actually enforced today; this block is inert until uncommented.
     // csp: {
     //   directives: {
     //     "script-src": ["self"],
+    //     "frame-src": ["https://www.youtube-nocookie.com"],
     //   },
     // },
     files: {
