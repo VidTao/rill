@@ -953,7 +953,7 @@
       url.searchParams.delete("scopes");
       window.history.replaceState({}, "", url.toString());
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      bounceOutOfOAuth(e instanceof Error ? e.message : String(e));
     } finally {
       loading = "";
     }
@@ -994,7 +994,7 @@
       url.searchParams.delete("scopes");
       window.history.replaceState({}, "", url.toString());
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      bounceOutOfOAuth(e instanceof Error ? e.message : String(e));
     } finally {
       loading = "";
     }
@@ -1034,7 +1034,7 @@
       url.searchParams.delete("state");
       window.history.replaceState({}, "", url.toString());
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      bounceOutOfOAuth(e instanceof Error ? e.message : String(e));
     } finally {
       loading = "";
     }
@@ -1047,12 +1047,20 @@
   // back to /connectors via `connectors_error` when that's where we came from.
   function bounceOutOfOAuth(message: string) {
     isOAuthBounce = false;
+    // Strip every callback param the six redirect flows can land with, so a
+    // refresh doesn't replay a spent auth code. Microsoft burns the code on the
+    // first exchange and then answers AADSTS70000 ("code has expired") for the
+    // replay, which buries the real error under a misleading one. All deletes
+    // must precede replaceState — two of them used to sit after it, which meant
+    // the Amazon SP-API params were never actually removed.
     const url = new URL(window.location.href);
     url.searchParams.delete("code");
     url.searchParams.delete("state");
-    window.history.replaceState({}, "", url.toString());
+    url.searchParams.delete("auth_code");
+    url.searchParams.delete("scopes");
     url.searchParams.delete("spapi_oauth_code");
     url.searchParams.delete("selling_partner_id");
+    window.history.replaceState({}, "", url.toString());
     sessionStorage.removeItem("pinterest_ads_oauth_state");
     sessionStorage.removeItem("bing_ads_oauth_state");
     sessionStorage.removeItem("klaviyo_oauth_state");
