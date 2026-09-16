@@ -4,20 +4,20 @@
   import { bratraxIsDemo, bratraxUser } from "$lib/bratrax/auth-store";
   import { canAccess, getHelpPage, splitHelpBody } from "$lib/help";
   import Markdown from "@rilldata/web-common/components/markdown/Markdown.svelte";
-  import LoomEmbed from "$lib/help/LoomEmbed.svelte";
+  import YouTubeEmbed from "$lib/help/YouTubeEmbed.svelte";
 
   $: slug = $page.params.slug ?? "";
   $: helpPage = getHelpPage(slug);
   $: role = $bratraxUser?.role ?? null;
   $: segments = helpPage ? splitHelpBody(helpPage.body) : [];
 
-  // LoomEmbed creates its iframe on click rather than on mount, which keeps a
-  // 13-video article cheap but puts the whole cold start — DNS, TCP, TLS, then
-  // the player itself — after the click. Preconnecting while the reader is still
-  // reading takes the handshake off that path; the connection is then reused by
-  // every later video on the page. Only emitted for articles that have one, so
-  // the rest of the help center opens no idle sockets.
-  $: hasLoom = segments.some((s) => s.kind === "loom");
+  // The video embeds create their iframe on click rather than on mount, which
+  // keeps a 13-video article cheap but puts the whole cold start — DNS, TCP, TLS,
+  // then the player itself — after the click. Preconnecting while the reader is
+  // still reading takes the handshake off that path; the connection is then
+  // reused by every later video on the page. Only emitted for articles that have
+  // one, so the rest of the help center opens no idle sockets.
+  $: hasYouTube = segments.some((s) => s.kind === "youtube");
 
   // If a viewer hits an admin-only page — or anyone outside the demo
   // workspace hits a demo-only one — send them to /help.
@@ -27,9 +27,9 @@
 </script>
 
 <svelte:head>
-  {#if hasLoom}
-    <link rel="preconnect" href="https://www.loom.com" />
-    <link rel="preconnect" href="https://cdn.loom.com" />
+  {#if hasYouTube}
+    <link rel="preconnect" href="https://www.youtube-nocookie.com" />
+    <link rel="preconnect" href="https://i.ytimg.com" />
   {/if}
 </svelte:head>
 
@@ -54,8 +54,8 @@
     </div>
 
     {#each segments as segment}
-      {#if segment.kind === "loom"}
-        <LoomEmbed
+      {#if segment.kind === "youtube"}
+        <YouTubeEmbed
           id={segment.id}
           label={segment.label ?? ""}
           duration={segment.duration ?? ""}

@@ -1,36 +1,42 @@
 import { describe, expect, it } from "vitest";
 import { canAccess, HELP_PAGES, pagesFor, splitHelpBody } from "./index";
 
-describe("splitHelpBody loom fences", () => {
-  it("reads a bare video id, the form most articles still use", () => {
-    const segments = splitHelpBody("intro\n\n```loom\nabc123\n```\n\nafter");
+describe("splitHelpBody youtube fences", () => {
+  it("reads a bare video id", () => {
+    const segments = splitHelpBody("intro\n\n```youtube\ndQw4w9WgXcQ\n```\n\nafter");
     expect(segments).toEqual([
       { kind: "markdown", value: "intro" },
-      { kind: "loom", id: "abc123" },
+      { kind: "youtube", id: "dQw4w9WgXcQ" },
       { kind: "markdown", value: "after" },
     ]);
   });
 
   it("reads a labelled fence, so the title can be the disclosure control", () => {
     const segments = splitHelpBody(
-      "```loom\nid: abc123\nlabel: Store Performance\nduration: 1:46\n```",
+      "```youtube\nid: Al_kvQ_xTNo\nlabel: Store Performance\nduration: 1:46\n```",
     );
     expect(segments).toEqual([
       {
-        kind: "loom",
-        id: "abc123",
+        kind: "youtube",
+        id: "Al_kvQ_xTNo",
         label: "Store Performance",
         duration: "1:46",
       },
     ]);
   });
 
+  it("keeps an id that contains a hyphen intact (YouTube ids often do)", () => {
+    // A bare id like "CFD3-zAEkHk" must not be mistaken for a "key: value" line.
+    const [segment] = splitHelpBody("```youtube\nCFD3-zAEkHk\n```");
+    expect(segment).toEqual({ kind: "youtube", id: "CFD3-zAEkHk" });
+  });
+
   it("keeps a label containing a colon intact", () => {
     const [segment] = splitHelpBody(
-      "```loom\nid: abc123\nlabel: Attribution: last-touch\n```",
+      "```youtube\nid: abc123\nlabel: Attribution: last-touch\n```",
     );
     expect(segment).toEqual({
-      kind: "loom",
+      kind: "youtube",
       id: "abc123",
       label: "Attribution: last-touch",
       duration: undefined,
@@ -38,19 +44,19 @@ describe("splitHelpBody loom fences", () => {
   });
 
   it("drops a fence with no id rather than rendering a broken player", () => {
-    expect(splitHelpBody("```loom\n\n```")).toEqual([]);
-    expect(splitHelpBody("```loom\nlabel: orphan\n```")).toEqual([]);
+    expect(splitHelpBody("```youtube\n\n```")).toEqual([]);
+    expect(splitHelpBody("```youtube\nlabel: orphan\n```")).toEqual([]);
   });
 
   it("keeps several fences and the prose between them in order", () => {
     const segments = splitHelpBody(
-      "a\n\n```loom\none\n```\n\nb\n\n```loom\nid: two\nlabel: Two\n```",
+      "a\n\n```youtube\none\n```\n\nb\n\n```youtube\nid: two\nlabel: Two\n```",
     );
     expect(segments.map((s) => s.kind)).toEqual([
       "markdown",
-      "loom",
+      "youtube",
       "markdown",
-      "loom",
+      "youtube",
     ]);
     expect(segments[3]).toMatchObject({ id: "two", label: "Two" });
   });

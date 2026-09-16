@@ -10,10 +10,9 @@ status: ready
 
 Use [**Email & SMS**](https://bratrax.com/canvas/email_marketing) to understand lifecycle marketing: campaigns, flows, sends, opens, clicks, unsubs, and email-attributed sales.
 
-```loom
-id: 5094aa525d134bf4b3056f9cfd87edf2
+```youtube
+id: yCvXbhdIWF8
 label: Email & SMS
-duration: 1:29
 ```
 
 ## Look first at

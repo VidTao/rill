@@ -13,11 +13,6 @@ company details, the team, billing, and integrations. Open it from the
 **SETTINGS** dropdown in the top header (visible to admins; viewers don't see
 this menu).
 
-```loom
-id: aeca0d86c03641ee959a15ca745d6f8b
-label: Settings
-```
-
 Settings is **not** where costs live. COGS, shipping, gateway fees, custom
 expenses, and ad-spend scoping have their own page — **Cost settings**, also in
 the SETTINGS dropdown — open it at

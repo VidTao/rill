@@ -203,20 +203,21 @@ export function canAccess(
 
 export type HelpSegment =
   | { kind: "markdown"; value: string }
-  | { kind: "loom"; id: string; label?: string; duration?: string };
+  | { kind: "youtube"; id: string; label?: string; duration?: string };
 
-// Splits a help body into markdown runs and Loom video embeds. A video is
-// authored as a fenced ```loom block, either as a bare video id:
+// Splits a help body into markdown runs and walkthrough-video embeds. A video is
+// authored as a fenced ```youtube block (the Bratrax walkthroughs live on
+// YouTube), either as a bare video id:
 //
-//   ```loom
-//   58f3efa9a75e483892ebe484a6c59afa
+//   ```youtube
+//   dQw4w9WgXcQ
 //   ```
 //
 // or with a label and duration, which turn the embed into a titled disclosure
 // the reader clicks to open:
 //
-//   ```loom
-//   id: 58f3efa9a75e483892ebe484a6c59afa
+//   ```youtube
+//   id: dQw4w9WgXcQ
 //   label: Store Performance
 //   duration: 1:46
 //   ```
@@ -226,10 +227,10 @@ export type HelpSegment =
 // player looks like a disclosure but cannot be clicked.
 //
 // The shared Markdown component sanitizes out iframes (it also renders AI chat
-// output), so the help page renders loom segments with the LoomEmbed component
-// instead of loosening that sanitizer.
+// output), so the help page renders video segments with the YouTubeEmbed
+// component instead of loosening that sanitizer.
 export function splitHelpBody(body: string): HelpSegment[] {
-  const re = /```loom\s*\n([\s\S]*?)```/g;
+  const re = /```youtube\s*\n([\s\S]*?)```/g;
   const segments: HelpSegment[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
@@ -238,7 +239,7 @@ export function splitHelpBody(body: string): HelpSegment[] {
       const md = body.slice(last, m.index).trim();
       if (md) segments.push({ kind: "markdown", value: md });
     }
-    const seg = parseLoomFence(m[1]);
+    const seg = parseVideoFence(m[1]);
     if (seg) segments.push(seg);
     last = re.lastIndex;
   }
@@ -247,18 +248,18 @@ export function splitHelpBody(body: string): HelpSegment[] {
   return segments;
 }
 
-function parseLoomFence(raw: string): HelpSegment | null {
+function parseVideoFence(raw: string): HelpSegment | null {
   const lines = raw
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
   if (!lines.length) return null;
 
-  // Bare-id form: the whole fence is the id. A Loom id never contains a colon,
-  // so any "key: value" first line means the fence is the keyed form — treating
-  // it as bare would silently embed "label: …" as the video id.
+  // Bare-id form: the whole fence is the id. A YouTube id never contains a
+  // colon, so any "key: value" first line means the fence is the keyed form —
+  // treating it as bare would silently embed "label: …" as the id.
   if (!/^[a-zA-Z_-]+\s*:/.test(lines[0])) {
-    return { kind: "loom", id: lines[0] };
+    return { kind: "youtube", id: lines[0] };
   }
 
   const fields: Record<string, string> = {};
@@ -269,7 +270,7 @@ function parseLoomFence(raw: string): HelpSegment | null {
   }
   if (!fields.id) return null;
   return {
-    kind: "loom",
+    kind: "youtube",
     id: fields.id,
     label: fields.label || undefined,
     duration: fields.duration || undefined,

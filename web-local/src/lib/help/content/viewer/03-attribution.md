@@ -10,13 +10,17 @@ status: ready
 
 Use [**Attribution**](https://bratrax.com/canvas/campaign_deep_dive) when you want to know where sales came from and which channels, campaigns, ad sets, or ads deserve credit.
 
-```loom
-id: c3a62d5c20d245aab5f86f578a5a851e
+```youtube
+id: CFD3-zAEkHk
 label: Attribution
-duration: 1:34
 ```
 
 The dashboard defaults to **last-touch** attribution. That means the last eligible source before the purchase gets credit.
+
+```youtube
+id: q0C6chIAcyg
+label: Attribution models explained
+```
 
 ## Look first at
 

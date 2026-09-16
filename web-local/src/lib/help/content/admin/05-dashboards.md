@@ -10,10 +10,9 @@ status: ready
 
 A **canvas dashboard** is the layout viewers see. It's a YAML file in `/dashboards/` that arranges tiles in a grid powered by metrics views.
 
-```loom
-id: 58f3efa9a75e483892ebe484a6c59afa
-label: Customizing charts
-duration: 1:28
+```youtube
+id: pP0aEPqx0e4
+label: Customizing your dashboard
 ```
 
 ## A minimum canvas

@@ -1,14 +1,17 @@
 <script lang="ts">
-  // Renders a Bratrax walkthrough video as a disclosure: a compact titled row
-  // the reader clicks to open the player. Used only by the help center (see
-  // help/[...slug]/+page.svelte). The generic Markdown component strips iframes
-  // via DOMPurify, so video embeds are handled here as a trusted, code-owned
-  // component rather than as raw HTML in markdown.
+  // Renders a Bratrax walkthrough video (YouTube) as a disclosure: a compact
+  // titled row the reader clicks to open the player. Used only by the help
+  // center (see help/[...slug]/+page.svelte). The generic Markdown component
+  // strips iframes via DOMPurify, so video embeds are handled here as a trusted,
+  // code-owned component rather than as raw HTML in markdown.
   //
-  // The iframe is created on open, not on mount. Loom's embed boots a heavy
-  // player per instance and some articles carry a dozen videos (start-here has
-  // 13), so mounting them all made the page crawl even with loading="lazy".
-  // Until a visitor asks for a video, this costs one button and no network.
+  // This is the YouTube successor to LoomEmbed: the help walkthroughs moved from
+  // Loom to the Bratrax YouTube channel. Behaviour is deliberately identical.
+  //
+  // The iframe is created on open, not on mount. The player boots a heavy embed
+  // per instance and some articles carry a dozen videos (the guided tour does),
+  // so mounting them all made the page crawl even with loading="lazy". Until a
+  // visitor asks for a video, this costs one button and no network.
   //
   // Colors come from the Bratrax theme tokens (src/bratrax-theme.css), not from
   // Tailwind's slate palette: the help center runs in both themes, and hardcoded
@@ -19,27 +22,26 @@
 
   let open = false;
 
-  const panelId = `loom-panel-${id}`;
+  const panelId = `youtube-panel-${id}`;
 
-  // Deliberately no `autoplay` param: opening a disclosure loads the player and
-  // stops, so the reader presses play themselves. Autoplaying meant expanding
-  // two stops of a tour started two videos talking over each other, and it also
-  // made the open feel slow — the player could not paint until it had fetched
-  // enough video to begin, where a paused player shows Loom's poster frame as
-  // soon as the embed lands.
+  // youtube-nocookie.com is YouTube's privacy-enhanced host: it sets no tracking
+  // cookie until the viewer actually starts playback, which keeps a help page
+  // that merely lists videos cookie-free. `rel=0` limits the end-screen
+  // suggestions to the Bratrax channel rather than the open web.
   //
-  // `allow="autoplay"` stays on the iframe. It grants nothing on its own (the
-  // URL decides), and it keeps Loom's own controls working for anything that
-  // resumes playback without a fresh click inside the frame.
-  $: src =
-    `https://www.loom.com/embed/${id}` +
-    `?hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true`;
+  // Deliberately no `autoplay`: opening a disclosure loads the player and stops,
+  // so the reader presses play themselves. Autoplaying meant expanding two stops
+  // of a tour started two videos talking over each other. `allow="autoplay"`
+  // stays on the iframe — it grants nothing on its own (the URL decides) and
+  // keeps YouTube's own controls working for anything that resumes playback
+  // without a fresh click inside the frame.
+  $: src = `https://www.youtube-nocookie.com/embed/${id}?rel=0`;
 </script>
 
-<div class="loom">
+<div class="video">
   <button
     type="button"
-    class="loom-toggle"
+    class="video-toggle"
     class:is-open={open}
     aria-expanded={open}
     aria-controls={panelId}
@@ -62,7 +64,7 @@
         {src}
         title={label ? `${label} walkthrough` : "Bratrax walkthrough video"}
         frameborder="0"
-        allow="autoplay; fullscreen"
+        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
         allowfullscreen
       ></iframe>
     </div>
@@ -70,10 +72,10 @@
 </div>
 
 <style lang="postcss">
-  .loom {
+  .video {
     margin: 14px 0 20px;
   }
-  .loom-toggle {
+  .video-toggle {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -89,11 +91,11 @@
       border-color 150ms ease,
       background-color 150ms ease;
   }
-  .loom-toggle:hover {
+  .video-toggle:hover {
     background: var(--color-elevated);
     border-color: var(--color-acid);
   }
-  .loom-toggle:focus-visible {
+  .video-toggle:focus-visible {
     outline: 2px solid var(--color-acid);
     outline-offset: 2px;
   }
