@@ -37,6 +37,11 @@
     createOneTimeExpense,
   } from "$lib/bratrax/costs/api";
   import { currencySymbol } from "$lib/bratrax/costs/currency";
+  import {
+    SHIPPING_REGIONS,
+    SUGGESTED_REGION_CODES,
+    regionLabel,
+  } from "$lib/bratrax/costs/regions";
 
   const tabs: { id: CostTab; label: string; icon: string }[] = [
     { id: "cogs", label: "Cost of Goods", icon: "📦" },
@@ -81,6 +86,10 @@
   // Shipping state
   let shippingCostMode: "customer_charges" | "flat_rate" = "customer_charges";
   let defaultShippingCost = 0;
+  // Per-region overrides on top of defaultShippingCost. Kept as a list so rows
+  // stay editable (and reorderable) in the UI; saved as a { code: rate } map.
+  let shippingRegionRates: { code: string; rate: number }[] = [];
+  $: usedRegionCodes = new Set(shippingRegionRates.map((r) => r.code));
 
   // Gateway edit state
   let editingGateway: string | null = null;
@@ -206,6 +215,17 @@
       if (Number.isFinite(parsedShippingCost) && parsedShippingCost >= 0) {
         defaultShippingCost = parsedShippingCost;
       }
+      // Stored as a bare object, not wrapped in { value } — the settings
+      // writer keeps dicts as-is and only wraps scalars.
+      const regionRates = storeSettings?.shipping_region_rates as
+        | Record<string, unknown>
+        | undefined;
+      if (regionRates && typeof regionRates === "object") {
+        shippingRegionRates = Object.entries(regionRates)
+          .map(([code, rate]) => ({ code, rate: Number(rate) }))
+          .filter((r) => Number.isFinite(r.rate) && r.rate >= 0)
+          .sort((a, b) => regionLabel(a.code).localeCompare(regionLabel(b.code)));
+      }
     } catch (e) {
       showError(e instanceof Error ? e.message : "Failed to load settings");
     } finally {
@@ -245,9 +265,40 @@
 
   // --- Shipping handlers ---
 
+  function addRegionRate() {
+    const next = SHIPPING_REGIONS.find((r) => !usedRegionCodes.has(r.code));
+    if (!next) return;
+    shippingRegionRates = [
+      ...shippingRegionRates,
+      { code: next.code, rate: defaultShippingCost },
+    ];
+  }
+
+  function removeRegionRate(index: number) {
+    shippingRegionRates = shippingRegionRates.filter((_, i) => i !== index);
+  }
+
+  /** Offer the regions that usually cost more, at a rate the merchant edits. */
+  function suggestRegionRates() {
+    shippingRegionRates = SUGGESTED_REGION_CODES.filter(
+      (code) => !usedRegionCodes.has(code),
+    )
+      .map((code) => ({ code, rate: defaultShippingCost }))
+      .concat(shippingRegionRates);
+  }
+
   async function handleSaveShippingSettings() {
     if (!Number.isFinite(defaultShippingCost) || defaultShippingCost < 0) {
       showError("Default shipping cost must be a non-negative number");
+      return;
+    }
+    if (shippingRegionRates.some((r) => !Number.isFinite(r.rate) || r.rate < 0)) {
+      showError("Every regional shipping cost must be a non-negative number");
+      return;
+    }
+    // A duplicated region would silently drop a row when keyed into the map.
+    if (usedRegionCodes.size !== shippingRegionRates.length) {
+      showError("Each region can only be listed once");
       return;
     }
 
@@ -256,6 +307,9 @@
       await saveStoreSettings({
         shipping_cost_mode: shippingCostMode,
         default_shipping_cost: defaultShippingCost,
+        shipping_region_rates: Object.fromEntries(
+          shippingRegionRates.map((r) => [r.code, r.rate]),
+        ),
       });
       showSaved("Shipping settings saved. Dashboard refresh queued.");
     } catch (e) {
@@ -946,7 +1000,7 @@
                     <label
                       class="mb-1 block font-mono text-[11px] font-bold uppercase text-bratrax-text-muted"
                     >
-                      Cost per order
+                      Default cost per order
                     </label>
                     <div class="flex items-center gap-2">
                       <span class="text-sm text-bratrax-text-muted"
@@ -959,6 +1013,85 @@
                         class="w-32 border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
                         bind:value={defaultShippingCost}
                       />
+                    </div>
+                    <div class="mt-1 text-xs text-bratrax-text-muted">
+                      Applied to every order without a regional cost below.
+                    </div>
+
+                    <div class="mt-5 border-t border-bratrax-border pt-4">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <div
+                            class="font-mono text-[11px] font-bold uppercase text-bratrax-text-muted"
+                          >
+                            Regional costs
+                          </div>
+                          <div class="mt-1 text-xs text-bratrax-text-muted">
+                            Charge a different cost where shipping is more
+                            expensive — Alaska, Hawaii and Puerto Rico
+                            typically are.
+                          </div>
+                        </div>
+                        <div class="flex gap-2">
+                          {#if shippingRegionRates.length === 0}
+                            <button
+                              type="button"
+                              class="btn-bratrax btn-compact"
+                              on:click={suggestRegionRates}
+                            >
+                              Add AK / HI / PR
+                            </button>
+                          {/if}
+                          <button
+                            type="button"
+                            class="btn-bratrax btn-compact"
+                            on:click={addRegionRate}
+                          >
+                            + Add region
+                          </button>
+                        </div>
+                      </div>
+
+                      {#if shippingRegionRates.length > 0}
+                        <div class="mt-3 space-y-2">
+                          {#each shippingRegionRates as row, i (i)}
+                            <div class="flex items-center gap-2">
+                              <select
+                                class="w-64 border border-bratrax-border bg-bratrax-surface px-2 py-2 text-sm"
+                                bind:value={row.code}
+                              >
+                                {#each SHIPPING_REGIONS as region (region.code)}
+                                  <option
+                                    value={region.code}
+                                    disabled={region.code !== row.code &&
+                                      usedRegionCodes.has(region.code)}
+                                  >
+                                    {region.label}
+                                  </option>
+                                {/each}
+                              </select>
+                              <span class="text-sm text-bratrax-text-muted"
+                                >{symbol}</span
+                              >
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                class="w-32 border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
+                                bind:value={row.rate}
+                              />
+                              <button
+                                type="button"
+                                class="btn-bratrax btn-compact"
+                                aria-label="Remove {regionLabel(row.code)}"
+                                on:click={() => removeRegionRate(i)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          {/each}
+                        </div>
+                      {/if}
                     </div>
                   </div>
                 {/if}
