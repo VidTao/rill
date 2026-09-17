@@ -10,6 +10,8 @@
     needsReconnectFromStackSelections,
     getOAuthConfig,
     verifyEmbedStatus,
+    fetchShopifyScopeStatus,
+    type ShopifyScopeGap,
   } from "$lib/bratrax/onboarding/api";
   import type { AdAccountInfo } from "$lib/bratrax/connectors/api";
   import AccountSelectionModal from "./AccountSelectionModal.svelte";
@@ -308,6 +310,20 @@
   let embedRecheckBusy = false;
   let embedRecheckMessage = "";
 
+  // Shopify scope-consent banner state. Surfaces when the merchant's token is
+  // missing a scope the app now declares in shopify.app.toml — which Shopify
+  // otherwise only re-prompts for inside the Shopify admin, somewhere a
+  // bratrax.com-native merchant never goes. Stays empty unless the backend
+  // actually reached Shopify (`checked`), so an unreachable Shopify renders
+  // nothing rather than claiming every permission is missing.
+  let shopifyMissingScopes: ShopifyScopeGap[] = [];
+  let shopifyConsentUrl = "";
+  // Set from ?shopify_scopes=updated, the marker the OAuth callback returns
+  // with. Without it a merchant who just granted would land back on a page
+  // that either still shows the banner (Shopify propagation lag) or shows
+  // nothing at all — both read as "did that work?".
+  let scopeGrantReturned = false;
+
   // External-pages install flow: clicking the "External Landing Pages"
   // card opens a builder picker (Funnelish active, ClickFunnels / GHL /
   // Custom coming soon); picking a builder opens the matching install
@@ -361,6 +377,16 @@
 
   $: showShopifyEmbedBanner =
     connectedPlatforms.has("shopify") && !shopifyEmbedEnabled;
+
+  $: showShopifyScopeBanner =
+    connectedPlatforms.has("shopify") &&
+    shopifyMissingScopes.length > 0 &&
+    !!shopifyConsentUrl;
+  // Only worth a confirmation while nothing is outstanding. If they came back
+  // from a grant and scopes are STILL missing, the banner below says so and a
+  // "you're all set" line next to it would contradict it.
+  $: showScopeGrantConfirmation =
+    scopeGrantReturned && !showShopifyScopeBanner;
   $: themeEditorUrl = shopifyShopDomain
     ? `https://${shopifyShopDomain}/admin/themes/current/editor?context=apps`
     : "";
@@ -430,6 +456,20 @@
         shopifyEmbedEnabled = res.enabled;
       } catch {
         // Non-fatal: keep the cached value from onboardMe.
+      }
+
+      // Scope gap. Checked on every visit for the same reason the embed is:
+      // the answer changes outside our control (we add a scope, or the
+      // merchant grants one in the admin), so a value cached at connect time
+      // would be wrong in both directions. Non-fatal and fail-closed — on any
+      // error the banner stays hidden rather than nagging on a network blip.
+      try {
+        const scopes = await fetchShopifyScopeStatus(clientId);
+        shopifyMissingScopes = scopes.checked ? scopes.missing : [];
+        shopifyConsentUrl = scopes.consent_url ?? "";
+      } catch {
+        shopifyMissingScopes = [];
+        shopifyConsentUrl = "";
       }
     }
   }
@@ -1342,6 +1382,20 @@
       );
     }
 
+    // Returning from the Shopify scope re-consent. The callback re-adopts the
+    // freshly-scoped token before redirecting here, so the refreshFromServer()
+    // below re-checks against the NEW token and the banner clears on its own.
+    // Scrub the marker so a refresh doesn't re-show the confirmation.
+    const scopeReturn = new URLSearchParams(window.location.search);
+    if (scopeReturn.get("shopify_scopes") === "updated") {
+      scopeGrantReturned = true;
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname,
+      );
+    }
+
     // ALLOW_WOOCOMMERCE gate (Go proxy env, via /bratrax/auth/config).
     allowWoocommerce = (await getAuthConfig()).allow_woocommerce;
 
@@ -1402,6 +1456,59 @@
         class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
       >
         {error}
+      </div>
+    {/if}
+
+    {#if showScopeGrantConfirmation}
+      <div
+        class="mb-4 border border-bratrax-acid/40 bg-bratrax-acid/10 px-4 py-3"
+      >
+        <p class="text-sm text-bratrax-text-body">
+          Thanks — Shopify permissions are up to date.
+        </p>
+      </div>
+    {/if}
+
+    {#if showShopifyScopeBanner}
+      <div
+        class="mb-4 border border-bratrax-acid/40 bg-bratrax-acid/10 px-4 py-3"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1">
+            <p
+              class="mb-1 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-acid"
+            >
+              Action required
+            </p>
+            <p class="text-sm text-bratrax-text-body">
+              Bratrax needs {shopifyMissingScopes.length === 1
+                ? "one extra permission"
+                : `${shopifyMissingScopes.length} extra permissions`} on your Shopify
+              store. Shopify has to ask you directly — approving takes a few seconds
+              and brings you straight back here.
+            </p>
+            <ul class="mt-2 space-y-1">
+              {#each shopifyMissingScopes as scope (scope.handle)}
+                <li class="font-mono text-[11px] text-bratrax-text-muted">
+                  <span class="text-bratrax-text-body">{scope.handle}</span>
+                  — {scope.purpose}
+                </li>
+              {/each}
+            </ul>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <!-- Plain same-tab navigation: this is an OAuth round trip that has
+                 to land back on this page with the new token adopted. Opening
+                 it in a new tab would strand the grant in a tab the merchant
+                 then closes, leaving this one showing a stale banner. -->
+            <a
+              href={shopifyConsentUrl}
+              class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[3px] text-bratrax-bg transition-opacity hover:opacity-90"
+            >
+              Approve in Shopify →
+            </a>
+          </div>
+        </div>
       </div>
     {/if}
 

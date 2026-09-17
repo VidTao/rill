@@ -446,6 +446,50 @@ export async function verifyEmbedStatus(
 }
 
 // -----------------------------------------------------------------------------
+// Shopify access scopes: has this merchant granted everything the app now asks for?
+//
+// When we add a scope to shopify.app.toml, Shopify only re-prompts a merchant
+// the next time they open Bratrax from inside the Shopify admin. Merchants who
+// connected once and have lived on bratrax.com ever since never hit that, so
+// their token silently keeps its original scope set — and a missing scope
+// answers HTTP 200 + ACCESS_DENIED, not 401, so the feature behind it reads as
+// "no data" rather than "no permission". The /connectors banner exists to close
+// that gap. See server/helpers/shopify_scopes.py.
+// -----------------------------------------------------------------------------
+
+export interface ShopifyScopeGap {
+  /** Raw Shopify scope handle, e.g. "read_reports". */
+  handle: string;
+  /** Merchant-facing explanation of what granting it unlocks. */
+  purpose: string;
+}
+
+export interface ShopifyScopeStatus {
+  connected: boolean;
+  /**
+   * Did Shopify actually answer. False means "unknown" (network blip, revoked
+   * token) — render nothing, rather than reporting everything as missing.
+   */
+  checked: boolean;
+  missing: ShopifyScopeGap[];
+  /** Where the "Approve in Shopify" CTA points. Null when nothing is missing. */
+  consent_url: string | null;
+  shop: string | null;
+}
+
+/**
+ * Ask Shopify (live, server-side) which scopes this client's token actually
+ * holds. Never throws a scope gap on an unreachable Shopify — see `checked`.
+ */
+export async function fetchShopifyScopeStatus(
+  clientId: string,
+): Promise<ShopifyScopeStatus> {
+  return apiFetch<ShopifyScopeStatus>(
+    `/bratrax/onboard/shopify/scope-status?client_id=${encodeURIComponent(clientId)}`,
+  );
+}
+
+// -----------------------------------------------------------------------------
 // WooCommerce tracking plugin: download + install verification
 //
 // The generic WordPress plugin (extensions/bratrax-woocommerce) is downloaded
