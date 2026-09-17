@@ -13,6 +13,7 @@ import type {
   MediaSpendScopeRule,
   MediaSpendScopeRuleData,
   StoreSettings,
+  StoreSettingsResponse,
   ProfitReadiness,
 } from "./types";
 
@@ -41,11 +42,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 // --- Store Settings ---
 
-export async function getStoreSettings(): Promise<StoreSettings> {
-  const res = await apiFetch<{ data: StoreSettings }>(
+export async function getStoreSettings(): Promise<StoreSettingsResponse> {
+  const res = await apiFetch<{ data: StoreSettings; currency?: string }>(
     "/bratrax/cost-settings/settings",
   );
-  return res.data;
+  return { settings: res.data, currency: res.currency || "USD" };
 }
 
 export async function saveStoreSettings(

@@ -137,6 +137,12 @@ export interface MediaSpendScopeGuidance {
 
 export type StoreSettings = Record<string, unknown>;
 
+export interface StoreSettingsResponse {
+  settings: StoreSettings;
+  /** ISO 4217 code from the client's config.yaml; "USD" when unset. */
+  currency: string;
+}
+
 export interface ProfitReadinessCost {
   key: "cogs" | "fees" | "shipping" | "ad_spend" | "custom_costs";
   label: string;

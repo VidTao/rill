@@ -36,6 +36,7 @@
     deleteMediaSpendScopeRule,
     createOneTimeExpense,
   } from "$lib/bratrax/costs/api";
+  import { currencySymbol } from "$lib/bratrax/costs/currency";
 
   const tabs: { id: CostTab; label: string; icon: string }[] = [
     { id: "cogs", label: "Cost of Goods", icon: "📦" },
@@ -55,6 +56,10 @@
 
   // Data
   let storeSettings: StoreSettings = {};
+  // Store currency from clients/<name>/config.yaml, so money inputs below are
+  // labelled with the store's own symbol rather than a hardcoded one.
+  let currencyCode = "USD";
+  $: symbol = currencySymbol(currencyCode);
   let products: ProductCogs[] = [];
   let marketplaceProducts: MarketplaceProductCogs[] = [];
   let gateways: GatewayFee[] = [];
@@ -136,7 +141,7 @@
         await Promise.all([
           getStoreSettings().catch((e) => {
             console.error("Settings:", e);
-            return {};
+            return { settings: {}, currency: "USD" };
           }),
           getProductsCogs().catch((e) => {
             console.error("COGS:", e);
@@ -159,7 +164,8 @@
             return { rules: [], guidance: null, availableAccounts: [] };
           }),
         ]);
-      storeSettings = settings;
+      storeSettings = settings.settings;
+      currencyCode = settings.currency;
       products = prods;
       marketplaceProducts = marketplaceProds;
       gateways = gws;
@@ -717,7 +723,7 @@
                             step="0.01"
                             min="0"
                             class="w-28 border border-bratrax-border bg-bratrax-surface px-2 py-1 text-right text-sm"
-                            placeholder="$ 0"
+                            placeholder="{symbol} 0"
                             bind:value={product.cogs_amount}
                             on:blur={() => handleSaveProductCogs(product)}
                           />
@@ -728,7 +734,7 @@
                             step="0.01"
                             min="0"
                             class="w-28 border border-bratrax-border bg-bratrax-surface px-2 py-1 text-right text-sm"
-                            placeholder="$ 0"
+                            placeholder="{symbol} 0"
                             bind:value={product.handling_fee}
                             on:blur={() => handleSaveProductCogs(product)}
                           />
@@ -853,7 +859,7 @@
                             step="0.01"
                             min="0"
                             class="w-28 border border-bratrax-border bg-bratrax-surface px-2 py-1 text-right text-sm"
-                            placeholder="$ 0"
+                            placeholder="{symbol} 0"
                             bind:value={product.unit_cost}
                             on:blur={() =>
                               handleSaveMarketplaceProductCogs(product)}
@@ -865,7 +871,7 @@
                             step="0.01"
                             min="0"
                             class="w-28 border border-bratrax-border bg-bratrax-surface px-2 py-1 text-right text-sm"
-                            placeholder="$ 0"
+                            placeholder="{symbol} 0"
                             bind:value={product.handling_cost}
                             on:blur={() =>
                               handleSaveMarketplaceProductCogs(product)}
@@ -943,7 +949,9 @@
                       Cost per order
                     </label>
                     <div class="flex items-center gap-2">
-                      <span class="text-sm text-bratrax-text-muted">€</span>
+                      <span class="text-sm text-bratrax-text-muted"
+                        >{symbol}</span
+                      >
                       <input
                         type="number"
                         step="0.01"
@@ -1034,7 +1042,9 @@
                         </td>
                         <td class="px-3 py-2">
                           <div class="flex items-center gap-1">
-                            <span class="text-bratrax-text-muted">$</span>
+                            <span class="text-bratrax-text-muted"
+                              >{symbol}</span
+                            >
                             <input
                               type="number"
                               step="0.01"
@@ -1248,7 +1258,7 @@
                             step="0.01"
                             min="0"
                             class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 text-sm"
-                            placeholder="$ 0"
+                            placeholder="{symbol} 0"
                             bind:value={expenseForm.fixed_amount}
                           />
                         </div>

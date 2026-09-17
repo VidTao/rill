@@ -41,10 +41,11 @@
     loading = true;
     error = "";
     try {
-      const [settings, profitReadiness] = await Promise.all([
+      const [storeSettings, profitReadiness] = await Promise.all([
         getStoreSettings(),
         getProfitReadiness(),
       ]);
+      const settings = storeSettings.settings;
       excludeTaxes = booleanSetting(settings, "profit_exclude_taxes", true);
       excludeZeroRevenue = booleanSetting(
         settings,
