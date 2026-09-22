@@ -534,6 +534,10 @@ export interface OAuthConfig {
   fb_app_id: string;
   google_client_id: string;
   bing_ads_client_id: string;
+  // True once a Google OAuth client is registered for the Microsoft Ads
+  // Google-identity leg. Gates the "Using Google sign-in?" shortcut so it does
+  // not render as a dead end before that ops step is done.
+  bing_ads_google_configured?: boolean;
 }
 
 export function getOAuthConfig(): Promise<OAuthConfig> {

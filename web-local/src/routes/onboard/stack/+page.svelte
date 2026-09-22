@@ -532,6 +532,14 @@
   let tiktokState = "";
   let klaviyoState = "";
   let bingAdsState = "";
+
+  // Set when Microsoft authenticated us successfully but the Bing Ads account
+  // turns out to be owned by a Google identity (SOAP fault 126 /
+  // GoogleAccountIsRequired). Not an error the user caused — it just means the
+  // second leg has to run against Google — so it renders as an offer, not a
+  // failure. Empty string = no prompt showing.
+  let bingIdentityPrompt = "";
+  let bingGoogleAvailable = false;
   let pinterestAdsState = "";
   let amazonAdsState = "";
   let amazonSpState = "";
@@ -1017,9 +1025,41 @@
         );
       }
       const body = (await res.json()) as {
+        status?: string;
         state: string;
+        message?: string;
+        google_available?: boolean;
         accounts: Array<{ id: string; name: string }>;
       };
+
+      // The Microsoft consent succeeded but this account signs in with Google.
+      // Offer the Google leg rather than reporting a dead end — and hand the
+      // offer back to /connectors if that's where the flow started.
+      if (body.status === "identity_mismatch") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("code");
+        url.searchParams.delete("state");
+        window.history.replaceState({}, "", url.toString());
+        sessionStorage.removeItem("bing_ads_oauth_state");
+
+        const msg =
+          body.message ?? "Your Microsoft Ads account signs in with Google.";
+        const where = sessionStorage.getItem("onboard_oauth_return");
+        isOAuthBounce = false;
+        if (where && where !== "/onboard/stack") {
+          sessionStorage.removeItem("onboard_oauth_return");
+          sessionStorage.removeItem("onboard_oauth_platform");
+          sessionStorage.setItem("connectors_bing_identity", msg);
+          if (body.google_available === false)
+            sessionStorage.setItem("connectors_bing_identity_blocked", "1");
+          await goto(where);
+          return;
+        }
+        bingGoogleAvailable = body.google_available !== false;
+        bingIdentityPrompt = msg;
+        return;
+      }
+
       bingAdsState = body.state;
       accountModalAccounts = body.accounts.map((a) => ({
         id: a.id,
@@ -2134,6 +2174,20 @@
     handleOAuthConnect(amazonSp, `?region=${e.detail.region}`);
   }
 
+  // Runs the Bing connect against Google as the identity provider. Reached
+  // either from the auto-detected prompt above, or from the "Using Google
+  // sign-in?" link for someone who already knows and wants to skip the
+  // Microsoft hop.
+  function connectBingWithGoogle() {
+    bingIdentityPrompt = "";
+    error = "";
+    const bing = categories
+      .flatMap((c) => c.platforms)
+      .find((p) => p.id === "bing_ads");
+    if (!bing) return;
+    handleOAuthConnect(bing, "?identity_provider=google");
+  }
+
   function handleCardClick(platform: Platform) {
     if (platform.type === "oauth") {
       handleOAuthConnect(platform);
@@ -2303,6 +2357,23 @@
           class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
         >
           {error}
+        </div>
+      {/if}
+
+      {#if bingIdentityPrompt}
+        <div
+          class="mb-4 border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-3 font-mono text-xs text-bratrax-text-body"
+        >
+          <p class="whitespace-pre-wrap break-words">{bingIdentityPrompt}</p>
+          {#if bingGoogleAvailable}
+            <button
+              type="button"
+              class="mt-3 border border-bratrax-acid bg-bratrax-acid/20 px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-[1px] text-bratrax-acid hover:bg-bratrax-acid/30"
+              on:click={connectBingWithGoogle}
+            >
+              Continue with Google →
+            </button>
+          {/if}
         </div>
       {/if}
 

@@ -248,6 +248,15 @@
   let loading = "";
   let error = "";
 
+  // Microsoft authenticated fine but the Bing Ads account is owned by a Google
+  // identity. Handed over from /onboard/stack, which is where the OAuth
+  // callback lands. Renders as an offer to retry via Google, not a failure.
+  let bingIdentityPrompt = "";
+  let bingGoogleAvailable = false;
+  // Mirrors BING_ADS_GOOGLE_CLIENT_ID/SECRET being set server-side; until they
+  // are, the shortcut link stays hidden rather than 503-ing on click.
+  let bingGoogleConfigured = false;
+
   // Per-source backfill/sync status, keyed by source (=== platform.id), from
   // /bratrax/sync-status. Drives the pill fill, the "Last sync" label, the
   // reassurance copy, and the per-account detail in the View Accounts pop-up.
@@ -1313,6 +1322,17 @@
     handleOAuthConnect(amazonSp, `?region=${e.detail.region}`);
   }
 
+  // Runs the Bing connect against Google as the identity provider — either from
+  // the auto-detected prompt, or from the "Using Google sign-in?" link for
+  // someone who already knows and wants to skip the Microsoft hop.
+  function connectBingWithGoogle() {
+    bingIdentityPrompt = "";
+    error = "";
+    const bing = platforms.find((p) => p.id === "bing_ads");
+    if (!bing) return;
+    handleOAuthConnect(bing, "?identity_provider=google");
+  }
+
   function openBuilderPickerModal() {
     error = "";
     showBuilderPickerModal = true;
@@ -1366,6 +1386,19 @@
       sessionStorage.removeItem("connectors_error");
     }
 
+    // Same hand-off, but for the Microsoft-Ads-signs-in-with-Google case, which
+    // is an offer rather than an error (see connectBingWithGoogle below).
+    const carriedBingIdentity = sessionStorage.getItem(
+      "connectors_bing_identity",
+    );
+    if (carriedBingIdentity) {
+      bingIdentityPrompt = carriedBingIdentity;
+      bingGoogleAvailable =
+        sessionStorage.getItem("connectors_bing_identity_blocked") !== "1";
+      sessionStorage.removeItem("connectors_bing_identity");
+      sessionStorage.removeItem("connectors_bing_identity_blocked");
+    }
+
     // WooCommerce wc-auth returns here with ?success=…&user_id=<signed token>
     // appended. The key pair already arrived via the server-to-server callback,
     // so just surface a failure (if any) and scrub the params from the URL +
@@ -1408,6 +1441,7 @@
       const cfg = await getOAuthConfig();
       fbAppId = cfg.fb_app_id;
       googleClientId = cfg.google_client_id;
+      bingGoogleConfigured = cfg.bing_ads_google_configured === true;
     } catch {
       // Non-fatal — connect-button handlers guard against empty values.
     }
@@ -1456,6 +1490,23 @@
         class="mb-4 whitespace-pre-wrap break-words border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
       >
         {error}
+      </div>
+    {/if}
+
+    {#if bingIdentityPrompt}
+      <div
+        class="mb-4 border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-3 font-mono text-xs text-bratrax-text-body"
+      >
+        <p class="whitespace-pre-wrap break-words">{bingIdentityPrompt}</p>
+        {#if bingGoogleAvailable}
+          <button
+            type="button"
+            class="mt-3 border border-bratrax-acid bg-bratrax-acid/20 px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-[1px] text-bratrax-acid hover:bg-bratrax-acid/30"
+            on:click={connectBingWithGoogle}
+          >
+            Continue with Google →
+          </button>
+        {/if}
       </div>
     {/if}
 
@@ -1602,6 +1653,19 @@
               {/if}
             {:else}
               <span class="connector-status-muted">Not connected</span>
+            {/if}
+            <!-- Connecting normally auto-detects a Google-owned Microsoft Ads
+                 account and offers this after the fact; the link is for the
+                 merchant who already knows and would rather skip the wasted
+                 Microsoft consent hop. -->
+            {#if platform.id === "bing_ads" && !connected && bingGoogleConfigured}
+              <button
+                type="button"
+                class="connector-status-muted underline hover:text-bratrax-acid"
+                on:click={connectBingWithGoogle}
+              >
+                Using Google sign-in?
+              </button>
             {/if}
           </div>
           <div class="connector-actions">
