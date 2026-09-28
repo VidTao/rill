@@ -14,6 +14,7 @@
     getAISettings,
     updateAISettings,
     deleteAISettings,
+    updateAIModel,
     getMCPSettings,
     regenerateMCPToken,
     deleteMCPToken,
@@ -127,6 +128,10 @@
   let aiSaving = false;
   let aiRemoving = false;
   let aiConfirmRemoveOpen = false;
+  let aiModelSaving = false;
+  $: aiCurrentModel = ai?.models.find(
+    (m) => m.id === (ai?.model ?? ai?.default_model),
+  );
 
   // ----- MCP state -----------------------------------------------------------
   let mcp: MCPSettings | null = null;
@@ -242,6 +247,25 @@
     } finally {
       aiRemoving = false;
       aiConfirmRemoveOpen = false;
+    }
+  }
+
+  async function saveAIModel(id: string) {
+    if (!ai || id === (ai.model ?? ai.default_model)) return;
+    aiModelSaving = true;
+    aiError = "";
+    aiSavedMessage = "";
+    try {
+      // The default is stored as null so the client follows future default changes.
+      ai = await updateAIModel(id === ai.default_model ? null : id);
+      const label = ai.models.find((m) => m.id === id)?.label ?? id;
+      aiSavedMessage = `Chat now uses ${label}`;
+    } catch (e: any) {
+      aiError = e.message ?? "Failed to change model";
+      // Put the dropdown back on the model that's actually saved.
+      ai = ai;
+    } finally {
+      aiModelSaving = false;
     }
   }
 
@@ -1031,6 +1055,39 @@
               works before saving.
             </p>
           </div>
+
+          {#if !ai.demo_ai}
+            <div>
+              <label
+                for="ai-model"
+                class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+              >
+                Chat model
+              </label>
+              <select
+                id="ai-model"
+                value={ai.model ?? ai.default_model}
+                on:change={(e) => saveAIModel(e.currentTarget.value)}
+                disabled={!isAdminOrSuper || aiModelSaving}
+                class="w-full border border-bratrax-border bg-bratrax-surface px-4 py-3 text-sm text-bratrax-text-body focus:border-bratrax-acid focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {#each ai.models as m (m.id)}
+                  <option value={m.id}>
+                    {m.label}{m.id === ai.default_model ? " (default)" : ""}
+                  </option>
+                {/each}
+              </select>
+              <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
+                {#if aiModelSaving}
+                  Checking the model with Anthropic…
+                {:else}
+                  {aiCurrentModel?.description ?? ""}
+                  Usage is billed to your Anthropic key.{#if !isAdminOrSuper}
+                    Only admins can change the model.{/if}
+                {/if}
+              </p>
+            </div>
+          {/if}
 
           {#if aiError}
             <div

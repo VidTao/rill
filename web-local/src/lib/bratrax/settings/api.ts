@@ -168,6 +168,15 @@ export function deleteAISettings(): Promise<AISettings> {
   return apiFetch<AISettings>("/bratrax/settings/ai", { method: "DELETE" });
 }
 
+// Pass null to go back to the default model.
+export function updateAIModel(model: string | null): Promise<AISettings> {
+  return apiFetch<AISettings>("/bratrax/settings/ai/model", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model }),
+  });
+}
+
 // ----- MCP (Claude Desktop bridge) -------------------------------------------
 
 export function getMCPSettings(): Promise<MCPSettings> {

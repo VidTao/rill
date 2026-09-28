@@ -120,9 +120,20 @@ export interface DemoAIQuota {
   exhausted: boolean;
 }
 
+// A Claude model the client can pick for in-app chat.
+export interface AIModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
 export interface AISettings {
   key_set: boolean;
   key_preview: string | null;
+  // The model picked in Settings → AI; null means default_model.
+  model: string | null;
+  default_model: string;
+  models: AIModelOption[];
   demo_ai?: DemoAIQuota;
 }
 

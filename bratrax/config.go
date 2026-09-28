@@ -63,8 +63,9 @@ type Config struct {
 	// instance only. Empty leaves the driver default in place.
 	DemoUsersModel string
 	// ClientAIModel overrides the claude driver's default model (claude-sonnet-5)
-	// for every BYOK client instance. Empty leaves the driver default in place.
-	// Instances pick up a change only when they're recreated, i.e. after a restart.
+	// for BYOK clients that haven't picked a model in Settings → AI. Empty leaves
+	// the driver default in place. Instances pick up a change only when they're
+	// recreated, i.e. after a restart.
 	ClientAIModel string
 	// DemoClientSlug is the clickhouse_db of the shared demo workspace. Must
 	// match Flask's DEMO_CLIENT_SLUG.

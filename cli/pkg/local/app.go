@@ -535,21 +535,25 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 		// applyDemoAI swaps a client's own BYOK key for the platform key on the
 		// shared demo workspace, and pins that instance to DEMO_USERS_MODEL (here
 		// we pay rather than the customer). Every other client keeps its own key
-		// and gets CLIENT_AI_MODEL, or the driver default when that's unset.
+		// and gets the model it picked in Settings → AI; without one,
+		// CLIENT_AI_MODEL, or the driver default when that's unset too.
 		//
 		// Both instance-creation paths — the browser instance router and the MCP
 		// ensure-ready — funnel through this, so a demo instance is identical no
 		// matter which one created it first. Reads bratraxHandlers lazily: it is
 		// assigned below, but these closures only run per-request.
-		applyDemoAI := func(clientDB, byokKey string) (key, model string) {
+		applyDemoAI := func(clientDB, byokKey, byokModel string) (key, model string) {
 			if bratraxHandlers == nil || bratraxHandlers.Config == nil {
-				return byokKey, ""
+				return byokKey, byokModel
 			}
 			cfg := bratraxHandlers.Config
 			if cfg.AnthropicAPIKey != "" && clientDB == cfg.DemoClientSlug {
 				return cfg.AnthropicAPIKey, cfg.DemoUsersModel
 			}
-			return byokKey, cfg.ClientAIModel
+			if byokModel == "" {
+				byokModel = cfg.ClientAIModel
+			}
+			return byokKey, byokModel
 		}
 
 		runtimeHandler, err := runtimeServer.HTTPHandler(ctx, func(mux *http.ServeMux) {
@@ -569,10 +573,10 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 						ensureReadyTimeout = time.Duration(secs) * time.Second
 					}
 				}
-				ensureReady = func(rctx context.Context, clientDB, key string) error {
+				ensureReady = func(rctx context.Context, clientDB, key, model string) error {
 					// Register the instance (idempotent — returns immediately if already
 					// cached), then wait, bounded, for its controller to be ready.
-					key, model := applyDemoAI(clientDB, key)
+					key, model = applyDemoAI(clientDB, key, model)
 					if _, ensErr := a.EnsureInstanceForClient(rctx, clientDB, key, model); ensErr != nil {
 						return ensErr
 					}
@@ -609,16 +613,16 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 		if a.MultiTenant && bratraxHandlers != nil {
 			cs := bratraxHandlers.ClientStore
 			ensure := func(clientDB string) (string, error) {
-				// Look up the per-client Anthropic key (BYOK). Empty if unset —
-				// instance still starts; chat fails at Open time and the frontend
-				// shows an "add your key" CTA.
-				key, lookupErr := cs.GetAnthropicKey(ctx, clientDB)
+				// Look up the per-client Anthropic key (BYOK) and model. Empty key if
+				// unset — instance still starts; chat fails at Open time and the
+				// frontend shows an "add your key" CTA.
+				key, model, lookupErr := cs.GetAnthropicSettings(ctx, clientDB)
 				if lookupErr != nil {
 					a.BaseLogger.Warn("anthropic key lookup failed; continuing without",
 						zap.String("clientDB", clientDB), zap.Error(lookupErr))
-					key = ""
+					key, model = "", ""
 				}
-				key, model := applyDemoAI(clientDB, key)
+				key, model = applyDemoAI(clientDB, key, model)
 				return a.EnsureInstanceForClient(ctx, clientDB, key, model)
 			}
 			demoAI := bratrax.NewDemoAIQuota(bratraxHandlers.PromptStore, bratraxHandlers.Config)
@@ -754,8 +758,9 @@ func IsProjectInit(projectPath string) bool {
 // an "add your key" CTA so users don't hit that error path.
 //
 // anthropicModel overrides the claude driver's default model. Empty leaves the
-// driver default in place. BYOK clients get CLIENT_AI_MODEL, the demo workspace
-// DEMO_USERS_MODEL; both are optional env vars.
+// driver default in place. BYOK clients get the model picked in Settings → AI
+// (rill_clients.anthropic_model), else CLIENT_AI_MODEL; the demo workspace gets
+// DEMO_USERS_MODEL.
 func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAPIKey, anthropicModel string) (string, error) {
 	if !a.MultiTenant {
 		// In single-tenant mode every request goes to the default instance.

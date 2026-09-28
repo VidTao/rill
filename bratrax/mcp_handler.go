@@ -109,16 +109,16 @@ func RegisterMCPHandler(mux *http.ServeMux, clientStore ClientStoreInterface, au
 		// registers the instance and waits (bounded) for it to become serveable;
 		// on timeout we return a retryable 503 rather than the opaque 400.
 		if ensureReady != nil {
-			key, keyErr := clientStore.GetAnthropicKey(ctx, client.ClickhouseDB)
+			key, model, keyErr := clientStore.GetAnthropicSettings(ctx, client.ClickhouseDB)
 			if keyErr != nil {
 				// Non-fatal: the instance still starts without a BYOK key.
 				logger.Debug("mcp handler: anthropic key lookup failed; continuing without",
 					zap.String("client_id", client.ClientID), zap.Error(keyErr))
-				key = ""
+				key, model = "", ""
 			}
 			// Use the raw request context so ensureReady's own bounded timeout
 			// governs the wait, not the short token-lookup deadline above.
-			if err := ensureReady(r.Context(), client.ClickhouseDB, key); err != nil {
+			if err := ensureReady(r.Context(), client.ClickhouseDB, key, model); err != nil {
 				logger.Warn("mcp handler: instance not ready",
 					zap.String("client_id", client.ClientID),
 					zap.String("clickhouse_db", client.ClickhouseDB), zap.Error(err))
