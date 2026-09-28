@@ -206,7 +206,10 @@
 
 <svelte:window
   on:keydown={(e) => {
-    if (e.metaKey && e.key === "k") {
+    // Bratrax: ⌘K is the global command palette, so the picker takes ⌘⇧K.
+    // Shift uppercases e.key on macOS, hence the toLowerCase.
+    if (e.metaKey && e.shiftKey && e.key.toLowerCase() === "k") {
+      e.preventDefault();
       open = !open;
     }
   }}
