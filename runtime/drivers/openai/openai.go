@@ -273,9 +273,13 @@ func (o *openaiHandle) Complete(ctx context.Context, opts *drivers.CompleteOptio
 		reqMsgs = append(reqMsgs, openaiMsgs...)
 	}
 
-	// Convert Rill tools to OpenAI's tool format
+	// Convert Rill tools to OpenAI's tool format.
+	// With NoToolCalls, send no tools at all (the behavior callers relied on before the flag existed).
 	var openaiTools []openai.ChatCompletionToolUnionParam
 	for _, tool := range opts.Tools {
+		if opts.NoToolCalls {
+			break
+		}
 		openaiTool, err := toolToOpenAI(tool)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert tool: %w", err)

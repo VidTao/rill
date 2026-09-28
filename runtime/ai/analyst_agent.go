@@ -191,12 +191,15 @@ func (t *AnalystAgent) Handler(ctx context.Context, args *AnalystAgentArgs) (*An
 		}
 	}
 
-	// Run an LLM tool call loop
+	// Run an LLM tool call loop.
+	// The budget is in input-token equivalents: 375K is about $0.75 of Claude Sonnet 5 per question
+	// (about $1.90 on Opus, $0.38 on Haiku). Past it, the agent answers with what it has.
 	var response string
 	err = s.Complete(ctx, "Analyst loop", &response, &CompleteOptions{
 		Messages:      messages,
 		Tools:         tools,
-		MaxIterations: 20,
+		MaxIterations: 12,
+		TokenBudget:   375_000,
 		UnwrapCall:    true,
 	})
 	if err != nil {
@@ -355,8 +358,14 @@ If you run into such issues, explicitly mention to the user that this may be due
 
 **Phase 2: analysis (loop)**
 In an iterative OODA loop, you should repeatedly use the "query_metrics_view" tool to query for insights.
+{{ if .is_report }}
 Execute a MINIMUM of 4-6 distinct analytical queries, building each query based on insights from previous results.
 Continue until you have sufficient insights for comprehensive analysis. Some analyses may require up to 20 queries.
+{{ else }}
+Scale the number of queries to the request:
+- If the user asks a specific question (e.g. "which ad earned the most?"), run only the queries needed to answer it, often 1-3, and stop as soon as you can answer it.
+- If the user asks for open-ended analysis (e.g. "analyze this dashboard"), run 4-8 distinct queries, building each query based on insights from previous results.
+{{ end }}
 
 {{ if and .is_report (not .is_prompt) }}
 {{ if (and .comparison_start .comparison_end) }}
@@ -395,12 +404,12 @@ In each iteration, you should:
 - **Observe**: What data patterns emerge? What insights are surfacing? What gaps remain?
 - **Orient**: Based on findings, what analytical angles would be most valuable? How do current insights shape next queries?
 - **Decide**: Choose specific dimensions, filters, time periods, or comparisons to explore
-- **Act**: Execute the query and evaluate results in <thinking> tags
+- **Act**: Execute the query and evaluate the results
 {{ end}}
 
 {{ if .feature_flags.chat_charts }}
 **Phase 3: visualization**
-Create a chart: After running "query_metrics_view" create a chart using "create_chart" unless:
+{{ if .is_report }}Create a chart: After running "query_metrics_view" create a chart using "create_chart" unless:{{ else }}Create a chart using "create_chart" for the queries that support your answer (usually one or two, not every query) unless:{{ end }}
 - The user explicitly requests a table-only response
 - The query returns only a single scalar value
 
@@ -440,7 +449,6 @@ Before answering, check if prior knowledge exists:
 - Always include time-based analysis using comparison features (delta_abs, delta_rel)
 - Focus on insights that are surprising, actionable, and quantified
 - Never repeat identical queries - each should explore new analytical angles
-- Use <thinking> tags between queries to evaluate results and plan next steps
 - Aim to make queries with high information density; keep row limits as low as possible and avoid pagination
 - The combined data you load across all queries should be below 10000 rows, ideally much less
 
@@ -462,16 +470,21 @@ If a question seems unrelated, first inspect the available metrics views to see 
 Decline to engage if the topic is clearly outside the scope of the data (e.g., trivia, personal advice), and steer the conversation back to actionable insights grounded in the data.
 </guardrails>
 
-<thinking>
-After each query in Phase 2, think through:
-- What patterns or anomalies did this reveal?
+<between_queries>
+After each query in Phase 2, consider:
+{{ if not .is_report }}- Can you already answer the user's question? If so, stop querying and answer.
+{{ end }}- What patterns or anomalies did this reveal?
 - How does this connect to previous findings?
-- What new questions does this raise?
 - What's the most valuable next query to run?
-- Are there any surprising insights worth highlighting?
-</thinking>
+</between_queries>
 
 <output_format>
+{{ if not .is_report }}
+**If the user asked a specific question**, begin your response with a direct answer in one or two sentences: name the specific item (e.g. the ad, campaign or product) and the number that answers the question, with a citation.
+Then add only the supporting detail that helps the user act on the answer. Do not replace the answer with general recommendations.
+Use the numbered insights format below only for open-ended analysis requests, or after the direct answer if several findings are relevant.
+
+{{ end }}
 **Format your analysis using markdown as follows**:
 {{ if .is_report }}
 <summary>

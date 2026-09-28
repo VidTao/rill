@@ -50,12 +50,6 @@ const (
 // BRATRAX_MCP_ENSURE_READY_TIMEOUT_SECONDS.
 const defaultMCPEnsureReadyTimeout = 8 * time.Second
 
-// defaultClaudeTemperature is the value the claude driver used to apply as its
-// own default. The driver now omits `temperature` unless a connector asks for
-// one (newer models 400 on it), so we set it explicitly here to keep clients on
-// the default model answering exactly as they did before.
-const defaultClaudeTemperature = 0.1
-
 // App encapsulates the logic associated with configuring and running the UI and the runtime in a local environment.
 // Here, a local environment means a non-authenticated, single-instance and single-project setup on localhost.
 // App encapsulates logic shared between different CLI commands, like start, init, build and source.
@@ -539,9 +533,9 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 		var bratraxHandlers *bratrax.Handlers
 
 		// applyDemoAI swaps a client's own BYOK key for the platform key on the
-		// shared demo workspace, and pins that instance to a cheaper model (the
-		// driver default is Opus, and here we pay rather than the customer). Every
-		// other client keeps its own key and the driver default.
+		// shared demo workspace, and pins that instance to DEMO_USERS_MODEL (here
+		// we pay rather than the customer). Every other client keeps its own key
+		// and gets CLIENT_AI_MODEL, or the driver default when that's unset.
 		//
 		// Both instance-creation paths — the browser instance router and the MCP
 		// ensure-ready — funnel through this, so a demo instance is identical no
@@ -555,7 +549,7 @@ func (a *App) Serve(httpPort, grpcPort int, enableUI, openBrowser, readonly bool
 			if cfg.AnthropicAPIKey != "" && clientDB == cfg.DemoClientSlug {
 				return cfg.AnthropicAPIKey, cfg.DemoUsersModel
 			}
-			return byokKey, ""
+			return byokKey, cfg.ClientAIModel
 		}
 
 		runtimeHandler, err := runtimeServer.HTTPHandler(ctx, func(mux *http.ServeMux) {
@@ -760,8 +754,8 @@ func IsProjectInit(projectPath string) bool {
 // an "add your key" CTA so users don't hit that error path.
 //
 // anthropicModel overrides the claude driver's default model. Empty leaves the
-// driver default in place, which is what every BYOK client gets; only the demo
-// workspace sets it (to a cheaper model, since the platform pays for it).
+// driver default in place. BYOK clients get CLIENT_AI_MODEL, the demo workspace
+// DEMO_USERS_MODEL; both are optional env vars.
 func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAPIKey, anthropicModel string) (string, error) {
 	if !a.MultiTenant {
 		// In single-tenant mode every request goes to the default instance.
@@ -835,17 +829,12 @@ func (a *App) EnsureInstanceForClient(ctx context.Context, clientDB, anthropicAP
 	// If empty, we still register the connector so the rest of the instance starts
 	// cleanly; the Claude driver will refuse Open at chat time (the frontend
 	// pre-checks GET /settings/ai and shows an "add your key" CTA before then).
+	//
+	// No `temperature` is sent: newer models reject it outright with 400
+	// "`temperature` is deprecated for this model", which would 400 every prompt.
 	aiProps := map[string]any{"api_key": anthropicAPIKey}
 	if anthropicModel != "" {
-		// Model overridden (demo workspace). Send no `temperature`: the newer
-		// models reject it outright with 400 "`temperature` is deprecated for
-		// this model", which would 400 every prompt.
 		aiProps["model"] = anthropicModel
-	} else {
-		// Default model. Pin the temperature the claude driver used to apply as
-		// its own default, so clients on the default model keep answering exactly
-		// as they did before that default was removed from the driver.
-		aiProps["temperature"] = defaultClaudeTemperature
 	}
 	aiConfig, err := structpb.NewStruct(aiProps)
 	if err != nil {

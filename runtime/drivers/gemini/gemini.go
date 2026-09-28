@@ -298,8 +298,9 @@ func (h *handle) Complete(ctx context.Context, opts *drivers.CompleteOptions) (*
 		genConfig.TopK = genai.Ptr(float32(h.config.TopK))
 	}
 
-	// Convert tools
-	if len(opts.Tools) > 0 {
+	// Convert tools.
+	// With NoToolCalls, send no tools at all (the behavior callers relied on before the flag existed).
+	if len(opts.Tools) > 0 && !opts.NoToolCalls {
 		geminiTools, err := convertTools(opts.Tools)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert tools: %w", err)
