@@ -26,6 +26,16 @@ Company name, your email, and the workspace **timezone**. The timezone drives
 how dashboard days are bucketed, so set it to match your store's timezone.
 Company name and timezone are editable by admins only.
 
+The Account tab also holds two merchant declarations, both admin-only:
+
+- **Your other domains** — extra domains you own (advertorials, bridge pages,
+  regional stores), so traffic from them isn't credited as a referral that steals
+  the ad.
+- **Exclude orders by tag** — Shopify order tags (wholesale, test, staff) whose
+  orders should be left out of your reporting.
+
+Saving either one rebuilds your data in the background (a few minutes).
+
 ### Team
 
 Everyone with access to the workspace, with their role (**admin** — full
@@ -42,9 +52,10 @@ You can't edit your own role or the workspace owner's.
 ### Billing
 
 Read-only summary of your plan: price, billing interval, status, and current
-period end. **Manage Subscription** opens the external billing portal where
-you can update payment details or cancel. See
-[Billing & subscription](/help/admin/billing).
+period end. **Manage Subscription** opens your billing portal to update payment
+details or cancel — the website (Lemon Squeezy) portal if you signed up on our
+site, or Shopify's hosted plan page if you installed from the Shopify App Store.
+See [Billing & subscription](/help/admin/billing).
 
 ### AI
 

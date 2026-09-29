@@ -24,3 +24,11 @@ Everything subscription-related lives in our billing portal, hosted by our payme
 - Pause or cancel your subscription
 
 If your email link doesn't arrive within a minute or two, check spam, and confirm you used the exact email that matches your Bratrax account. If you're still stuck, email [support@bratrax.com](mailto:support@bratrax.com).
+
+## If you installed from the Shopify App Store
+
+Your subscription is billed by **Shopify**, not through our billing portal — so the steps above (join.bratrax.com/billing) don't apply to you.
+
+- **Change your plan:** Open **Settings → Billing** in Bratrax and click **Manage Subscription** — it takes you to Shopify's hosted plan page, where you can upgrade or downgrade.
+- **Payment method & invoices:** these live in your **Shopify admin** (Settings → Billing), alongside your other Shopify charges.
+- **Cancel:** uninstall the Bratrax app from your Shopify admin — Shopify ends the subscription when the app is removed.

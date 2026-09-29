@@ -174,8 +174,9 @@ models; add or modify charts; pick dimensions and metrics.
 ## 12. When you're stuck
 
 The help section covers every dashboard, metric, and setup step — searchable.
-Beyond that: in-app AI chat, the Bratrax Slack (fastest for bugs, via
-**#bugs-feedback**), and [support@bratrax.com](mailto:support@bratrax.com) —
+Beyond that: the **?** Ask-support assistant in the sidebar (free, no setup —
+it can draft an email to us if it can't answer), the Bratrax Slack (fastest for
+bugs, via **#bugs-feedback**), and [support@bratrax.com](mailto:support@bratrax.com) —
 a real person reads every email.
 
 - **Try:** search the help section for one metric you weren't sure about

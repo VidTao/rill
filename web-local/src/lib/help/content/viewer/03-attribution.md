@@ -68,6 +68,7 @@ Do not automatically treat Direct as bad data. Treat a sudden Direct spike as a 
 - If NC CPA rose, check whether spend increased, new purchases dropped, or AOV fell.
 - If Direct rose, compare Direct by day and ask whether pixel/landing evidence was missing.
 - If a campaign looks too good, check whether orders are new customers or returning customers.
+- To see *why* a campaign got credit, click an **Attributed Orders** number and open a single order — you'll see the full journey from first touch to purchase.
 
 ## Good Claude questions
 

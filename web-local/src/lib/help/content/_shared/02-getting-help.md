@@ -10,13 +10,15 @@ status: ready
 
 ## What's the fastest way to get support?
 
-Three options, ranked by speed:
+Three ways to reach us:
 
-1. **In-app chat** — use the chat icon while you're working in Bratrax. Fastest for product questions. Note: in-app chat requires you to have your Anthropic API key connected under Settings → AI. If you haven't set that up yet, use Slack or email instead.
+1. **Ask support — the "?" button** in the sidebar. A built-in help assistant, free and with no setup: ask how a feature works or where to find something, and if it can't answer it drafts an email to our team for you. Fastest first stop.
 2. **Slack workspace** — [join here](https://join.slack.com/t/bratrax/shared_invite/zt-3xnp3nbb6-FoyYspvqEkVv~uMvyXWmGA). Brat and the team are in there during business hours.
 3. **Email** — [support@bratrax.com](mailto:support@bratrax.com). Best for anything that needs documentation, screenshots, or a longer response.
 
-No tickets, no bots, no phone tree.
+No tickets, no phone tree.
+
+The **AI chat sidebar** is a different thing: it answers questions about *your own data* and runs on your own Anthropic API key (Settings → AI). It's an analytics tool, not a support channel — for a human, use Slack or email.
 
 ## How do I report a bug?
 
