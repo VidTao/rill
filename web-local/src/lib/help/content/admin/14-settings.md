@@ -14,9 +14,9 @@ company details, the team, billing, and integrations. Open it from the
 this menu).
 
 Settings is **not** where costs live. COGS, shipping, gateway fees, custom
-expenses, and ad-spend scoping have their own page — **Cost settings**, also in
-the SETTINGS dropdown — open it at
-[bratrax.com/cost-settings](https://bratrax.com/cost-settings).
+expenses, and ad-spend scoping have their own page —
+**[Cost settings](https://bratrax.com/cost-settings)**, also in the SETTINGS
+dropdown. See the [Cost settings & COGS guide](/help/admin/cost-settings).
 
 ## The six tabs
 
@@ -97,5 +97,5 @@ or link a channel, and disconnect at any time. Connecting is admin-only.
 - **Passwords** are set when accepting an invite. To change a forgotten
   password, use **Forgot password?** on the login page — there is no password
   field inside Settings.
-- **Multi-store accounts** get a client switcher in the header (separate from
+- **[Multi-store accounts](/help/admin/multi-store)** get a client switcher in the header (separate from
   Settings) to jump between stores; each store has its own Settings.

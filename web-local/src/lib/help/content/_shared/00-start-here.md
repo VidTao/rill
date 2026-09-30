@@ -48,10 +48,10 @@ Profit metrics are only as good as the costs you feed them: COGS (pulled from
 Shopify automatically), shipping, payment-gateway fees, custom expenses, and —
 if several stores share one ad account — your media-spend split.
 
-- **Try:** open Cost Settings → Cost of goods and confirm your product costs
-  came in from Shopify.
-- **Go deeper:** [Settings](/help/admin/settings) ·
-  [Cost Settings](https://bratrax.com/cost-settings)
+- **Try:** open [Cost Settings](https://bratrax.com/cost-settings) → Cost of goods
+  and confirm your product costs came in from Shopify.
+- **Go deeper:** [Cost settings & COGS](/help/admin/cost-settings) ·
+  [Settings](/help/admin/settings)
 
 ## 4. Your daily health check
 

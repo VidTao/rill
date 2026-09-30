@@ -49,7 +49,8 @@ net-profit lines.
 Assigns what share of an ad account's spend belongs to this store. Most stores
 can ignore it — leave it alone and 100% of each connected ad account counts. It
 matters when **several stores share one ad account**: Media Scope splits that
-spend by rule so each store carries only its share.
+spend by rule so each store carries only its share. See
+[Multi-store accounts](/help/admin/multi-store).
 
 ### Profit Rules
 How the pieces above combine into your profit metrics — which costs are
