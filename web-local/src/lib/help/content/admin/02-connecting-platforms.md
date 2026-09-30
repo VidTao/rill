@@ -46,7 +46,7 @@ You'll see progress on the connector card while the backfill is running.
 | Amazon Seller Central | Amazon marketplace orders and sales (SP-API) |
 | Klaviyo | Email/SMS campaigns & flows, opens, clicks, attributed revenue |
 | Bloomreach | Email/SMS & engagement campaigns, attributed revenue |
-| External landing pages (Funnelish, or Custom / Other) | Orders + visitor journeys via the Bratrax tracking pixel (no ad connector) |
+| External landing pages (Funnelish, or Custom / Other) | Orders + visitor journeys via the Bratrax tracking pixel (no ad connector). See [External & custom landing pages](/help/admin/external-pages) |
 
 ## Reconnecting an expired token
 

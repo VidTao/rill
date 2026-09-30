@@ -9,9 +9,9 @@ status: ready
 # Cost settings
 
 Your profit metrics — contribution margin, MER, net profit, true ROAS — are only
-as accurate as the costs you feed them. **Cost Settings** is where those costs
-live. Open it from the **SETTINGS** dropdown in the top header, or go straight to
-[bratrax.com/cost-settings](https://bratrax.com/cost-settings). Admin-only.
+as accurate as the costs you feed them. **[Cost Settings](https://bratrax.com/cost-settings)**
+is where those costs live — open it from the **SETTINGS** dropdown in the top
+header. Admin-only.
 
 It's a set of tabs, each feeding a different part of the profit calculation. You
 don't have to fill in everything at once — the more complete your costs, the more
