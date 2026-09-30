@@ -1201,7 +1201,7 @@
               >
               to query your Bratrax data with Claude. The token authenticates as
               your workspace and lets Claude read your metrics and dashboards,
-              draw charts, and read and save business notes.
+              draw charts, and read your business notes.
             </p>
             <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
               On macOS the config file lives at

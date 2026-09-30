@@ -168,8 +168,10 @@ func (t *AnalystAgent) Handler(ctx context.Context, args *AnalystAgentArgs) (*An
 	if !args.DisableCharts {
 		tools = append(tools, CreateChartName)
 	}
-	// Bratrax knowledge tools (read/write client knowledge base)
-	tools = append(tools, WorkshopReadKnowledgeName, WorkshopWriteKnowledgeName)
+	// Bratrax knowledge tools (client knowledge base).
+	// DISABLED 2026-09-30: workshop_write_knowledge is unregistered (see ai.go).
+	// To restore: tools = append(tools, WorkshopReadKnowledgeName, WorkshopWriteKnowledgeName)
+	tools = append(tools, WorkshopReadKnowledgeName)
 
 	// Build completion messages
 	systemPrompt, err := t.systemPrompt(ctx, metricsViewNames, args)
@@ -425,6 +427,10 @@ Choose the appropriate chart type based on your data:
 
 {{ if .ai_instructions }}
 **Phase 4: knowledge (when applicable)**
+{{/* DISABLED 2026-09-30: workshop_write_knowledge is unregistered (see ai.go), so the
+model must not be told to call it. To restore, move these lines back out of this
+template comment:
+
 If the user asks about data that doesn't exist in any available table or metrics view, this is an ontology gap:
 - You MUST call the workshop_write_knowledge tool with category "discoveries" to log the gap BEFORE telling the user.
 - Do NOT claim you logged something without actually calling the tool. The tool call must appear in your response.
@@ -432,7 +438,7 @@ If the user asks about data that doesn't exist in any available table or metrics
 
 If your analysis produced a substantive business insight (a trend, anomaly, pattern, or business conclusion — not just raw numbers):
 - Call workshop_write_knowledge with category "insights" to file it.
-
+*/}}
 Before answering, check if prior knowledge exists:
 - Call workshop_read_knowledge with filepath "index.md" and "profile.md" to load existing context.
 {{ end }}

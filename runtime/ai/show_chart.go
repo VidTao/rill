@@ -221,6 +221,16 @@ func (t *ShowChart) Handler(ctx context.Context, args *ShowChartArgs) (*ShowChar
 			res.Note = fmt.Sprintf("Showing the top %d values by %s.", limit, res.Series[0].Label)
 		}
 	}
+	if len(data) == 0 {
+		// An empty chart looks like a broken tool. Say when the data actually
+		// ends, so the model can pick a period that has some: common for a
+		// store whose extracts have stopped, and for demo workspaces.
+		res.Note = "No data in this period."
+		if latest := t.latestDataTime(ctx, session, args.MetricsView); !latest.IsZero() {
+			res.Note = fmt.Sprintf("No data in this period. The most recent data is from %s; choose a period ending on or before that date.",
+				latest.In(loc).Format(time.DateOnly))
+		}
+	}
 	res.Rows = make([]map[string]any, 0, len(data))
 	for _, row := range data {
 		m := make(map[string]any, len(schema))
@@ -268,6 +278,34 @@ func (t *ShowChart) metricsViewSpec(ctx context.Context, session *Session, name 
 		return nil, fmt.Errorf("metrics view %q is not available right now", name)
 	}
 	return spec, nil
+}
+
+// latestDataTime returns the newest timestamp in the metrics view, or zero if
+// it can't be determined. Best effort: it only improves an empty result's note.
+func (t *ShowChart) latestDataTime(ctx context.Context, session *Session, metricsView string) time.Time {
+	rr, err := t.Runtime.Resolve(ctx, &runtime.ResolveOptions{
+		InstanceID:         session.InstanceID(),
+		Resolver:           "metrics_time_range",
+		ResolverProperties: map[string]any{"metrics_view": metricsView},
+		Claims:             session.Claims(),
+	})
+	if err != nil {
+		return time.Time{}
+	}
+	defer rr.Close()
+	row, err := rr.Next()
+	if err != nil {
+		return time.Time{}
+	}
+	// Cached resolver results come back JSON-decoded, so the time may be a string.
+	switch v := row["max"].(type) {
+	case time.Time:
+		return v
+	case string:
+		latest, _ := time.Parse(time.RFC3339Nano, v)
+		return latest
+	}
+	return time.Time{}
 }
 
 // chartTimeRange builds the query's time_range and a human label for it.

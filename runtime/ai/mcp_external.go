@@ -29,12 +29,14 @@ var externalToolAnnotations = map[string]*mcp.ToolAnnotations{
 	GetCanvasName:               readOnlyAnnotations("Describe a dashboard"),
 	WorkshopReadKnowledgeName:   readOnlyAnnotations("Read saved business notes"),
 	ShowChartName:               readOnlyAnnotations("Show chart"),
-	// Adds a note to the workspace's knowledge base. Never edits or deletes
-	// existing notes, hence not destructive.
+	// Saves a note to the workspace's knowledge base. Destructive: every call
+	// rewrites index.md and log.md, and a note with the same filename is
+	// overwritten. Destructive tools also make Claude confirm with the user.
+	// The tool is DISABLED (see ai.go); this entry is ready for when it returns.
 	WorkshopWriteKnowledgeName: {
 		Title:           "Save a business note",
 		ReadOnlyHint:    false,
-		DestructiveHint: boolPtr(false),
+		DestructiveHint: boolPtr(true),
 		IdempotentHint:  false,
 		OpenWorldHint:   boolPtr(false),
 	},

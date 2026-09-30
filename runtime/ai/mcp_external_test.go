@@ -93,6 +93,7 @@ func TestExternalMCPToolSurface(t *testing.T) {
 		ai.ListTablesName, ai.ShowTableName, ai.ListBucketsName, ai.ListBucketObjectsName, ai.ProjectStatusName,
 		ai.CreateChartName, ai.QuerySQLName, "navigate", "developer_agent", "analyst_agent", "router_agent",
 		"read_file", "write_file", "workshop_deploy", "workshop_list_clients",
+		ai.WorkshopWriteKnowledgeName, // disabled 2026-09-30, see ai.go
 	} {
 		require.NotContains(t, names, hidden, "%s must not reach external MCP clients", hidden)
 	}
@@ -171,6 +172,16 @@ func TestShowChart(t *testing.T) {
 		require.Equal(t, "Meta", res.Rows[0]["channel"], "sorted by the first measure, descending")
 		require.NotEmpty(t, res.Note, "a cut-off breakdown says so")
 		require.Equal(t, "Revenue by Channel", res.Title)
+	})
+
+	t.Run("empty period names the latest data", func(t *testing.T) {
+		var res *ai.ShowChartResult
+		_, err := s.CallTool(t.Context(), ai.RoleUser, ai.ShowChartName, &res, &ai.ShowChartArgs{
+			MetricsView: "sales", Measures: []string{"revenue"}, Start: "2025-01-01", End: "2025-02-01",
+		})
+		require.NoError(t, err)
+		require.Empty(t, res.Rows)
+		require.Contains(t, res.Note, "2026-09-03", "the note says when the data ends")
 	})
 
 	t.Run("helpful errors", func(t *testing.T) {

@@ -86,7 +86,12 @@ func NewRunner(rt *runtime.Runtime, activity *activity.Client) *Runner {
 	RegisterTool(r, &WorkshopDeploy{Runtime: rt})
 	RegisterTool(r, &WorkshopListTemplates{Runtime: rt})
 	RegisterTool(r, &WorkshopGetCatalogs{Runtime: rt})
-	RegisterTool(r, &WorkshopWriteKnowledge{Runtime: rt})
+	// DISABLED 2026-09-30 (Drasko): workshop_write_knowledge isn't used and is
+	// under reconsideration; it was the one write tool on the Claude connector,
+	// flagged in the directory review. The tool itself is intact in
+	// bratrax_workshop_write_knowledge.go. To restore, uncomment this line and
+	// the two DISABLED blocks in analyst_agent.go (tool list + Phase 4 prompt).
+	// RegisterTool(r, &WorkshopWriteKnowledge{Runtime: rt})
 	RegisterTool(r, &WorkshopReadKnowledge{Runtime: rt})
 
 	// Bratrax catalog tools

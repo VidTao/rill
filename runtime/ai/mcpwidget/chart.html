@@ -268,8 +268,10 @@
     var open = document.getElementById("open");
     open.hidden = !(typeof d.open_url === "string" && d.open_url.indexOf("https://") === 0);
 
+    // An empty chart's note already explains the emptiness; show it once, in
+    // place of the chart, rather than under a generic "No data" line.
     var note = document.getElementById("note");
-    note.hidden = !d.note;
+    note.hidden = !d.note || !d.rows.length;
     note.textContent = d.note || "";
 
     var panels = document.getElementById("panels");
@@ -277,7 +279,7 @@
     state.width = panels.clientWidth || document.body.clientWidth || 480;
 
     if (!d.rows.length) {
-      panels.appendChild(el("div", { "class": "empty" }, "No data for this period."));
+      panels.appendChild(el("div", { "class": "empty" }, d.note || "No data for this period."));
     } else {
       d.series.forEach(function (s, i) {
         panels.appendChild(d.x_type === "time" ? linePanel(d, s, i) : barPanel(d, s, i));

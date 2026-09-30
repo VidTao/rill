@@ -151,8 +151,9 @@ anonymous, winback, ...), and recommends what to do with each group.
 The dashboards answer the common questions; the AI answers the custom ones —
 cohort cuts, comparisons, "why did this move." In-app chat uses your own
 Anthropic API key (Settings → AI). If you already pay for a Claude
-subscription, connect the MCP endpoint instead (Settings → MCP) and query the
-same data at no extra cost.
+subscription, connect Bratrax from Claude's connector settings instead and ask
+about the same data at no extra cost
+([how to connect](https://bratrax.com/integrations/claude)).
 
 - **Try:** ask one scoped question, e.g. "ROAS by campaign, last 7 days."
 - **Go deeper:** [Asking Claude](/help/viewer/asking-claude) ·

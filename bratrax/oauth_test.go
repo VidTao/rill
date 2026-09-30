@@ -647,3 +647,15 @@ func TestOAuthRoutesCoexistWithAppMux(t *testing.T) {
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/.well-known/oauth-authorization-server", nil))
 	require.Contains(t, rec.Body.String(), `"issuer"`)
 }
+
+// The directory listing and the OAuth metadata both link this page; an
+// embed-path typo would compile fine and serve an empty 200.
+func TestIntegrationsClaudePage(t *testing.T) {
+	rec := httptest.NewRecorder()
+	serveIntegrationsClaude(rec, httptest.NewRequest(http.MethodGet, "/integrations/claude", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	require.Contains(t, body, "<title>Bratrax for Claude")
+	require.Contains(t, body, "https://bratrax.com/bratrax/mcp")
+	require.Contains(t, body, "privacy-policy")
+}

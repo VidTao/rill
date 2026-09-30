@@ -55,14 +55,18 @@ is added. See [AI chat & Anthropic API key](/help/admin/ai-and-api-keys).
 
 ### MCP
 
-Connect Claude Desktop (or any MCP client) to your Bratrax data:
+Connect Claude to your Bratrax data. Most people don't need anything from this
+tab: connect Bratrax from Claude's own connector settings instead (see
+[bratrax.com/integrations/claude](https://bratrax.com/integrations/claude)).
 
-- **Generate token** creates a workspace MCP token granting access to the
-  full Bratrax tool set.
-- The tab shows a ready-to-paste `claude_desktop_config.json` block with a
-  copy button, plus instructions for where the file lives.
-- **Regenerate** or **Revoke** the token at any time — anyone holding the
-  token can query your data, so treat it like a password.
+- **Connected AI assistants** lists every assistant connected that way, with
+  who connected it and when it was last used. **Disconnect** cuts it off
+  immediately.
+- For Claude Desktop setups that use a config file, **Generate token** creates
+  a workspace MCP token, and the tab shows a ready-to-paste
+  `claude_desktop_config.json` block.
+- **Regenerate** or **Revoke** the token at any time. Anyone holding the token
+  can query your data, so treat it like a password.
 
 ### Slack
 

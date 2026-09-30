@@ -164,7 +164,7 @@ func (s *OAuthService) handleProtectedResourceMetadata(w http.ResponseWriter, r 
 		"authorization_servers":    []string{s.publicURL},
 		"bearer_methods_supported": []string{"header"},
 		"resource_name":            "Bratrax",
-		"resource_documentation":   s.publicURL + "/integrations",
+		"resource_documentation":   s.publicURL + "/integrations/claude",
 	})
 }
 
@@ -188,7 +188,7 @@ func (s *OAuthService) handleAuthorizationServerMetadata(w http.ResponseWriter, 
 		// Preferred over DCR by both Claude and ChatGPT because it doesn't mint
 		// a new registration on every connection.
 		"client_id_metadata_document_supported": true,
-		"service_documentation":                 s.publicURL + "/integrations",
+		"service_documentation":                 s.publicURL + "/integrations/claude",
 	})
 }
 

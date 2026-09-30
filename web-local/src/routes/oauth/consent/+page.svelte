@@ -172,7 +172,7 @@
           <ul class="list-disc space-y-1 pl-5">
             <li>Read your store, ad and attribution metrics</li>
             <li>See your dashboards and chart your data</li>
-            <li>Read and add notes in your workspace's business knowledge</li>
+            <li>Read the business notes saved in your workspace</li>
           </ul>
           <p class="mt-3 text-bratrax-text-muted">
             It can't change your connectors, settings or billing. You can disconnect it any time in
