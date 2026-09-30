@@ -7,6 +7,7 @@ import type {
   BrandDomains,
   InvitationPreview,
   InviteResult,
+  MCPConnection,
   MCPSettings,
   OrderExclusions,
   Role,
@@ -191,6 +192,20 @@ export function regenerateMCPToken(): Promise<MCPSettings> {
 
 export function deleteMCPToken(): Promise<MCPSettings> {
   return apiFetch<MCPSettings>("/bratrax/settings/mcp", { method: "DELETE" });
+}
+
+export async function listMCPConnections(): Promise<MCPConnection[]> {
+  const res = await apiFetch<{ connections: MCPConnection[] }>(
+    "/bratrax/settings/mcp/connections",
+  );
+  return res.connections;
+}
+
+export function revokeMCPConnection(grantId: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(
+    `/bratrax/settings/mcp/connections/${encodeURIComponent(grantId)}`,
+    { method: "DELETE" },
+  );
 }
 
 // ----- Slack (@bratrax assistant) ---------------------------------------------

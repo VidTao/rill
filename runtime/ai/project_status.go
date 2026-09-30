@@ -43,7 +43,8 @@ func (t *ProjectStatus) Spec() *mcp.Tool {
 }
 
 func (t *ProjectStatus) CheckAccess(ctx context.Context) (bool, error) {
-	return checkDeveloperAccess(ctx, t.Runtime, false)
+	// Bratrax: developer surface; kept off external MCP clients (Claude/ChatGPT connector).
+	return checkDeveloperAccess(ctx, t.Runtime, true)
 }
 
 func (t *ProjectStatus) Handler(ctx context.Context, args *ProjectStatusArgs) (*ProjectStatusResult, error) {

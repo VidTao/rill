@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds the Bratrax proxy configuration.
@@ -74,6 +75,23 @@ type Config struct {
 	// match Flask's DEMO_USER_MAX_PROMPTS, which only advertises the number —
 	// this is the one that's enforced.
 	DemoUserMaxPrompts int
+
+	// --- MCP connector OAuth (Claude / ChatGPT) ---
+	//
+	// MCPOAuthEnabled turns on the OAuth authorization server in oauth.go and
+	// lets /bratrax/mcp accept its access tokens. Off by default: with it off,
+	// the discovery endpoints don't exist and /bratrax/mcp only takes brx_mcp_
+	// tokens, exactly as before. Read from BRATRAX_MCP_OAUTH_ENABLED.
+	MCPOAuthEnabled bool
+	// PublicURL is the external origin clients see (https://bratrax.com). It
+	// is the OAuth issuer and the base of the MCP resource URL, so it must be
+	// exactly what users paste into Claude. Read from BRATRAX_PUBLIC_URL,
+	// defaulting to AudienceURL, which is the same origin in production.
+	PublicURL string
+	// OAuthRedirectHosts adds hosts an OAuth redirect_uri may point at, on top
+	// of claude.ai, claude.com and chatgpt.com. Comma-separated, from
+	// BRATRAX_MCP_OAUTH_REDIRECT_HOSTS.
+	OAuthRedirectHosts []string
 }
 
 // ConfigFromEnv reads Bratrax configuration from environment variables.
@@ -162,6 +180,27 @@ func ConfigFromEnv() (*Config, error) {
 		demoUserMaxPrompts = v
 	}
 
+	mcpOAuthEnabled := false
+	if raw := os.Getenv("BRATRAX_MCP_OAUTH_ENABLED"); raw != "" {
+		v, parseErr := strconv.ParseBool(raw)
+		if parseErr != nil {
+			return nil, fmt.Errorf("bratrax: invalid BRATRAX_MCP_OAUTH_ENABLED %q: %w", raw, parseErr)
+		}
+		mcpOAuthEnabled = v
+	}
+
+	publicURL := strings.TrimSuffix(os.Getenv("BRATRAX_PUBLIC_URL"), "/")
+	if publicURL == "" {
+		publicURL = strings.TrimSuffix(audienceURL, "/")
+	}
+
+	var oauthRedirectHosts []string
+	for _, h := range strings.Split(os.Getenv("BRATRAX_MCP_OAUTH_REDIRECT_HOSTS"), ",") {
+		if h = strings.TrimSpace(h); h != "" {
+			oauthRedirectHosts = append(oauthRedirectHosts, h)
+		}
+	}
+
 	return &Config{
 		TargetURL:           u,
 		UsersDSN:            usersDSN,
@@ -178,5 +217,8 @@ func ConfigFromEnv() (*Config, error) {
 		ClientAIModel:       os.Getenv("CLIENT_AI_MODEL"),
 		DemoClientSlug:      demoClientSlug,
 		DemoUserMaxPrompts:  demoUserMaxPrompts,
+		MCPOAuthEnabled:     mcpOAuthEnabled,
+		PublicURL:           publicURL,
+		OAuthRedirectHosts:  oauthRedirectHosts,
 	}, nil
 }

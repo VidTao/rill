@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Bratrax chart</title>
+<!--
+  Bratrax show_chart widget (an MCP App, SEP-1865).
+
+  Rendered by Claude / ChatGPT in a sandboxed iframe next to a show_chart tool
+  call. Deliberately dependency-free: the tool result already carries every
+  row, so this page makes no network requests and needs no CSP allowances. It
+  talks to the host over postMessage JSON-RPC (ui/initialize, then the host
+  pushes ui/notifications/tool-result) and draws SVG itself.
+
+  Every piece of data is written with textContent / setAttribute, never
+  innerHTML: row values come from merchant data (campaign names and the like).
+-->
+<style>
+  :root {
+    --bg: transparent;
+    --fg: #1f1f1f;
+    --muted: #6b6b6b;
+    --grid: rgba(0, 0, 0, 0.08);
+    --tip-bg: #ffffff;
+    --tip-border: rgba(0, 0, 0, 0.12);
+    --s0: #4d6b00; --s1: #1f6fb2; --s2: #c2551b; --s3: #7a3d9a;
+  }
+  :root[data-theme="dark"] {
+    --fg: #ececec;
+    --muted: #a3a3a3;
+    --grid: rgba(255, 255, 255, 0.09);
+    --tip-bg: #262626;
+    --tip-border: rgba(255, 255, 255, 0.14);
+    --s0: #d4ff00; --s1: #5bc0eb; --s2: #ff8a5b; --s3: #c792ea;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--color-background-primary, var(--bg)); }
+  body {
+    color: var(--color-text-primary, var(--fg));
+    font: 13px/1.4 var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+    padding: 14px 16px 12px;
+    overflow: hidden;
+  }
+  header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  header .titles { flex: 1; min-width: 0; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { color: var(--color-text-secondary, var(--muted)); font-size: 12px; margin-top: 2px; }
+  .actions { display: flex; gap: 6px; flex: none; }
+  button {
+    font: inherit; font-size: 12px; cursor: pointer;
+    color: var(--color-text-primary, var(--fg));
+    background: transparent;
+    border: 1px solid var(--color-border-primary, var(--tip-border));
+    border-radius: 6px; padding: 4px 10px;
+  }
+  button:hover { background: var(--grid); }
+  .panel { margin-top: 12px; position: relative; }
+  .panel:first-of-type { margin-top: 0; }
+  .panel-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 4px; }
+  .panel-head .label { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .panel-head .latest { color: var(--color-text-secondary, var(--muted)); }
+  svg { display: block; width: 100%; overflow: visible; }
+  svg text { fill: var(--color-text-secondary, var(--muted)); font-size: 11px; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .guide { stroke: var(--color-text-secondary, var(--muted)); stroke-width: 1; stroke-dasharray: 3 3; }
+  .tip {
+    position: absolute; pointer-events: none; display: none; z-index: 2;
+    background: var(--tip-bg); border: 1px solid var(--tip-border); border-radius: 6px;
+    padding: 5px 8px; font-size: 12px; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+  .tip .v { font-weight: 600; }
+  .bars { display: grid; grid-template-columns: minmax(80px, 38%) 1fr auto; gap: 5px 10px; align-items: center; }
+  .bars .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bars .track { height: 14px; }
+  .bars .fill { height: 100%; border-radius: 3px; min-width: 2px; }
+  .bars .val { font-variant-numeric: tabular-nums; text-align: right; color: var(--color-text-secondary, var(--muted)); }
+  .note, .empty, .status { color: var(--color-text-secondary, var(--muted)); font-size: 12px; margin-top: 10px; }
+  .status { margin: 0; }
+</style>
+</head>
+<body>
+<p class="status" id="status">Loading chart…</p>
+<div id="root" hidden>
+  <header>
+    <div class="titles"><h1 id="title"></h1><div class="sub" id="sub"></div></div>
+    <div class="actions">
+      <button id="expand" type="button" hidden>Expand</button>
+      <button id="open" type="button" hidden>Open in Bratrax</button>
+    </div>
+  </header>
+  <div id="panels"></div>
+  <div class="note" id="note" hidden></div>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  var PROTOCOL_VERSION = "2026-01-26";
+  var state = { data: null, displayMode: "inline", width: 0, canFullscreen: false };
+
+  // --- Host bridge: JSON-RPC 2.0 over postMessage --------------------------
+
+  var nextId = 1;
+  var pending = {};
+
+  function send(msg) { window.parent.postMessage(msg, "*"); }
+
+  function request(method, params) {
+    var id = nextId++;
+    send({ jsonrpc: "2.0", id: id, method: method, params: params || {} });
+    return new Promise(function (resolve, reject) {
+      pending[id] = { resolve: resolve, reject: reject };
+      setTimeout(function () {
+        if (pending[id]) { delete pending[id]; reject(new Error("timeout: " + method)); }
+      }, 10000);
+    });
+  }
+
+  function notify(method, params) { send({ jsonrpc: "2.0", method: method, params: params || {} }); }
+
+  window.addEventListener("message", function (ev) {
+    if (ev.source !== window.parent) return;
+    var msg = ev.data;
+    if (!msg || msg.jsonrpc !== "2.0") return;
+
+    if (msg.id != null && pending[msg.id] && !msg.method) {
+      var p = pending[msg.id];
+      delete pending[msg.id];
+      if (msg.error) p.reject(msg.error); else p.resolve(msg.result);
+      return;
+    }
+    switch (msg.method) {
+      case "ui/notifications/tool-result":
+        receiveResult(msg.params);
+        break;
+      case "ui/notifications/tool-cancelled":
+        showStatus("The chart was cancelled.");
+        break;
+      case "ui/notifications/host-context-changed":
+        applyHostContext(msg.params);
+        break;
+      case "ui/resource-teardown":
+        if (msg.id != null) send({ jsonrpc: "2.0", id: msg.id, result: {} });
+        break;
+      default:
+        // An unknown request still deserves an answer, or the host waits on it.
+        if (msg.id != null && msg.method) {
+          send({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } });
+        }
+    }
+  });
+
+  function applyHostContext(ctx) {
+    if (!ctx) return;
+    if (ctx.theme) document.documentElement.setAttribute("data-theme", ctx.theme);
+    var vars = ctx.styles && ctx.styles.variables;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        if (k.indexOf("--") === 0 && typeof vars[k] === "string") {
+          document.documentElement.style.setProperty(k, vars[k]);
+        }
+      });
+    }
+    if (ctx.displayMode) state.displayMode = ctx.displayMode;
+    render();
+  }
+
+  function receiveResult(result) {
+    var sc = result && result.structuredContent;
+    if (!sc || !Array.isArray(sc.rows) || !Array.isArray(sc.series)) {
+      var text = result && result.content && result.content[0] && result.content[0].text;
+      showStatus(result && result.isError ? (text || "The chart could not be drawn.") : "No chart data.");
+      return;
+    }
+    state.data = sc;
+    render();
+  }
+
+  function showStatus(text) {
+    document.getElementById("root").hidden = true;
+    var s = document.getElementById("status");
+    s.hidden = false;
+    s.textContent = text;
+    reportSize();
+  }
+
+  // --- Formatting ----------------------------------------------------------
+
+  function fmtNumber(v, format, compact) {
+    if (v === null || v === undefined || v === "" || isNaN(Number(v))) return "–";
+    var n = Number(v);
+    var opts = {};
+    if (format === "currency_usd" || format === "currency_eur") {
+      opts.style = "currency";
+      opts.currency = format === "currency_usd" ? "USD" : "EUR";
+      opts.maximumFractionDigits = compact ? 1 : 2;
+      if (compact && Math.abs(n) >= 1000) opts.notation = "compact";
+    } else if (format === "percentage") {
+      opts.style = "percent";
+      opts.maximumFractionDigits = 1;
+    } else {
+      if (compact ? Math.abs(n) >= 1000 : Math.abs(n) >= 1e6) opts.notation = "compact";
+      opts.maximumFractionDigits = Math.abs(n) < 10 ? 2 : (compact ? 1 : 0);
+    }
+    try { return new Intl.NumberFormat(undefined, opts).format(n); } catch (e) { return String(n); }
+  }
+
+  function fmtTime(v, grain, tz) {
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    var opts = grain === "month" ? { month: "short", year: "numeric" } : { month: "short", day: "numeric" };
+    opts.timeZone = tz || "UTC";
+    try { return new Intl.DateTimeFormat(undefined, opts).format(d); } catch (e) { return d.toISOString().slice(0, 10); }
+  }
+
+  function xLabel(row, d) {
+    var v = row[d.x_field];
+    if (d.x_type === "time") return fmtTime(v, d.time_grain, d.time_zone);
+    return v === null || v === undefined || v === "" ? "(none)" : String(v);
+  }
+
+  // --- Rendering -----------------------------------------------------------
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function el(tag, attrs, text) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function svgEl(tag, attrs, text) {
+    var n = document.createElementNS(SVG_NS, tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function seriesColor(i) { return "var(--s" + (i % 4) + ")"; }
+
+  function niceTicks(min, max, count) {
+    if (min === max) { max = min === 0 ? 1 : min * 1.1; if (min > 0) min = 0; }
+    var raw = (max - min) / count;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var step = [1, 2, 2.5, 5, 10].map(function (m) { return m * mag; }).find(function (s) { return s >= raw; });
+    var lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step, ticks = [];
+    for (var t = lo; t <= hi + step / 2; t += step) ticks.push(Math.round(t / step) * step);
+    return ticks;
+  }
+
+  function render() {
+    var d = state.data;
+    if (!d) return;
+    document.getElementById("status").hidden = true;
+    document.getElementById("root").hidden = false;
+
+    document.getElementById("title").textContent = d.title || "Chart";
+    document.getElementById("sub").textContent = d.period_label || "";
+
+    var expand = document.getElementById("expand");
+    expand.hidden = !state.canFullscreen;
+    expand.textContent = state.displayMode === "fullscreen" ? "Collapse" : "Expand";
+    var open = document.getElementById("open");
+    open.hidden = !(typeof d.open_url === "string" && d.open_url.indexOf("https://") === 0);
+
+    var note = document.getElementById("note");
+    note.hidden = !d.note;
+    note.textContent = d.note || "";
+
+    var panels = document.getElementById("panels");
+    panels.replaceChildren();
+    state.width = panels.clientWidth || document.body.clientWidth || 480;
+
+    if (!d.rows.length) {
+      panels.appendChild(el("div", { "class": "empty" }, "No data for this period."));
+    } else {
+      d.series.forEach(function (s, i) {
+        panels.appendChild(d.x_type === "time" ? linePanel(d, s, i) : barPanel(d, s, i));
+      });
+    }
+    reportSize();
+  }
+
+  function panelHead(s, i, right) {
+    var head = el("div", { "class": "panel-head" });
+    var label = el("span", { "class": "label" });
+    var sw = el("span", { "class": "swatch" });
+    sw.style.background = seriesColor(i);
+    label.appendChild(sw);
+    label.appendChild(document.createTextNode(s.label));
+    head.appendChild(label);
+    if (right) head.appendChild(el("span", { "class": "latest" }, right));
+    return head;
+  }
+
+  function linePanel(d, s, i) {
+    var rows = d.rows;
+    var last = rows[rows.length - 1];
+    var panel = el("div", { "class": "panel" });
+    panel.appendChild(panelHead(s, i, xLabel(last, d) + ": " + fmtNumber(last[s.field], s.format, false)));
+
+    var W = state.width, H = state.displayMode === "fullscreen" ? 300 : 170;
+    var m = { l: 52, r: 10, t: 6, b: 22 };
+    var iw = Math.max(W - m.l - m.r, 40), ih = H - m.t - m.b;
+    var vals = rows.map(function (r) { var v = r[s.field]; return v === null || v === undefined ? null : Number(v); });
+    var present = vals.filter(function (v) { return v !== null && !isNaN(v); });
+    var ticks = niceTicks(Math.min(0, Math.min.apply(null, present.length ? present : [0])),
+                          Math.max.apply(null, present.length ? present : [1]), 4);
+    var y0 = ticks[0], y1 = ticks[ticks.length - 1];
+    var x = function (idx) { return m.l + (rows.length === 1 ? iw / 2 : (idx * iw) / (rows.length - 1)); };
+    var y = function (v) { return m.t + ih - ((v - y0) / (y1 - y0)) * ih; };
+
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, height: H, role: "img", "aria-label": s.label });
+    ticks.forEach(function (t) {
+      svg.appendChild(svgEl("line", { "class": "gridline", x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }));
+      svg.appendChild(svgEl("text", { x: m.l - 6, y: y(t) + 4, "text-anchor": "end" }, fmtNumber(t, s.format, true)));
+    });
+    var labelCount = Math.min(rows.length, Math.max(2, Math.floor(iw / 80)));
+    for (var k = 0; k < labelCount; k++) {
+      var idx = labelCount === 1 ? 0 : Math.round((k * (rows.length - 1)) / (labelCount - 1));
+      var anchor = k === 0 ? "start" : (k === labelCount - 1 ? "end" : "middle");
+      svg.appendChild(svgEl("text", { x: x(idx), y: H - 4, "text-anchor": anchor }, xLabel(rows[idx], d)));
+    }
+
+    // Line and area, broken wherever a value is missing.
+    var line = "", area = "", open = false, runStart = 0;
+    vals.forEach(function (v, idx) {
+      if (v === null || isNaN(v)) {
+        if (open) { area += "L" + x(idx - 1) + "," + y(Math.max(y0, 0)) + "L" + x(runStart) + "," + y(Math.max(y0, 0)) + "Z"; }
+        open = false;
+        return;
+      }
+      var cmd = (open ? "L" : "M") + x(idx) + "," + y(v);
+      if (!open) runStart = idx;
+      line += cmd;
+      area += cmd;
+      open = true;
+    });
+    if (open) area += "L" + x(vals.length - 1) + "," + y(Math.max(y0, 0)) + "L" + x(runStart) + "," + y(Math.max(y0, 0)) + "Z";
+    var color = seriesColor(i);
+    var areaPath = svgEl("path", { d: area, fill: color, "fill-opacity": "0.12", stroke: "none" });
+    svg.appendChild(areaPath);
+    svg.appendChild(svgEl("path", { d: line, fill: "none", stroke: color, "stroke-width": "2", "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    if (rows.length === 1) svg.appendChild(svgEl("circle", { cx: x(0), cy: y(vals[0] || 0), r: 3.5, fill: color }));
+
+    // Hover: nearest point, guide line, dot and tooltip.
+    var guide = svgEl("line", { "class": "guide", y1: m.t, y2: m.t + ih, visibility: "hidden" });
+    var dot = svgEl("circle", { r: 4, fill: color, visibility: "hidden" });
+    svg.appendChild(guide);
+    svg.appendChild(dot);
+    var tip = el("div", { "class": "tip" });
+    var overlay = svgEl("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" });
+    function move(ev) {
+      var rect = svg.getBoundingClientRect();
+      var px = ((ev.clientX - rect.left) / rect.width) * W;
+      var idx = rows.length === 1 ? 0 : Math.round(((px - m.l) / iw) * (rows.length - 1));
+      idx = Math.max(0, Math.min(rows.length - 1, idx));
+      var v = vals[idx];
+      guide.setAttribute("x1", x(idx));
+      guide.setAttribute("x2", x(idx));
+      guide.setAttribute("visibility", "visible");
+      if (v !== null && !isNaN(v)) {
+        dot.setAttribute("cx", x(idx));
+        dot.setAttribute("cy", y(v));
+        dot.setAttribute("visibility", "visible");
+      } else {
+        dot.setAttribute("visibility", "hidden");
+      }
+      tip.replaceChildren(el("div", null, xLabel(rows[idx], d)), el("div", { "class": "v" }, fmtNumber(v, s.format, false)));
+      tip.style.display = "block";
+      var left = (x(idx) / W) * rect.width;
+      var tw = tip.offsetWidth;
+      tip.style.left = Math.max(0, Math.min(rect.width - tw, left - tw / 2)) + "px";
+      tip.style.top = "22px";
+    }
+    function leave() {
+      guide.setAttribute("visibility", "hidden");
+      dot.setAttribute("visibility", "hidden");
+      tip.style.display = "none";
+    }
+    overlay.addEventListener("pointermove", move);
+    overlay.addEventListener("pointerdown", move);
+    overlay.addEventListener("pointerleave", leave);
+    svg.appendChild(overlay);
+
+    panel.appendChild(svg);
+    panel.appendChild(tip);
+    return panel;
+  }
+
+  function barPanel(d, s, i) {
+    var panel = el("div", { "class": "panel" });
+    panel.appendChild(panelHead(s, i, ""));
+    var max = 0;
+    d.rows.forEach(function (r) { var v = Number(r[s.field]); if (!isNaN(v)) max = Math.max(max, Math.abs(v)); });
+    var grid = el("div", { "class": "bars", role: "list" });
+    d.rows.forEach(function (r) {
+      var v = Number(r[s.field]);
+      var name = xLabel(r, d);
+      grid.appendChild(el("div", { "class": "name", title: name, role: "listitem" }, name));
+      var track = el("div", { "class": "track" });
+      var fill = el("div", { "class": "fill" });
+      fill.style.width = (max > 0 && !isNaN(v) ? (Math.abs(v) / max) * 100 : 0) + "%";
+      fill.style.background = seriesColor(i);
+      track.appendChild(fill);
+      grid.appendChild(track);
+      grid.appendChild(el("div", { "class": "val" }, fmtNumber(r[s.field], s.format, false)));
+    });
+    panel.appendChild(grid);
+    return panel;
+  }
+
+  // --- Size + actions ------------------------------------------------------
+
+  var lastHeight = 0;
+  function reportSize() {
+    var h = Math.ceil(document.documentElement.scrollHeight);
+    if (h === lastHeight) return;
+    lastHeight = h;
+    notify("ui/notifications/size-changed", { width: Math.ceil(document.documentElement.scrollWidth), height: h });
+  }
+
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(function () {
+      var w = document.getElementById("panels").clientWidth;
+      if (state.data && w && Math.abs(w - state.width) > 4) render(); else reportSize();
+    }).observe(document.body);
+  }
+
+  document.getElementById("expand").addEventListener("click", function () {
+    var mode = state.displayMode === "fullscreen" ? "inline" : "fullscreen";
+    request("ui/request-display-mode", { mode: mode }).then(function (res) {
+      state.displayMode = (res && res.mode) || mode;
+      render();
+    }).catch(function () {});
+  });
+
+  document.getElementById("open").addEventListener("click", function () {
+    var url = state.data && state.data.open_url;
+    if (typeof url === "string" && url.indexOf("https://") === 0) {
+      request("ui/open-link", { url: url }).catch(function () {});
+    }
+  });
+
+  // --- Start ---------------------------------------------------------------
+
+  request("ui/initialize", {
+    protocolVersion: PROTOCOL_VERSION,
+    clientInfo: { name: "bratrax-chart", version: "1.0.0" },
+    capabilities: {},
+    appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] }
+  }).then(function (res) {
+    // Offer Expand unless the host says outright that it has no fullscreen.
+    state.canFullscreen = true;
+    var ctx = (res && res.hostContext) || {};
+    var modes = ctx.availableDisplayModes || (res && res.hostCapabilities && res.hostCapabilities.availableDisplayModes);
+    if (Array.isArray(modes)) state.canFullscreen = modes.indexOf("fullscreen") !== -1;
+    applyHostContext(ctx);
+    notify("ui/notifications/initialized", {});
+    render();
+  }).catch(function () {
+    // Not an MCP Apps host. ChatGPT's legacy bridge exposes the result directly.
+  });
+
+  function fromOpenAI() {
+    var o = window.openai;
+    if (o && o.toolOutput && Array.isArray(o.toolOutput.rows)) {
+      if (o.theme) document.documentElement.setAttribute("data-theme", o.theme);
+      receiveResult({ structuredContent: o.toolOutput });
+    }
+  }
+  window.addEventListener("openai:set_globals", fromOpenAI);
+  fromOpenAI();
+
+  if (!document.documentElement.getAttribute("data-theme") && window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+  reportSize();
+})();
+</script>
+</body>
+</html>

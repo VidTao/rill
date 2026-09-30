@@ -32,7 +32,7 @@ func mcpTestSetup(t *testing.T, ensureReady EnsureReadyFn) (*http.ServeMux, *boo
 	t.Cleanup(upstream.Close)
 
 	mux := http.NewServeMux()
-	RegisterMCPHandler(mux, clientStore, authSvc, upstream.URL, ensureReady, zap.NewNop())
+	RegisterMCPHandler(mux, clientStore, authSvc, nil, upstream.URL, ensureReady, zap.NewNop())
 	return mux, &upstreamHit
 }
 

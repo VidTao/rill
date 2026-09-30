@@ -286,6 +286,11 @@ export async function onboardStart(
      * they connected their store before they had an account.
      */
     shopifyInstallToken?: string;
+    /**
+     * Entry point this account came through when it wasn't bratrax.com itself,
+     * e.g. "claude_connector". Stored on rill_clients.signup_source.
+     */
+    signupSource?: string;
   } = {},
 ): Promise<OnboardStartResult> {
   // requires_payment defaults true on the backend, so we only send the field
@@ -308,6 +313,9 @@ export async function onboardStart(
   }
   if (options.shopifyInstallToken) {
     body.shopify_install_token = options.shopifyInstallToken;
+  }
+  if (options.signupSource) {
+    body.signup_source = options.signupSource;
   }
   return apiFetch<OnboardStartResult>("/bratrax/onboard/start", {
     method: "POST",

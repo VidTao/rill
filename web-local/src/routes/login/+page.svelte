@@ -4,6 +4,21 @@
   import { bratraxLogin } from "$lib/bratrax/auth";
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
+  import { onMount } from "svelte";
+  import { getPendingInfo, resumeIdFromRedirect } from "$lib/bratrax/oauth-connect";
+
+  // Arriving from an AI assistant's Connect button: say so, and keep the
+  // consent destination when the visitor chooses to create an account instead.
+  $: redirectParam = $page.url.searchParams.get("redirect");
+  $: signupHref = redirectParam ? `/signup?redirect=${encodeURIComponent(redirectParam)}` : "/signup";
+  let connectingClient = "";
+  onMount(async () => {
+    const resume = resumeIdFromRedirect(redirectParam);
+    if (resume) {
+      const info = await getPendingInfo(resume);
+      if (info.valid && info.client_name) connectingClient = info.client_name;
+    }
+  });
 
   let email = "";
   let password = "";
@@ -54,7 +69,7 @@
         />
       </h1>
       <p class="mt-3 font-mono text-xs text-bratrax-text-muted">
-        Sign in to continue
+        {connectingClient ? `Sign in to connect ${connectingClient}` : "Sign in to continue"}
       </p>
     </div>
 
@@ -117,7 +132,7 @@
 
     <p class="mt-6 text-center font-mono text-[11px] text-bratrax-text-muted">
       Don't have an account?
-      <a href="/signup" class="text-bratrax-acid hover:underline">Create one</a>
+      <a href={signupHref} class="text-bratrax-acid hover:underline">Create one</a>
     </p>
   </div>
 </div>

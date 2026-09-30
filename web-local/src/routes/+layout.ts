@@ -22,6 +22,12 @@ import {
   needsReconnectFromStackSelections,
 } from "$lib/bratrax/onboarding/api";
 import { getChecklist } from "$lib/bratrax/onboarding/checklist";
+import {
+  CONSENT_PATH,
+  consentUrl,
+  isUserOnboardingDone,
+  readResumeHint,
+} from "$lib/bratrax/oauth-connect";
 import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient.js";
 import {
   getRuntimeServiceListFilesQueryKey,
@@ -189,7 +195,10 @@ export async function load({ url, depends, untrack, fetch }) {
     // sees getOnboardRouteIndex() === -1 and redirects it straight to the
     // user's current step, so the launcher never runs and the provider never
     // opens. See routes/onboard/oauth-launch/+page.svelte.
-    url.pathname.startsWith("/onboard/oauth-launch");
+    url.pathname.startsWith("/onboard/oauth-launch") ||
+    // AI-assistant connect (Claude / ChatGPT). The consent page decides for
+    // itself where a mid-onboarding merchant goes next; see oauth-connect.ts.
+    url.pathname.startsWith("/oauth");
 
   try {
     const me = await onboardMe();
@@ -219,6 +228,20 @@ export async function load({ url, depends, untrack, fetch }) {
     bratraxNeedsReconnect.set(
       needsReconnectFromStackSelections(me?.stack_selections),
     );
+
+    // A merchant who started connecting an AI assistant before their workspace
+    // was set up was sent through onboarding with the request remembered. Once
+    // their own part is done (activation has started), take them back to the
+    // consent page to finish connecting. Must run before the bounces below,
+    // which would otherwise park them on /onboard/loading or /developer.
+    const oauthResume = readResumeHint();
+    if (
+      oauthResume &&
+      !url.pathname.startsWith(CONSENT_PATH) &&
+      (me == null || isUserOnboardingDone(me.step))
+    ) {
+      throw redirect(307, consentUrl(oauthResume));
+    }
 
     // Fully-onboarded users typing /onboard/* directly: bounce to the
     // workspace landing. Without this they'd land on stale onboarding
@@ -328,7 +351,9 @@ export async function load({ url, depends, untrack, fetch }) {
   }
 
   // Onboarding routes are auth-gated but don't require a Rill project yet.
-  if (url.pathname.startsWith("/onboard")) {
+  // Neither does the AI-assistant consent page, which a merchant can reach
+  // before their workspace's project exists.
+  if (url.pathname.startsWith("/onboard") || url.pathname.startsWith("/oauth")) {
     return { initialized: false };
   }
 

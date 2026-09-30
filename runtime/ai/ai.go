@@ -60,6 +60,7 @@ func NewRunner(rt *runtime.Runtime, activity *activity.Client) *Runner {
 	RegisterTool(r, &QueryMetricsViewSummary{Runtime: rt})
 	RegisterTool(r, &QueryMetricsView{Runtime: rt})
 	RegisterTool(r, &CreateChart{Runtime: rt})
+	RegisterTool(r, &ShowChart{Runtime: rt})
 
 	RegisterTool(r, &DevelopFile{Runtime: rt})
 	RegisterTool(r, &ListFiles{Runtime: rt})
@@ -409,7 +410,9 @@ func RegisterTool[In, Out any](s *Runner, t Tool[In, Out]) {
 			return data, nil
 		},
 		RegisterWithMCPServer: func(srv *mcp.Server) {
-			mcp.AddTool(srv, spec, func(ctx context.Context, req *mcp.CallToolRequest, args In) (*mcp.CallToolResult, Out, error) {
+			// Bratrax: MCP clients are external (the app calls tools in-process),
+			// so they get the annotated, $ref-free definition; see mcp_external.go.
+			mcp.AddTool(srv, externalMCPSpec(spec), func(ctx context.Context, req *mcp.CallToolRequest, args In) (*mcp.CallToolResult, Out, error) {
 				s := GetSession(ctx)
 				var res Out
 				_, err := s.CallToolWithOptions(ctx, &CallToolOptions{

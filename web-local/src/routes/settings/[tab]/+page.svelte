@@ -18,6 +18,8 @@
     getMCPSettings,
     regenerateMCPToken,
     deleteMCPToken,
+    listMCPConnections,
+    revokeMCPConnection,
     getSlackSettings,
     createSlackInstallLink,
     disconnectSlack,
@@ -29,6 +31,7 @@
     AccountInfo,
     AISettings,
     BillingSummary,
+    MCPConnection,
     MCPSettings,
     PendingInvite,
     Role,
@@ -143,6 +146,10 @@
   let mcpTokenCopied = false;
   let mcpConfirmRegenerateOpen = false;
   let mcpConfirmRemoveOpen = false;
+  // AI assistants connected by OAuth. null = not loaded or unavailable, in
+  // which case the section is simply not shown.
+  let mcpConnections: MCPConnection[] | null = null;
+  let mcpRevokingGrant = "";
 
   // ----- Slack state ---------------------------------------------------------
   let slack: SlackSettings | null = null;
@@ -276,6 +283,26 @@
       mcp = await getMCPSettings();
     } catch (e: any) {
       mcpError = e.message ?? "Failed to load MCP settings";
+    }
+    try {
+      mcpConnections = await listMCPConnections();
+    } catch {
+      mcpConnections = null;
+    }
+  }
+
+  async function disconnectMCPConnection(grantId: string) {
+    mcpRevokingGrant = grantId;
+    mcpError = "";
+    mcpStatusMessage = "";
+    try {
+      await revokeMCPConnection(grantId);
+      mcpConnections = (mcpConnections ?? []).filter((c) => c.grant_id !== grantId);
+      mcpStatusMessage = "Disconnected. That assistant can no longer read your data.";
+    } catch (e: any) {
+      mcpError = e.message ?? "Failed to disconnect";
+    } finally {
+      mcpRevokingGrant = "";
     }
   }
 
@@ -1119,6 +1146,50 @@
         </div>
       {:else if mcp}
         <div class="flex flex-col gap-4">
+          {#if mcpConnections}
+            <div>
+              <h2 class="text-lg font-black text-bratrax-text-headline">
+                Connected AI assistants
+              </h2>
+              <p class="mt-2 text-sm font-light text-bratrax-text-body">
+                Assistants such as Claude and ChatGPT that were connected by
+                signing in to Bratrax. Disconnecting takes effect immediately.
+              </p>
+              {#if mcpConnections.length === 0}
+                <p class="mt-3 font-mono text-xs text-bratrax-text-muted">
+                  No assistants connected.
+                </p>
+              {:else}
+                <div class="mt-3 flex flex-col gap-2">
+                  {#each mcpConnections as conn (conn.grant_id)}
+                    <div
+                      class="flex items-center justify-between gap-3 border border-bratrax-border bg-bratrax-bg p-3"
+                    >
+                      <div class="min-w-0">
+                        <div class="text-sm font-semibold text-bratrax-text-headline">
+                          {conn.client_name}
+                        </div>
+                        <div class="font-mono text-[11px] text-bratrax-text-muted">
+                          {conn.user_email}{conn.last_used_at
+                            ? ` · last used ${formatDate(conn.last_used_at)}`
+                            : ""}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        on:click={() => disconnectMCPConnection(conn.grant_id)}
+                        disabled={mcpRevokingGrant === conn.grant_id}
+                        class="btn-bratrax btn-destructive btn-compact flex-shrink-0"
+                      >
+                        {mcpRevokingGrant === conn.grant_id ? "Disconnecting…" : "Disconnect"}
+                      </button>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
+
           <div>
             <h2 class="text-lg font-black text-bratrax-text-headline">
               Connect Claude Desktop
@@ -1129,8 +1200,8 @@
                 >claude_desktop_config.json</code
               >
               to query your Bratrax data with Claude. The token authenticates as
-              your workspace and gives Claude access to all 22 MCP tools (metrics
-              queries, SQL, file operations, workshop tools).
+              your workspace and lets Claude read your metrics and dashboards,
+              draw charts, and read and save business notes.
             </p>
             <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
               On macOS the config file lives at

@@ -145,6 +145,15 @@ export interface MCPSettings {
   claude_desktop_config: Record<string, unknown> | null;
 }
 
+/** An AI assistant connected through the OAuth flow (Claude, ChatGPT). */
+export interface MCPConnection {
+  grant_id: string;
+  client_name: string;
+  user_email: string;
+  connected_at: string | null;
+  last_used_at: string | null;
+}
+
 export interface SlackWorkspace {
   team_id: string;
   team_name: string | null;

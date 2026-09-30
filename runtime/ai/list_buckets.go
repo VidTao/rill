@@ -37,7 +37,8 @@ func (t *ListBuckets) Spec() *mcp.Tool {
 }
 
 func (t *ListBuckets) CheckAccess(ctx context.Context) (bool, error) {
-	return checkDeveloperAccess(ctx, t.Runtime, false)
+	// Bratrax: developer surface; kept off external MCP clients (Claude/ChatGPT connector).
+	return checkDeveloperAccess(ctx, t.Runtime, true)
 }
 
 func (t *ListBuckets) Handler(ctx context.Context, args *ListBucketsArgs) (*ListBucketsResult, error) {

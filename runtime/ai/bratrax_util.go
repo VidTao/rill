@@ -14,15 +14,17 @@ func checkBratraxAccess(ctx context.Context) (bool, error) {
 	return s.Claims().Can(runtime.UseAI), nil
 }
 
-// checkBratraxWriteAccess verifies the session has admin role.
-// Workshop tools (create, write, compile, deploy) require this.
-// Lite viewer users get read-only MCP (query tools + Claude chat, no workshop).
+// checkBratraxWriteAccess verifies the session has the super_admin role.
+// Workshop tools (create, write, compile, deploy, list_clients) require this.
+// It must NOT be the tenant-level "admin" role: that means "owner of one store",
+// and these tools reach across every tenant. See the Tripwires section of
+// bratrax/docs/INCIDENT_2026-07-29_cross_tenant_ai_data_leak.md.
 func checkBratraxWriteAccess(ctx context.Context) (bool, error) {
 	s := GetSession(ctx)
 	if !s.Claims().Can(runtime.UseAI) {
 		return false, nil
 	}
-	return getBratraxUserRole(ctx) == "admin", nil
+	return getBratraxUserRole(ctx) == "super_admin", nil
 }
 
 // getBratraxClientID extracts the client_id from the session's security claims.

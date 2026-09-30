@@ -50,7 +50,9 @@ func (t *ListTables) Spec() *mcp.Tool {
 func (t *ListTables) CheckAccess(ctx context.Context) (bool, error) {
 	// Bratrax: safe for customers — the ClickHouse information schema is filtered to
 	// currentDatabase(), so this lists only the caller's own tables.
-	return checkDeveloperAccess(ctx, t.Runtime, false)
+	// Bratrax: kept off external MCP clients (the Claude/ChatGPT connector surface is
+	// the curated metrics tools). The in-app agents (user agent "rill") still get it.
+	return checkDeveloperAccess(ctx, t.Runtime, true)
 }
 
 func (t *ListTables) Handler(ctx context.Context, args *ListTablesArgs) (*ListTablesResult, error) {
