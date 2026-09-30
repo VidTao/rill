@@ -7,6 +7,7 @@ import type {
   BrandDomains,
   InvitationPreview,
   InviteResult,
+  MCPConnection,
   MCPSettings,
   OrderExclusions,
   Role,
@@ -168,6 +169,15 @@ export function deleteAISettings(): Promise<AISettings> {
   return apiFetch<AISettings>("/bratrax/settings/ai", { method: "DELETE" });
 }
 
+// Pass null to go back to the default model.
+export function updateAIModel(model: string | null): Promise<AISettings> {
+  return apiFetch<AISettings>("/bratrax/settings/ai/model", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model }),
+  });
+}
+
 // ----- MCP (Claude Desktop bridge) -------------------------------------------
 
 export function getMCPSettings(): Promise<MCPSettings> {
@@ -182,6 +192,20 @@ export function regenerateMCPToken(): Promise<MCPSettings> {
 
 export function deleteMCPToken(): Promise<MCPSettings> {
   return apiFetch<MCPSettings>("/bratrax/settings/mcp", { method: "DELETE" });
+}
+
+export async function listMCPConnections(): Promise<MCPConnection[]> {
+  const res = await apiFetch<{ connections: MCPConnection[] }>(
+    "/bratrax/settings/mcp/connections",
+  );
+  return res.connections;
+}
+
+export function revokeMCPConnection(grantId: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(
+    `/bratrax/settings/mcp/connections/${encodeURIComponent(grantId)}`,
+    { method: "DELETE" },
+  );
 }
 
 // ----- Slack (@bratrax assistant) ---------------------------------------------

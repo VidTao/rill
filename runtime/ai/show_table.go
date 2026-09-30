@@ -50,7 +50,9 @@ func (t *ShowTable) Spec() *mcp.Tool {
 func (t *ShowTable) CheckAccess(ctx context.Context) (bool, error) {
 	// Bratrax: safe for customers — this tool takes no database argument, so it can only
 	// describe tables in the connector's own database.
-	return checkDeveloperAccess(ctx, t.Runtime, false)
+	// Bratrax: kept off external MCP clients (the Claude/ChatGPT connector surface is
+	// the curated metrics tools). The in-app agents (user agent "rill") still get it.
+	return checkDeveloperAccess(ctx, t.Runtime, true)
 }
 
 func (t *ShowTable) Handler(ctx context.Context, args *ShowTableArgs) (*ShowTableResult, error) {

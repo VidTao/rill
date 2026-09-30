@@ -114,11 +114,14 @@ export function backfillLabel(progressPct: number): string {
  * "2 min ago", "2 hr ago", "Yesterday", "N days ago". Absolute timestamps
  * (toLocaleString) are used in the pop-up instead.
  */
-export function relativeTime(iso: string | null | undefined): string {
+export function relativeTime(
+  iso: string | null | undefined,
+  now: number = Date.now(),
+): string {
   if (!iso) return "";
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
-  const diffMs = Date.now() - then;
+  const diffMs = now - then;
   const mins = Math.floor(diffMs / 60_000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins} min ago`;

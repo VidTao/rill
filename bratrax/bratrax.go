@@ -472,6 +472,11 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 		observability.Middleware("bratrax", logger,
 			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/integrations/shopify/index.html")))
 
+	// Claude connector docs page (integrations_claude.go). Exact match like the
+	// two above, so it shadows nothing else under /integrations.
+	observability.MuxHandle(mux, "GET /integrations/claude",
+		observability.Middleware("bratrax", logger, http.HandlerFunc(serveIntegrationsClaude)))
+
 	// /slack is the short vanity URL that appears in the Slack app listing and
 	// marketing copy; /integrations/slack is canonical. A 301 consolidates link
 	// equity on the canonical URL rather than leaving crawlers with two pages of
@@ -539,10 +544,25 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	// Health and proxy (existing routes)
 	observability.MuxHandle(mux, "/bratrax/health", observability.Middleware("bratrax", logger, healthHandler))
 
+	// MCP connector OAuth (Claude / ChatGPT directory listings). Off unless
+	// BRATRAX_MCP_OAUTH_ENABLED; see oauth.go. Its routes self-authenticate, so
+	// they are registered ahead of the /bratrax/ auth catch-all like the other
+	// public endpoints above. The /.well-known/oauth-* paths must be explicit:
+	// unrouted paths fall through to the SPA, which answers 200 with index.html,
+	// and a client reading that as metadata fails without saying why.
+	var oauthSvc *OAuthService
+	if cfg.MCPOAuthEnabled {
+		oauthSvc = NewOAuthService(newPGOAuthStore(store.DB()), authSvc, authMapper, clientStore,
+			cfg.PublicURL, cfg.OAuthRedirectHosts, logger)
+		oauthSvc.RegisterRoutes(mux)
+		logger.Info("bratrax mcp oauth enabled", zap.String("resource", oauthSvc.ResourceURL()))
+	}
+
 	// /bratrax/mcp — public MCP endpoint for Claude Desktop. Auths an opaque
-	// per-client token and forwards into the runtime's existing per-instance
-	// MCP handler. Registered before the catch-all proxy so it takes precedence.
-	RegisterMCPHandler(mux, clientStore, authSvc, cfg.RuntimeAddr, ensureReady, logger)
+	// per-client token (or, with OAuth on, a connector access token) and
+	// forwards into the runtime's existing per-instance MCP handler.
+	// Registered before the catch-all proxy so it takes precedence.
+	RegisterMCPHandler(mux, clientStore, authSvc, oauthSvc, cfg.RuntimeAddr, ensureReady, logger)
 
 	// Middleware chain: observability → auth → proxy (catch-all)
 	proxyHandler := observability.Middleware("bratrax", logger, authMapper.Middleware(proxy))

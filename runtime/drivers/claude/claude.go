@@ -39,7 +39,7 @@ var spec = drivers.Spec{
 			Type:        drivers.StringPropertyType,
 			Required:    false,
 			DisplayName: "Model",
-			Description: "The Claude model to use (e.g., 'claude-opus-4-5-20251101').",
+			Description: "The Claude model to use (e.g., 'claude-sonnet-5'). Defaults to 'claude-sonnet-5'.",
 			Placeholder: "",
 		},
 		{
@@ -48,7 +48,7 @@ var spec = drivers.Spec{
 			Required:    false,
 			DisplayName: "Max Tokens",
 			Description: "Maximum number of tokens in the response.",
-			Default:     "8192",
+			Default:     "16000",
 		},
 		{
 			Key:         "temperature",
@@ -123,20 +123,25 @@ type configProperties struct {
 	BaseURL     string   `mapstructure:"base_url"`
 }
 
+// defaultModel is used when the connector doesn't set a model. It's a plain string
+// because the pinned SDK version has no constant for it.
+const defaultModel = "claude-sonnet-5"
+
 func (c *configProperties) getModel() string {
 	if c.Model != "" {
 		return c.Model
 	}
-	return string(anthropic.ModelClaudeOpus4_5_20251101)
+	return defaultModel
 }
 
 func (c *configProperties) getMaxTokens() int {
 	if c.MaxTokens > 0 {
 		return c.MaxTokens
 	}
-	return 8192 // Default max tokens
+	// Newer models think by default and thinking counts against max_tokens, so leave
+	// room for it. Staying well under ~21K keeps the SDK from demanding streaming.
+	return 16000
 }
-
 
 type handle struct {
 	client anthropic.Client
@@ -273,7 +278,16 @@ func (h *handle) Complete(ctx context.Context, opts *drivers.CompleteOptions) (*
 		params.ToolChoice = anthropic.BetaToolChoiceUnionParam{
 			OfAuto: &anthropic.BetaToolChoiceAutoParam{},
 		}
+		if opts.NoToolCalls {
+			// Keep the tools: a history with tool_use blocks should come with the tool
+			// definitions it references, and removing them would miss the cached prefix.
+			params.ToolChoice = anthropic.BetaToolChoiceUnionParam{
+				OfNone: &anthropic.BetaToolChoiceNoneParam{},
+			}
+		}
 	}
+
+	setCacheBreakpoints(params.System, params.Tools, params.Messages)
 
 	if opts.OutputSchema != nil {
 		schemaBytes, err := json.Marshal(opts.OutputSchema)
@@ -299,10 +313,39 @@ func (h *handle) Complete(ctx context.Context, opts *drivers.CompleteOptions) (*
 	}
 
 	return &drivers.CompleteResult{
-		Message:      resMsgs,
-		InputTokens:  int(res.Usage.InputTokens),
-		OutputTokens: int(res.Usage.OutputTokens),
+		Message:                  resMsgs,
+		InputTokens:              int(res.Usage.InputTokens),
+		OutputTokens:             int(res.Usage.OutputTokens),
+		CacheCreationInputTokens: int(res.Usage.CacheCreationInputTokens),
+		CacheReadInputTokens:     int(res.Usage.CacheReadInputTokens),
 	}, nil
+}
+
+// setCacheBreakpoints marks the request for Anthropic prompt caching.
+// The API renders tools, then system, then messages, and caches by exact prefix.
+// The first breakpoint (last system block, or last tool if there is no system) caches
+// the static part of the prompt. The second (last block of the last message) caches the
+// whole conversation so far: the agent loop re-sends it unchanged on the next iteration
+// with only new tool calls appended, so it's read back at a fraction of the input price.
+func setCacheBreakpoints(system []anthropic.BetaTextBlockParam, tools []anthropic.BetaToolUnionParam, msgs []anthropic.BetaMessageParam) {
+	if len(system) > 0 {
+		system[len(system)-1].CacheControl = anthropic.NewBetaCacheControlEphemeralParam()
+	} else if len(tools) > 0 {
+		if cc := tools[len(tools)-1].GetCacheControl(); cc != nil {
+			*cc = anthropic.NewBetaCacheControlEphemeralParam()
+		}
+	}
+
+	if len(msgs) == 0 {
+		return
+	}
+	content := msgs[len(msgs)-1].Content
+	if len(content) == 0 {
+		return
+	}
+	if cc := content[len(content)-1].GetCacheControl(); cc != nil {
+		*cc = anthropic.NewBetaCacheControlEphemeralParam()
+	}
 }
 
 // convertMessages converts Rill messages to Claude beta message format.

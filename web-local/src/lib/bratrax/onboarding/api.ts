@@ -286,6 +286,11 @@ export async function onboardStart(
      * they connected their store before they had an account.
      */
     shopifyInstallToken?: string;
+    /**
+     * Entry point this account came through when it wasn't bratrax.com itself,
+     * e.g. "claude_connector". Stored on rill_clients.signup_source.
+     */
+    signupSource?: string;
   } = {},
 ): Promise<OnboardStartResult> {
   // requires_payment defaults true on the backend, so we only send the field
@@ -308,6 +313,9 @@ export async function onboardStart(
   }
   if (options.shopifyInstallToken) {
     body.shopify_install_token = options.shopifyInstallToken;
+  }
+  if (options.signupSource) {
+    body.signup_source = options.signupSource;
   }
   return apiFetch<OnboardStartResult>("/bratrax/onboard/start", {
     method: "POST",
@@ -534,6 +542,10 @@ export interface OAuthConfig {
   fb_app_id: string;
   google_client_id: string;
   bing_ads_client_id: string;
+  // True once a Google OAuth client is registered for the Microsoft Ads
+  // Google-identity leg. Gates the "Using Google sign-in?" shortcut so it does
+  // not render as a dead end before that ops step is done.
+  bing_ads_google_configured?: boolean;
 }
 
 export function getOAuthConfig(): Promise<OAuthConfig> {

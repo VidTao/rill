@@ -22,6 +22,21 @@
     trackOnce,
     seedConnectedSourcesBaseline,
   } from "$lib/bratrax/analytics";
+  import { page } from "$app/stores";
+  import {
+    getPendingInfo,
+    resumeIdFromRedirect,
+    type OAuthPendingInfo,
+  } from "$lib/bratrax/oauth-connect";
+
+  // Signing up from an AI assistant's Connect button (Claude, ChatGPT): the
+  // redirect is the consent page, which sends the new account through normal
+  // onboarding and back. Only a consent-page redirect is honoured here; any
+  // other target keeps the usual /onboard/store landing.
+  const oauthRedirect = $page.url.searchParams.get("redirect");
+  const oauthResume = resumeIdFromRedirect(oauthRedirect);
+  let connectInfo: OAuthPendingInfo = { valid: false };
+  const loginHref = oauthResume && oauthRedirect ? `/login?redirect=${encodeURIComponent(oauthRedirect)}` : "/login";
 
   let email = "";
   let password = "";
@@ -106,8 +121,12 @@
   let waitlistError = "";
 
   onMount(async () => {
-    const cfg = await getAuthConfig();
+    const [cfg, info] = await Promise.all([
+      getAuthConfig(),
+      oauthResume ? getPendingInfo(oauthResume) : Promise.resolve(connectInfo),
+    ]);
     inviteOnly = cfg.invite_only;
+    connectInfo = info;
     configLoaded = true;
   });
 
@@ -147,10 +166,14 @@
       // Exactly-once is structural: a double-submit races two requests, only one
       // creates the account and the other 4xxs on "email exists", so this line
       // is reached once. The guard is belt-and-braces.
-      trackOnce(`signup_${user.id}`, "sign_up", { method: "signup" });
+      trackOnce(`signup_${user.id}`, "sign_up", {
+        method: connectInfo.valid ? (connectInfo.source ?? "mcp_connector") : "signup",
+      });
 
       // Step 2: Create client + CH database + template
-      const result = await onboardStart(companyName);
+      const result = await onboardStart(companyName, {
+        signupSource: connectInfo.valid ? connectInfo.source : undefined,
+      });
 
       // Store client_id for subsequent onboarding steps
       sessionStorage.setItem("onboard_client_id", result.client_id);
@@ -160,8 +183,9 @@
       // instead of mistaking it for one that already existed.
       seedConnectedSourcesBaseline(result.client_id);
 
-      // Redirect to Connect your store (Screen 2)
-      await goto("/onboard/store");
+      // Connecting an AI assistant: the consent page takes over and routes the
+      // new account through onboarding. Otherwise, Connect your store (Screen 2).
+      await goto(oauthResume && oauthRedirect ? oauthRedirect : "/onboard/store");
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -195,7 +219,11 @@
         />
       </h1>
       <p class="mt-3 text-sm font-light text-bratrax-text-body">
-        Get your analytics live in under 60&nbsp;minutes
+        {#if connectInfo.valid && connectInfo.client_name}
+          Create your Bratrax account to connect {connectInfo.client_name}
+        {:else}
+          Get your analytics live in under 60&nbsp;minutes
+        {/if}
       </p>
     </div>
 
@@ -286,7 +314,7 @@
 
         <p class="text-center font-mono text-[11px] text-bratrax-text-muted">
           Already have an account?
-          <a href="/login" class="text-bratrax-acid hover:underline">Sign in</a>
+          <a href={loginHref} class="text-bratrax-acid hover:underline">Sign in</a>
         </p>
       </div>
     {:else}
@@ -401,7 +429,7 @@
 
         <p class="text-center font-mono text-[11px] text-bratrax-text-muted">
           Already have an account?
-          <a href="/login" class="text-bratrax-acid hover:underline">Sign in</a>
+          <a href={loginHref} class="text-bratrax-acid hover:underline">Sign in</a>
         </p>
       </form>
     {/if}

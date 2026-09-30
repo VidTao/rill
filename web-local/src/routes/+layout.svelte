@@ -56,6 +56,8 @@
   } from "$lib/bratrax/shopify-embed";
   import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
   import AddStoreButton from "$lib/bratrax/AddStoreButton.svelte";
+  import CommandPalette from "$lib/bratrax/command-palette/CommandPalette.svelte";
+  import CommandPaletteTrigger from "$lib/bratrax/command-palette/CommandPaletteTrigger.svelte";
   import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
   import ChecklistBanner from "$lib/bratrax/onboarding/ChecklistBanner.svelte";
   import ContinueSetupPill from "$lib/bratrax/onboarding/ContinueSetupPill.svelte";
@@ -308,6 +310,7 @@
               : null}
           >
             <svelte:fragment slot="header-extras">
+              <CommandPaletteTrigger />
               {#if isSuper || isMultiStore}
                 <ClientSwitcher />
               {/if}
@@ -501,6 +504,13 @@
 {/if}
 
 <NotificationCenter />
+
+<!-- ⌘K / Ctrl+K search over settings and help. Same gate as the header that
+     carries its trigger: nothing to search for signed-out visitors, and the
+     /embed iframe has its own minimal chrome. -->
+{#if $bratraxUser && !onEmbedPage}
+  <CommandPalette {role} onboarded={$bratraxOnboarded} {shopifyEmbedded} />
+{/if}
 
 {#if $bratraxShowWelcomeCard}
   <WelcomeCard />

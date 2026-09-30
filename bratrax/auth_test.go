@@ -18,7 +18,7 @@ type mockClientStore struct {
 	projectMap    map[string]*Client
 	userMap       map[int]*Client
 	mcpClient     *Client            // returned by GetByMCPToken when set (nil → not recognized)
-	anthropicKey  string             // returned by GetAnthropicKey when set
+	anthropicKey  string             // returned by GetAnthropicSettings when set
 	shopMap       map[string]*Client // myshopify domain → client (Shopify session-token auth)
 }
 
@@ -66,8 +66,8 @@ func (m *mockClientStore) GetByUserID(_ context.Context, userID int) (*Client, e
 	return c, nil
 }
 
-func (m *mockClientStore) GetAnthropicKey(_ context.Context, _ string) (string, error) {
-	return m.anthropicKey, nil
+func (m *mockClientStore) GetAnthropicSettings(_ context.Context, _ string) (string, string, error) {
+	return m.anthropicKey, "", nil
 }
 
 func (m *mockClientStore) GetByMCPToken(_ context.Context, _ string) (*Client, error) {

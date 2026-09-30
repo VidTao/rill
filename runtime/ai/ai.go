@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -59,6 +60,7 @@ func NewRunner(rt *runtime.Runtime, activity *activity.Client) *Runner {
 	RegisterTool(r, &QueryMetricsViewSummary{Runtime: rt})
 	RegisterTool(r, &QueryMetricsView{Runtime: rt})
 	RegisterTool(r, &CreateChart{Runtime: rt})
+	RegisterTool(r, &ShowChart{Runtime: rt})
 
 	RegisterTool(r, &DevelopFile{Runtime: rt})
 	RegisterTool(r, &ListFiles{Runtime: rt})
@@ -84,7 +86,12 @@ func NewRunner(rt *runtime.Runtime, activity *activity.Client) *Runner {
 	RegisterTool(r, &WorkshopDeploy{Runtime: rt})
 	RegisterTool(r, &WorkshopListTemplates{Runtime: rt})
 	RegisterTool(r, &WorkshopGetCatalogs{Runtime: rt})
-	RegisterTool(r, &WorkshopWriteKnowledge{Runtime: rt})
+	// DISABLED 2026-09-30 (Drasko): workshop_write_knowledge isn't used and is
+	// under reconsideration; it was the one write tool on the Claude connector,
+	// flagged in the directory review. The tool itself is intact in
+	// bratrax_workshop_write_knowledge.go. To restore, uncomment this line and
+	// the two DISABLED blocks in analyst_agent.go (tool list + Phase 4 prompt).
+	// RegisterTool(r, &WorkshopWriteKnowledge{Runtime: rt})
 	RegisterTool(r, &WorkshopReadKnowledge{Runtime: rt})
 
 	// Bratrax catalog tools
@@ -408,7 +415,9 @@ func RegisterTool[In, Out any](s *Runner, t Tool[In, Out]) {
 			return data, nil
 		},
 		RegisterWithMCPServer: func(srv *mcp.Server) {
-			mcp.AddTool(srv, spec, func(ctx context.Context, req *mcp.CallToolRequest, args In) (*mcp.CallToolResult, Out, error) {
+			// Bratrax: MCP clients are external (the app calls tools in-process),
+			// so they get the annotated, $ref-free definition; see mcp_external.go.
+			mcp.AddTool(srv, externalMCPSpec(spec), func(ctx context.Context, req *mcp.CallToolRequest, args In) (*mcp.CallToolResult, Out, error) {
 				s := GetSession(ctx)
 				var res Out
 				_, err := s.CallToolWithOptions(ctx, &CallToolOptions{
@@ -1112,6 +1121,10 @@ type CompleteOptions struct {
 	// In some cases, it's desirable to capture these intermediate messages in the parent call's context, in other cases it's better to isolate them and only expose the final result to the parent context.
 	// When UnwrapCall is true, we run the completion loop within the current call, otherwise we wrap the complete loop in a new call to isolate internal messages.
 	UnwrapCall bool
+	// TokenBudget caps what the loop may spend, in input-token equivalents (see weightedTokens).
+	// Once it's used up, the next iteration is the final one, as if MaxIterations were reached.
+	// Zero means no budget.
+	TokenBudget int
 }
 
 // Complete runs LLM completions.
@@ -1192,7 +1205,8 @@ func (s *Session) Complete(ctx context.Context, name string, out any, opts *Comp
 		// TODO: For durable execution, add messages from current scope.
 
 		// Telemetry
-		var iterations, truncations, inputTokens, outputTokens int
+		var iterations, truncations, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens, spentTokens int
+		var budgetExhausted bool
 		s.logger.Debug("completion started",
 			zap.Int("initial_messages", len(messages)),
 			zap.Int("tools_count", len(tools)),
@@ -1200,11 +1214,20 @@ func (s *Session) Complete(ctx context.Context, name string, out any, opts *Comp
 			observability.ZapCtx(ctx),
 		)
 		defer func() {
-			s.logger.Debug("completion finished",
+			// Logged at info so per-question LLM spend is visible in production logs.
+			s.logger.Info("completion finished",
+				zap.String("name", name),
 				zap.Int("iterations", iterations),
 				zap.Int("iterations_with_truncation", truncations),
 				zap.Int("added_messages", len(messages)-len(opts.Messages)),
 				zap.Int("total_messages", len(messages)),
+				zap.Int("input_tokens", inputTokens),
+				zap.Int("cache_write_tokens", cacheWriteTokens),
+				zap.Int("cache_read_tokens", cacheReadTokens),
+				zap.Int("output_tokens", outputTokens),
+				zap.Int("spent_tokens", spentTokens),
+				zap.Int("token_budget", opts.TokenBudget),
+				zap.Bool("budget_exhausted", budgetExhausted),
 				zap.Error(outErr),
 				observability.ZapCtx(ctx),
 			)
@@ -1225,19 +1248,26 @@ func (s *Session) Complete(ctx context.Context, name string, out any, opts *Comp
 				attribute.Int("added_messages", len(messages)-len(opts.Messages)),
 				attribute.Int("input_tokens", inputTokens),
 				attribute.Int("output_tokens", outputTokens),
+				attribute.Int("cache_write_tokens", cacheWriteTokens),
+				attribute.Int("cache_read_tokens", cacheReadTokens),
+				attribute.Int("spent_tokens", spentTokens),
+				attribute.Int("token_budget", opts.TokenBudget),
+				attribute.Bool("budget_exhausted", budgetExhausted),
 			)
 		}()
 
 		// Complete and execute tool calls in a loop.
 		var result *aiv1.CompletionMessage
 		for i := range opts.MaxIterations {
-			// Disable tool calls in the last iteration
-			final := i+1 == opts.MaxIterations
-			if final {
-				tools = nil
-				if i != 0 {
-					messages = append(messages, NewTextCompletionMessage(RoleUser, "Tool call limit reached. Provide a final response without additional tool calls."))
-				}
+			// Disable tool calls in the last iteration, which is either the iteration cap or
+			// the first iteration after the token budget ran out. The tools are still sent
+			// (see drivers.CompleteOptions.NoToolCalls).
+			if opts.TokenBudget > 0 && spentTokens >= opts.TokenBudget {
+				budgetExhausted = true
+			}
+			final := i+1 == opts.MaxIterations || budgetExhausted
+			if final && i != 0 {
+				messages = append(messages, NewTextCompletionMessage(RoleUser, "Tool call limit reached. Answer the user's question now using the tool results you already have, without additional tool calls. If they are not enough for a complete answer, say what is missing."))
 			}
 
 			// Truncate messages to fit within LLM context window.
@@ -1258,6 +1288,7 @@ func (s *Session) Complete(ctx context.Context, name string, out any, opts *Comp
 				Messages:     truncMessages,
 				Tools:        tools,
 				OutputSchema: outputSchema,
+				NoToolCalls:  final,
 			})
 			llmCancel()
 
@@ -1267,6 +1298,9 @@ func (s *Session) Complete(ctx context.Context, name string, out any, opts *Comp
 				resMsgsCount = len(res.Message.Content)
 				inputTokens += res.InputTokens
 				outputTokens += res.OutputTokens
+				cacheWriteTokens += res.CacheCreationInputTokens
+				cacheReadTokens += res.CacheReadInputTokens
+				spentTokens += weightedTokens(res)
 			}
 			s.logger.Debug("completion iteration got response", zap.Int("iteration", i), zap.Int("response_messages_count", resMsgsCount), zap.Error(err), observability.ZapCtx(ctx))
 
@@ -1289,6 +1323,11 @@ func (s *Session) Complete(ctx context.Context, name string, out any, opts *Comp
 			if !hasCall {
 				result = res.Message
 				break
+			}
+			if final {
+				// The model was told not to call tools but did anyway. Running them would
+				// leave no iteration to answer in, so fail instead of spending more.
+				return nil, errors.New("completion loop did not produce a final result: tool calls requested after the tool call limit")
 			}
 
 			// Add returned blocks as messages.
@@ -1541,40 +1580,85 @@ func NewTextCompletionMessage(role Role, content string) *aiv1.CompletionMessage
 	}
 }
 
-// maybeTruncateMessages keeps recent messages and a few early ones for context.
-// It's a simple placeholder strategy. In the future, we'll enhance this with AI summarization.
-func maybeTruncateMessages(messages []*aiv1.CompletionMessage) []*aiv1.CompletionMessage {
-	const (
-		maxMessages = 20 // Keep up to 20 messages total
-		keepFirst   = 4  // Always keep first 4 messages for context
-		keepLast    = 16 // Keep last 16 messages
-	)
+// maxContextChars is the serialized size of completion messages above which maybeTruncateMessages starts dropping content.
+// At roughly 4 characters per token it's about 100K tokens, well within the context windows of the models we use.
+const maxContextChars = 400_000
 
-	if len(messages) <= maxMessages {
+// truncationNotice replaces content dropped by maybeTruncateMessages.
+// It's constant so that repeated truncations don't change the prompt prefix more than necessary.
+const truncationNotice = "[Some earlier tool calls and their results were omitted to fit the context window.]"
+
+// maybeTruncateMessages drops content once the messages grow past maxContextChars.
+// Below that it returns messages unchanged, which keeps the prompt strictly append-only across loop iterations; that's what lets provider-side prompt caching work.
+// Above it, it drops the oldest tool calls together with their results first, then the oldest assistant text.
+// It never drops system or user messages, so the user's question always stays in the prompt.
+func maybeTruncateMessages(messages []*aiv1.CompletionMessage) []*aiv1.CompletionMessage {
+	sizes := make([]int, len(messages))
+	var total int
+	for i, msg := range messages {
+		sizes[i] = proto.Size(msg)
+		total += sizes[i]
+	}
+	if total <= maxContextChars {
 		return messages
 	}
 
-	var result []*aiv1.CompletionMessage
+	// Index the messages that carry results for each tool call ID.
+	resultsByID := make(map[string][]int)
+	for i, msg := range messages {
+		for _, block := range msg.Content {
+			if res := block.GetToolResult(); res != nil {
+				resultsByID[res.Id] = append(resultsByID[res.Id], i)
+			}
+		}
+	}
 
-	// Keep first messages
-	result = append(result, messages[:keepFirst]...)
+	dropped := make([]bool, len(messages))
+	drop := func(i int) {
+		if !dropped[i] {
+			dropped[i] = true
+			total -= sizes[i]
+		}
+	}
 
-	// Add truncation indicator
-	skipped := len(messages) - keepFirst - keepLast
-	result = append(result, &aiv1.CompletionMessage{
-		Role: "system",
-		Content: []*aiv1.ContentBlock{
-			{
-				BlockType: &aiv1.ContentBlock_Text{
-					Text: fmt.Sprintf("... [%d messages omitted for brevity] ...", skipped),
-				},
-			},
-		},
-	})
+	// First drop the oldest tool calls along with their results.
+	for i, msg := range messages {
+		if total <= maxContextChars {
+			break
+		}
+		for _, block := range msg.Content {
+			if call := block.GetToolCall(); call != nil {
+				drop(i)
+				for _, j := range resultsByID[call.Id] {
+					drop(j)
+				}
+			}
+		}
+	}
 
-	// Keep last messages
-	start := len(messages) - keepLast
-	result = append(result, messages[start:]...)
+	// Then, as a last resort, the oldest assistant text.
+	for i, msg := range messages {
+		if total <= maxContextChars {
+			break
+		}
+		if msg.Role == string(RoleAssistant) {
+			drop(i)
+		}
+	}
+
+	// Rebuild, putting the notice after the leading system messages.
+	// It's a user message: the claude driver hoists system messages into the system prompt, which would change the cached prefix.
+	result := make([]*aiv1.CompletionMessage, 0, len(messages)+1)
+	noticeAdded := false
+	for i, msg := range messages {
+		if !noticeAdded && msg.Role != string(RoleSystem) {
+			result = append(result, NewTextCompletionMessage(RoleUser, truncationNotice))
+			noticeAdded = true
+		}
+		if !dropped[i] {
+			result = append(result, msg)
+		}
+	}
 
 	// Make sure there are no partial tool calls/results
 	unbalancedIDs := make(map[string]bool)
@@ -1599,6 +1683,12 @@ func maybeTruncateMessages(messages []*aiv1.CompletionMessage) []*aiv1.Completio
 	})
 
 	return result
+}
+
+// weightedTokens converts an LLM call's token usage into input-token equivalents: what the call cost, divided by the model's input price per token.
+// The ratios (cache writes 1.25x, cache reads 0.1x, output 5x) are the same across current Claude models, so the result doesn't depend on which model ran.
+func weightedTokens(res *drivers.CompleteResult) int {
+	return res.InputTokens + res.CacheCreationInputTokens*5/4 + res.CacheReadInputTokens/10 + res.OutputTokens*5
 }
 
 // completionMessageID turns a UUID into a truncated ID suitable for use in completion messages (which don't require IDs to be globally unique).

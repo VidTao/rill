@@ -14,9 +14,12 @@
     getAISettings,
     updateAISettings,
     deleteAISettings,
+    updateAIModel,
     getMCPSettings,
     regenerateMCPToken,
     deleteMCPToken,
+    listMCPConnections,
+    revokeMCPConnection,
     getSlackSettings,
     createSlackInstallLink,
     disconnectSlack,
@@ -28,6 +31,7 @@
     AccountInfo,
     AISettings,
     BillingSummary,
+    MCPConnection,
     MCPSettings,
     PendingInvite,
     Role,
@@ -127,6 +131,10 @@
   let aiSaving = false;
   let aiRemoving = false;
   let aiConfirmRemoveOpen = false;
+  let aiModelSaving = false;
+  $: aiCurrentModel = ai?.models.find(
+    (m) => m.id === (ai?.model ?? ai?.default_model),
+  );
 
   // ----- MCP state -----------------------------------------------------------
   let mcp: MCPSettings | null = null;
@@ -138,6 +146,10 @@
   let mcpTokenCopied = false;
   let mcpConfirmRegenerateOpen = false;
   let mcpConfirmRemoveOpen = false;
+  // AI assistants connected by OAuth. null = not loaded or unavailable, in
+  // which case the section is simply not shown.
+  let mcpConnections: MCPConnection[] | null = null;
+  let mcpRevokingGrant = "";
 
   // ----- Slack state ---------------------------------------------------------
   let slack: SlackSettings | null = null;
@@ -245,6 +257,25 @@
     }
   }
 
+  async function saveAIModel(id: string) {
+    if (!ai || id === (ai.model ?? ai.default_model)) return;
+    aiModelSaving = true;
+    aiError = "";
+    aiSavedMessage = "";
+    try {
+      // The default is stored as null so the client follows future default changes.
+      ai = await updateAIModel(id === ai.default_model ? null : id);
+      const label = ai.models.find((m) => m.id === id)?.label ?? id;
+      aiSavedMessage = `Chat now uses ${label}`;
+    } catch (e: any) {
+      aiError = e.message ?? "Failed to change model";
+      // Put the dropdown back on the model that's actually saved.
+      ai = ai;
+    } finally {
+      aiModelSaving = false;
+    }
+  }
+
   // ---------- MCP -----------------------------------------------------------
   async function loadMCP() {
     mcpError = "";
@@ -252,6 +283,26 @@
       mcp = await getMCPSettings();
     } catch (e: any) {
       mcpError = e.message ?? "Failed to load MCP settings";
+    }
+    try {
+      mcpConnections = await listMCPConnections();
+    } catch {
+      mcpConnections = null;
+    }
+  }
+
+  async function disconnectMCPConnection(grantId: string) {
+    mcpRevokingGrant = grantId;
+    mcpError = "";
+    mcpStatusMessage = "";
+    try {
+      await revokeMCPConnection(grantId);
+      mcpConnections = (mcpConnections ?? []).filter((c) => c.grant_id !== grantId);
+      mcpStatusMessage = "Disconnected. That assistant can no longer read your data.";
+    } catch (e: any) {
+      mcpError = e.message ?? "Failed to disconnect";
+    } finally {
+      mcpRevokingGrant = "";
     }
   }
 
@@ -1032,6 +1083,39 @@
             </p>
           </div>
 
+          {#if !ai.demo_ai}
+            <div>
+              <label
+                for="ai-model"
+                class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+              >
+                Chat model
+              </label>
+              <select
+                id="ai-model"
+                value={ai.model ?? ai.default_model}
+                on:change={(e) => saveAIModel(e.currentTarget.value)}
+                disabled={!isAdminOrSuper || aiModelSaving}
+                class="w-full border border-bratrax-border bg-bratrax-surface px-4 py-3 text-sm text-bratrax-text-body focus:border-bratrax-acid focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {#each ai.models as m (m.id)}
+                  <option value={m.id}>
+                    {m.label}{m.id === ai.default_model ? " (default)" : ""}
+                  </option>
+                {/each}
+              </select>
+              <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
+                {#if aiModelSaving}
+                  Checking the model with Anthropic…
+                {:else}
+                  {aiCurrentModel?.description ?? ""}
+                  Usage is billed to your Anthropic key.{#if !isAdminOrSuper}
+                    Only admins can change the model.{/if}
+                {/if}
+              </p>
+            </div>
+          {/if}
+
           {#if aiError}
             <div
               class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
@@ -1062,6 +1146,50 @@
         </div>
       {:else if mcp}
         <div class="flex flex-col gap-4">
+          {#if mcpConnections}
+            <div>
+              <h2 class="text-lg font-black text-bratrax-text-headline">
+                Connected AI assistants
+              </h2>
+              <p class="mt-2 text-sm font-light text-bratrax-text-body">
+                Assistants such as Claude and ChatGPT that were connected by
+                signing in to Bratrax. Disconnecting takes effect immediately.
+              </p>
+              {#if mcpConnections.length === 0}
+                <p class="mt-3 font-mono text-xs text-bratrax-text-muted">
+                  No assistants connected.
+                </p>
+              {:else}
+                <div class="mt-3 flex flex-col gap-2">
+                  {#each mcpConnections as conn (conn.grant_id)}
+                    <div
+                      class="flex items-center justify-between gap-3 border border-bratrax-border bg-bratrax-bg p-3"
+                    >
+                      <div class="min-w-0">
+                        <div class="text-sm font-semibold text-bratrax-text-headline">
+                          {conn.client_name}
+                        </div>
+                        <div class="font-mono text-[11px] text-bratrax-text-muted">
+                          {conn.user_email}{conn.last_used_at
+                            ? ` · last used ${formatDate(conn.last_used_at)}`
+                            : ""}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        on:click={() => disconnectMCPConnection(conn.grant_id)}
+                        disabled={mcpRevokingGrant === conn.grant_id}
+                        class="btn-bratrax btn-destructive btn-compact flex-shrink-0"
+                      >
+                        {mcpRevokingGrant === conn.grant_id ? "Disconnecting…" : "Disconnect"}
+                      </button>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
+
           <div>
             <h2 class="text-lg font-black text-bratrax-text-headline">
               Connect Claude Desktop
@@ -1072,8 +1200,8 @@
                 >claude_desktop_config.json</code
               >
               to query your Bratrax data with Claude. The token authenticates as
-              your workspace and gives Claude access to all 22 MCP tools (metrics
-              queries, SQL, file operations, workshop tools).
+              your workspace and lets Claude read your metrics and dashboards,
+              draw charts, and read your business notes.
             </p>
             <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
               On macOS the config file lives at

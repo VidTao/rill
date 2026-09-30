@@ -87,6 +87,11 @@ func (s *Session) MCPServer(ctx context.Context) *mcp.Server {
 			continue
 		}
 		t.RegisterWithMCPServer(srv)
+		// Bratrax: show_chart renders through an MCP App resource, which only
+		// makes sense to advertise alongside the tool itself.
+		if t.Spec.Name == ShowChartName {
+			registerChartWidget(srv)
+		}
 	}
 
 	return srv

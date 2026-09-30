@@ -32,7 +32,7 @@ func mcpTestSetup(t *testing.T, ensureReady EnsureReadyFn) (*http.ServeMux, *boo
 	t.Cleanup(upstream.Close)
 
 	mux := http.NewServeMux()
-	RegisterMCPHandler(mux, clientStore, authSvc, upstream.URL, ensureReady, zap.NewNop())
+	RegisterMCPHandler(mux, clientStore, authSvc, nil, upstream.URL, ensureReady, zap.NewNop())
 	return mux, &upstreamHit
 }
 
@@ -47,7 +47,7 @@ func mcpInitRequest() *http.Request {
 // When the instance is ready, the request is proxied to the upstream runtime.
 func TestMCPHandler_EnsureReadySucceeds_Proxies(t *testing.T) {
 	ensured := false
-	mux, upstreamHit := mcpTestSetup(t, func(_ context.Context, clientDB, _ string) error {
+	mux, upstreamHit := mcpTestSetup(t, func(_ context.Context, clientDB, _, _ string) error {
 		ensured = true
 		require.Equal(t, "cod_db", clientDB)
 		return nil
@@ -64,7 +64,7 @@ func TestMCPHandler_EnsureReadySucceeds_Proxies(t *testing.T) {
 // When the instance can't be made ready, the handler returns a retryable 503
 // with a Retry-After header instead of proxying into a hard 400.
 func TestMCPHandler_EnsureReadyFails_Returns503(t *testing.T) {
-	mux, upstreamHit := mcpTestSetup(t, func(_ context.Context, _, _ string) error {
+	mux, upstreamHit := mcpTestSetup(t, func(_ context.Context, _, _, _ string) error {
 		return errors.New("controller not ready")
 	})
 

@@ -56,7 +56,22 @@ export function isShopifyEmbedded(): boolean {
   }
 
   const params = new URLSearchParams(window.location.search);
-  if (params.get("embedded") === "1" || params.has("host")) {
+  // `embedded=1` is ours — _embedded_redirect in routes/shopify_install.py
+  // adds it only once the server has decided the merchant is in the admin, so
+  // it is trusted without a frame check. That matters: the App Store grant can
+  // momentarily land top-level, which is the round trip the sticky flag exists
+  // for in the first place.
+  //
+  // `host` is Shopify's, and it is NOT evidence of embedding. Shopify appends
+  // it to EVERY OAuth redirect for an embedded app, including the Bratrax-first
+  // connect that returns to /onboard/shopify/callback in an ordinary tab.
+  // Latching there wrongly marked the whole tab embedded for the rest of its
+  // session — and nothing ever clears the flag — which hid the SETTINGS
+  // dropdown (and Connectors, which lives inside it) plus the support toggle.
+  // A merchant who connected Shopify lost the menu they need to manage
+  // connectors, with a new tab as the only way back. So `host` only counts
+  // when we are genuinely framed.
+  if (params.get("embedded") === "1" || (inIframe() && params.has("host"))) {
     markShopifyEmbedded();
     return true;
   }

@@ -2,6 +2,7 @@
   import BratraxLogo from "@rilldata/web-common/layout/BratraxLogo.svelte";
   import HeaderToggleButton from "@rilldata/web-common/layout/HeaderToggleButton.svelte";
   import SupportChatToggle from "@rilldata/web-common/features/chat/layouts/sidebar/SupportChatToggle.svelte";
+  import DataFreshnessBadge from "$lib/bratrax/freshness/DataFreshnessBadge.svelte";
   import { reserveTopLevelTab } from "$lib/bratrax/shopify-embed";
   import { createEmbedHandoff } from "$lib/bratrax/onboarding/api";
   import { theme, toggleTheme } from "$lib/bratrax/theme";
@@ -95,6 +96,10 @@
     {#if openError}
       <span class="embed-open-error">{openError}</span>
     {/if}
+
+    <!-- Here rather than beside the filter bar as on /canvas: this page has no
+         Edit link to share that slot with, and the header has the room. -->
+    <DataFreshnessBadge />
 
     <!-- No active state: this switches the theme rather than opening a panel,
          so it stays muted and acid keeps meaning "panel open". Mirrors the

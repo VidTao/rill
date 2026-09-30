@@ -26,7 +26,7 @@ type RefreshInstanceFn func(clientDB string) error
 // the InstanceRouterMiddleware runs this for /bratrax/* requests, but the MCP
 // inner route (/v1/instances/{id}/mcp) bypasses that middleware. The CLI's
 // local.App satisfies this with EnsureInstanceForClient + Runtime.Controller.
-type EnsureReadyFn func(ctx context.Context, clientDB, anthropicKey string) error
+type EnsureReadyFn func(ctx context.Context, clientDB, anthropicKey, anthropicModel string) error
 
 // RegisterInternalHandlers mounts /bratrax/internal/* endpoints. These are
 // intended for the Bratrax Flask backend to notify the Go runtime when

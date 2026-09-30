@@ -6,6 +6,7 @@
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
   import { bratraxUser } from "$lib/bratrax/auth-store";
   import BratraxChatGate from "$lib/bratrax/BratraxChatGate.svelte";
+  import DataFreshnessBadge from "$lib/bratrax/freshness/DataFreshnessBadge.svelte";
   import WelcomeBanner from "$lib/bratrax/onboarding/WelcomeBanner.svelte";
   import { autoMarkOnce } from "$lib/bratrax/onboarding/checklist";
   import type { PageData } from "./$types";
@@ -31,24 +32,28 @@
       <div class="canvas-area">
         <CanvasProvider {canvasName} {instanceId} showBanner>
           <CanvasDashboardEmbed {canvasName}>
-            <!-- Edit-dashboard button — rendered into CanvasDashboardWrapper's
-                 filter-right slot, which sits INSIDE the same max-width
-                 relative wrapper as CanvasFilters. The slotted content is
-                 absolutely positioned to that wrapper's right edge, so it
-                 lines up with the filter bar's right edge regardless of
-                 viewport width. svelte:fragment is required so the {#if}
-                 lives INSIDE the slot (Svelte 4 requires slot="..." on a
-                 direct child of the component). -->
+            <!-- Freshness badge + Edit-dashboard button — rendered into
+                 CanvasDashboardWrapper's filter-right slot, which sits INSIDE
+                 the same max-width relative wrapper as CanvasFilters. The
+                 slotted row is absolutely positioned to that wrapper's right
+                 edge, so it lines up with the filter bar's right edge
+                 regardless of viewport width. svelte:fragment is required so
+                 the {#if} lives INSIDE the slot (Svelte 4 requires slot="..."
+                 on a direct child of the component). -->
             <svelte:fragment slot="filter-right">
-              {#if isAdminOrSuper}
-                <a
-                  href={`/files/dashboards/${canvasName}.yaml`}
-                  class="canvas-edit-link"
-                  style="position: absolute; top: 0; right: var(--filter-slot-right, 0); z-index: 60;"
-                >
-                  Edit dashboard
-                </a>
-              {/if}
+              <div class="canvas-filter-right">
+                <!-- Every role: "is this number current?" is a viewer's
+                     question as much as an admin's. -->
+                <DataFreshnessBadge />
+                {#if isAdminOrSuper}
+                  <a
+                    href={`/files/dashboards/${canvasName}.yaml`}
+                    class="canvas-edit-link"
+                  >
+                    Edit dashboard
+                  </a>
+                {/if}
+              </div>
             </svelte:fragment>
           </CanvasDashboardEmbed>
         </CanvasProvider>
@@ -64,6 +69,16 @@
   .canvas-area {
     @apply flex-1 overflow-hidden;
     position: relative;
+  }
+
+  :global(.canvas-filter-right) {
+    position: absolute;
+    top: 0;
+    right: var(--filter-slot-right, 0);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   :global(.canvas-edit-link) {

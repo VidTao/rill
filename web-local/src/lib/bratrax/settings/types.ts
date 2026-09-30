@@ -120,9 +120,20 @@ export interface DemoAIQuota {
   exhausted: boolean;
 }
 
+// A Claude model the client can pick for in-app chat.
+export interface AIModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
 export interface AISettings {
   key_set: boolean;
   key_preview: string | null;
+  // The model picked in Settings → AI; null means default_model.
+  model: string | null;
+  default_model: string;
+  models: AIModelOption[];
   demo_ai?: DemoAIQuota;
 }
 
@@ -132,6 +143,15 @@ export interface MCPSettings {
   mcp_url: string;
   created_at: string | null;
   claude_desktop_config: Record<string, unknown> | null;
+}
+
+/** An AI assistant connected through the OAuth flow (Claude, ChatGPT). */
+export interface MCPConnection {
+  grant_id: string;
+  client_name: string;
+  user_email: string;
+  connected_at: string | null;
+  last_used_at: string | null;
 }
 
 export interface SlackWorkspace {

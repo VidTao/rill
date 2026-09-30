@@ -37,7 +37,7 @@ type ClientStoreInterface interface {
 	GetByRillProjectID(ctx context.Context, projectID string) (*Client, error)
 	GetDefault(ctx context.Context) (*Client, error)
 	GetByUserID(ctx context.Context, userID int) (*Client, error)
-	GetAnthropicKey(ctx context.Context, clientDB string) (string, error)
+	GetAnthropicSettings(ctx context.Context, clientDB string) (key, model string, err error)
 	GetByMCPToken(ctx context.Context, token string) (*Client, error)
 	GetByClientID(ctx context.Context, clientID string) (*Client, error)
 	GetByShopifyShop(ctx context.Context, shop string) (*Client, error)
@@ -89,28 +89,30 @@ func (s *ClientStore) GetDefault(ctx context.Context) (*Client, error) {
 	return &c, nil
 }
 
-// GetAnthropicKey returns the per-client Anthropic API key for BYOK chat.
-// Returns ("", nil) if the client has no key configured (chat will be disabled).
-// Returns ("", err) only on actual database errors. The clientDB argument is
-// the rill_clients.clickhouse_db value (the per-client slug like "vyne") —
-// matches what InstanceRouterMiddleware passes to ensure(). NOTE: this is
-// distinct from rill_clients.client_id (which is a UUID).
-func (s *ClientStore) GetAnthropicKey(ctx context.Context, clientDB string) (string, error) {
-	var key sql.NullString
-	err := s.db.GetContext(ctx, &key,
-		`SELECT anthropic_api_key FROM rill_clients WHERE clickhouse_db = $1`,
+// GetAnthropicSettings returns the per-client Anthropic API key for BYOK chat
+// and the Claude model the client picked in Settings → AI.
+// An empty key means the client has no key configured (chat will be disabled);
+// an empty model means the platform default. err is non-nil only on actual
+// database errors. The clientDB argument is the rill_clients.clickhouse_db
+// value (the per-client slug like "vyne") — matches what
+// InstanceRouterMiddleware passes to ensure(). NOTE: this is distinct from
+// rill_clients.client_id (which is a UUID).
+func (s *ClientStore) GetAnthropicSettings(ctx context.Context, clientDB string) (key, model string, err error) {
+	var row struct {
+		Key   sql.NullString `db:"anthropic_api_key"`
+		Model sql.NullString `db:"anthropic_model"`
+	}
+	err = s.db.GetContext(ctx, &row,
+		`SELECT anthropic_api_key, anthropic_model FROM rill_clients WHERE clickhouse_db = $1`,
 		clientDB,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil
+			return "", "", nil
 		}
-		return "", fmt.Errorf("bratrax clientstore: query failed: %w", err)
+		return "", "", fmt.Errorf("bratrax clientstore: query failed: %w", err)
 	}
-	if !key.Valid {
-		return "", nil
-	}
-	return key.String, nil
+	return row.Key.String, row.Model.String, nil
 }
 
 // GetByMCPToken returns the client whose mcp_token matches the given opaque
