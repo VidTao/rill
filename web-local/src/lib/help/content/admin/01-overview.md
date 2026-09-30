@@ -12,7 +12,7 @@ As an admin you can do everything a viewer can, plus build and modify the things
 
 ## What admins can do
 
-- **Connect platforms** — Shopify, Facebook, Google, TikTok, Klaviyo and more, from the Connectors tab.
+- **Connect platforms** — Shopify, Facebook, Google, TikTok, Klaviyo and more, from the [Connectors tab](https://bratrax.com/connectors).
 - **Edit dashboards** — change layout, add tiles, build new dashboards from scratch.
 - **Define metrics** — declare which numbers are available and how they're calculated.
 - **Tune Claude** — give the AI analyst business context so it answers questions correctly.

@@ -47,7 +47,7 @@ Three usual suspects:
 
 A platform's OAuth token has lapsed (typically every 30–90 days).
 
-1. Go to **Connectors**.
+1. Go to [**Connectors**](https://bratrax.com/connectors).
 2. Find the connector flagged **Needs reconnect**.
 3. Click **Reconnect** and sign in again.
 

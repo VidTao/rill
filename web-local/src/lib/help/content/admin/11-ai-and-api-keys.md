@@ -10,9 +10,9 @@ status: ready
 
 ## Where do I add my Anthropic API key in Bratrax?
 
-Go to [bratrax.com/settings](https://bratrax.com/settings) and open the **AI** tab. Paste your key there and save — the in-app chat will work immediately.
+Go to [bratrax.com/settings](https://bratrax.com/settings) and open the [**AI**](https://bratrax.com/settings/ai) tab. Paste your key there and save — the in-app chat will work immediately.
 
-If you're setting up the MCP endpoint (to use Bratrax data from Claude Desktop or another MCP-compatible client), that lives one tab over in the **MCP** tab on the same Settings page.
+If you're setting up the MCP endpoint (to use Bratrax data from Claude Desktop or another MCP-compatible client), that lives one tab over in the [**MCP**](https://bratrax.com/settings/mcp) tab on the same Settings page.
 
 ## How do I create an Anthropic API key from scratch?
 

@@ -10,7 +10,7 @@ status: ready
 
 ## How do I invite teammates to my Bratrax workspace?
 
-Open [bratrax.com/settings](https://bratrax.com/settings) and go to the **Team** tab. From there you can generate invites for as many teammates as you want — there's no per-seat fee and no cap.
+Open [bratrax.com/settings](https://bratrax.com/settings) and go to the [**Team**](https://bratrax.com/settings/team) tab. From there you can generate invites for as many teammates as you want — there's no per-seat fee and no cap.
 
 When you create an invite, you'll assign one of two roles:
 
