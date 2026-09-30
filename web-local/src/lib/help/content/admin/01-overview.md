@@ -12,10 +12,10 @@ As an admin you can do everything a viewer can, plus build and modify the things
 
 ## What admins can do
 
-- **Connect platforms** — Shopify, Facebook, Google, TikTok, Klaviyo and more, from the Connectors tab.
+- **Connect platforms** — Shopify, Facebook, Google, TikTok, Klaviyo and more, from the [Connectors tab](https://bratrax.com/connectors).
 - **Edit dashboards** — change layout, add tiles, build new dashboards from scratch.
 - **Define metrics** — declare which numbers are available and how they're calculated.
-- **Tune Claude** — give the AI analyst business context so it answers questions correctly.
+- **[Tune Claude](/help/admin/tuning-claude)** — give the AI analyst business context so it answers questions correctly.
 
 ## The three authoring folders
 
@@ -52,6 +52,8 @@ For larger or risky changes, do them in a quieter window and click around as a v
 
 ## Where to go next
 
-- **Connecting platforms** — add a data source
-- **Models, Metrics views, Canvas dashboards** — build new things
-- **Best practices** — naming and performance conventions that keep things tidy
+- [Connecting platforms](/help/admin/connecting-platforms) — add a data source
+- [Metrics views](/help/admin/metrics) and [Canvas dashboards](/help/admin/dashboards) — build new things
+- [Best practices](/help/admin/best-practices) — naming and performance conventions that keep things tidy
+- [Troubleshooting builds](/help/admin/troubleshooting) — when a save won't validate
+- [Settings](/help/admin/settings) and [Team & access](/help/admin/team-access) — manage your workspace and teammates

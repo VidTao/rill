@@ -59,4 +59,5 @@ Use the dashboard's "as of" timestamp when a number looks stale or when you are 
 - [**Attribution**](/help/viewer/attribution) — channel and campaign performance
 - [**Products**](/help/viewer/products) — product and SKU sales
 - [**Filters and time range**](/help/viewer/filters-and-time) — how to scope any dashboard
+- [**Troubleshooting**](/help/viewer/troubleshooting) — when the numbers look off
 - [**Glossary**](/help/glossary) — what each metric means

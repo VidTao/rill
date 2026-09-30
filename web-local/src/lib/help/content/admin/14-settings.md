@@ -14,9 +14,9 @@ company details, the team, billing, and integrations. Open it from the
 this menu).
 
 Settings is **not** where costs live. COGS, shipping, gateway fees, custom
-expenses, and ad-spend scoping have their own page — **Cost settings**, also in
-the SETTINGS dropdown — open it at
-[bratrax.com/cost-settings](https://bratrax.com/cost-settings).
+expenses, and ad-spend scoping have their own page —
+**[Cost settings](https://bratrax.com/cost-settings)**, also in the SETTINGS
+dropdown. See the [Cost settings & COGS guide](/help/admin/cost-settings).
 
 ## The six tabs
 
@@ -25,6 +25,16 @@ the SETTINGS dropdown — open it at
 Company name, your email, and the workspace **timezone**. The timezone drives
 how dashboard days are bucketed, so set it to match your store's timezone.
 Company name and timezone are editable by admins only.
+
+The Account tab also holds two merchant declarations, both admin-only:
+
+- **Your other domains** — extra domains you own (advertorials, bridge pages,
+  regional stores), so traffic from them isn't credited as a referral that steals
+  the ad.
+- **Exclude orders by tag** — Shopify order tags (wholesale, test, staff) whose
+  orders should be left out of your reporting.
+
+Saving either one rebuilds your data in the background (a few minutes).
 
 ### Team
 
@@ -42,9 +52,10 @@ You can't edit your own role or the workspace owner's.
 ### Billing
 
 Read-only summary of your plan: price, billing interval, status, and current
-period end. **Manage Subscription** opens the external billing portal where
-you can update payment details or cancel. See
-[Billing & subscription](/help/admin/billing).
+period end. **Manage Subscription** opens your billing portal to update payment
+details or cancel — the website (Lemon Squeezy) portal if you signed up on our
+site, or Shopify's hosted plan page if you installed from the Shopify App Store.
+See [Billing & subscription](/help/admin/billing).
 
 ### AI
 
@@ -90,5 +101,5 @@ or link a channel, and disconnect at any time. Connecting is admin-only.
 - **Passwords** are set when accepting an invite. To change a forgotten
   password, use **Forgot password?** on the login page — there is no password
   field inside Settings.
-- **Multi-store accounts** get a client switcher in the header (separate from
+- **[Multi-store accounts](/help/admin/multi-store)** get a client switcher in the header (separate from
   Settings) to jump between stores; each store has its own Settings.

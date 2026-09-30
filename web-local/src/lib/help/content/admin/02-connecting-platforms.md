@@ -23,7 +23,8 @@ Connect ad platforms, your store, and other data sources from the **Connectors**
 | Platform | First data | Ongoing refresh |
 |---|---|---|
 | Store (Shopify, WooCommerce) | Recent orders in minutes; ~1 year backfilled over hours | Hourly |
-| Ad platforms (Meta, Google, TikTok, Microsoft/Bing, Pinterest, Taboola, Outbrain) | 15–60 min to start; ~60 days backfilled over hours to days | Every 4 hours |
+| Ad platforms (Meta, Google, TikTok, Microsoft/Bing, Pinterest, Taboola, Outbrain, Amazon Ads) | 15–60 min to start; ~60 days backfilled over hours to days | Every 4 hours |
+| Amazon Seller Central (SP-API) | 30–60 min to start; recent orders backfilled over hours | Every 4 hours |
 | Email / SMS (Klaviyo, Bloomreach) | 30–60 minutes | Every 4 hours |
 
 You'll see progress on the connector card while the backfill is running.
@@ -41,15 +42,17 @@ You'll see progress on the connector card while the backfill is running.
 | Pinterest Ads | Same as Meta |
 | Taboola | Spend, impressions, clicks, conversions per campaign |
 | Outbrain | Spend, impressions, clicks, conversions per campaign |
+| Amazon Ads | Spend, impressions, clicks, conversions per campaign |
+| Amazon Seller Central | Amazon marketplace orders and sales (SP-API) |
 | Klaviyo | Email/SMS campaigns & flows, opens, clicks, attributed revenue |
 | Bloomreach | Email/SMS & engagement campaigns, attributed revenue |
-| External landing pages / Funnelish | Orders + visitor journeys via the Bratrax tracking pixel (no ad connector) |
+| External landing pages (Funnelish, or Custom / Other) | Orders + visitor journeys via the Bratrax tracking pixel (no ad connector). See [External & custom landing pages](/help/admin/external-pages) |
 
 ## Reconnecting an expired token
 
 OAuth tokens expire periodically — Shopify after 60 days, others between 30 and 90 days. When that happens:
 
-1. The connector card turns yellow with a "Reconnect" prompt.
+1. The connector shows a **Needs reconnect** flag (and a shortcut appears in the app header). We also email you that the connection dropped.
 2. Click **Reconnect** and sign in to the platform again.
 3. Backfill resumes from where it left off.
 
@@ -92,6 +95,14 @@ If an ad account doesn't appear, the Facebook login you connected with doesn't h
 Give it 30–60 seconds and refresh the connectors page at [bratrax.com/connectors](https://bratrax.com/connectors) — the connection state can lag briefly after authorization.
 
 If it still shows as disconnected after a refresh, email [support@bratrax.com](mailto:support@bratrax.com) and we'll trace it. It's usually a permissions or scope issue we can sort out quickly.
+
+### My Microsoft Ads (Bing) account signs in with Google
+
+A Microsoft Advertising account can sign in with **either** a Microsoft login or a Google one — Bratrax handles both.
+
+When you connect **Microsoft Ads** from the [Connectors](https://bratrax.com/connectors) page, if Bratrax detects that your account signs in with Google, it offers a **Continue with Google** button — click it, sign in with Google, and your Microsoft Ads data connects normally. If you already know your account uses Google, use the **"Using Google sign-in?"** shortcut on the same page to go straight there.
+
+Everything after sign-in is identical — only how you log in differs; your campaigns, spend, and reporting come through the same.
 
 ### My WooCommerce orders stopped syncing — is my firewall blocking Bratrax?
 

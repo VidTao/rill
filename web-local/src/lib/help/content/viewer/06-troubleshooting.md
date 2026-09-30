@@ -50,7 +50,7 @@ Use **Yesterday** or **Last 7 days** when you need a stable read.
 
 ## Attribution changed but Store Performance did not
 
-This can happen. Store Performance is store truth. Attribution decides which channel gets credit for the same store sales.
+This can happen. [Store Performance](https://bratrax.com/canvas/performance_overview) is store truth. [Attribution](https://bratrax.com/canvas/campaign_deep_dive) decides which channel gets credit for the same store sales.
 
 If total sales are stable but Attribution changed, the business may be fine while the source mix changed.
 

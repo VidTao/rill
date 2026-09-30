@@ -61,6 +61,7 @@ Do not automatically treat Direct as bad data. Treat a sudden Direct spike as a 
 - **Last-touch is not first-touch.** A customer may first arrive from Google but purchase later through Email or Direct.
 - **Subscription renewals can distort CPA.** Use new-customer metrics when judging acquisition.
 - **Spend without attributed sales does not always mean failure.** There may be lag, low volume, or upper-funnel activity.
+- **Your own pages can masquerade as a Referral.** If you run advertorials or bridge pages on other domains you own, a hop from one of them into your store can be counted as a *Referral* — stealing credit from the ad that paid for the visit. An admin can fix this by declaring them under [Settings → Account → Your other domains](https://bratrax.com/settings/account); see [External & custom landing pages](/help/admin/external-pages).
 
 ## Drilldown moves
 
@@ -68,6 +69,26 @@ Do not automatically treat Direct as bad data. Treat a sudden Direct spike as a 
 - If NC CPA rose, check whether spend increased, new purchases dropped, or AOV fell.
 - If Direct rose, compare Direct by day and ask whether pixel/landing evidence was missing.
 - If a campaign looks too good, check whether orders are new customers or returning customers.
+- To see *why* a campaign got credit, click an **Attributed Orders** number and open a single order — you'll see the full journey from first touch to purchase (see **The order journey** below).
+
+## The order journey
+
+The blue **Attributed Orders** numbers are clickable, and they drill all the way
+to a single order:
+
+1. Click an **Attributed Orders** number to see the **list of orders** behind it.
+2. Click an order to open its **full journey** — every step Bratrax recorded
+   before the purchase (about 30 days of history), shown as both a path graph and
+   a timeline.
+3. Click any step for the full detail of that event.
+
+The journey pulls together the customer's on-site behavior (page views,
+identifying themselves, reaching checkout), every ad touchpoint considered, the
+evidence for *why* each was matched to the order, and the purchase itself. The
+touchpoint that won the credit is highlighted for the **attribution model** you're
+viewing — switch models and the winner updates to match. It's the fastest way to
+answer "**why** did this order get credited to this campaign?" — you see the
+actual path instead of trusting the number.
 
 ## Good Claude questions
 

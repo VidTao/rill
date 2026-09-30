@@ -10,7 +10,7 @@ status: ready
 
 ## Where do I add my Anthropic API key in Bratrax?
 
-Go to [bratrax.com/settings](https://bratrax.com/settings) and open the **AI** tab. Paste your key there and save — the in-app chat will work immediately.
+Go to [bratrax.com/settings](https://bratrax.com/settings) and open the [**AI**](https://bratrax.com/settings/ai) tab. Paste your key there and save — the in-app chat will work immediately.
 
 To use Bratrax data from Claude itself instead, connect Bratrax from Claude's connector settings (see [how to connect](https://bratrax.com/integrations/claude)); connected assistants are listed one tab over in the **MCP** tab on the same Settings page.
 

@@ -47,8 +47,8 @@ Three usual suspects:
 
 A platform's OAuth token has lapsed (typically every 30–90 days).
 
-1. Go to **Connectors**.
-2. Find the yellow card.
+1. Go to [**Connectors**](https://bratrax.com/connectors).
+2. Find the connector flagged **Needs reconnect**.
 3. Click **Reconnect** and sign in again.
 
 No data is lost; the backfill resumes from where it left off.
