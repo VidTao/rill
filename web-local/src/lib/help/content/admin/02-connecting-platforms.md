@@ -96,6 +96,14 @@ Give it 30–60 seconds and refresh the connectors page at [bratrax.com/connecto
 
 If it still shows as disconnected after a refresh, email [support@bratrax.com](mailto:support@bratrax.com) and we'll trace it. It's usually a permissions or scope issue we can sort out quickly.
 
+### My Microsoft Ads (Bing) account signs in with Google
+
+A Microsoft Advertising account can sign in with **either** a Microsoft login or a Google one — Bratrax handles both.
+
+When you connect **Microsoft Ads** from the [Connectors](https://bratrax.com/connectors) page, if Bratrax detects that your account signs in with Google, it offers a **Continue with Google** button — click it, sign in with Google, and your Microsoft Ads data connects normally. If you already know your account uses Google, use the **"Using Google sign-in?"** shortcut on the same page to go straight there.
+
+Everything after sign-in is identical — only how you log in differs; your campaigns, spend, and reporting come through the same.
+
 ### My WooCommerce orders stopped syncing — is my firewall blocking Bratrax?
 
 Possibly. If your WooCommerce store shows as connected but orders have stopped
