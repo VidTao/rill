@@ -9,7 +9,8 @@
   } from "./freshness";
 
   /**
-   * "Updated 23 min ago · Next update in 17 min" beside the canvas filter bar.
+   * "Next update in 17 min" (or a red "Updated 17 days ago" when the data has
+   * stalled) beside the canvas filter bar; data age is in the tooltip.
    * Self-contained: fetches for whichever client is active, renders nothing
    * until it has an answer (or ever, if the backend can't tell). A client
    * switch is a full page reload, so there is no identity to key on here.
@@ -69,10 +70,7 @@
       {#if view.tone === "delayed"}
         <span class="freshness-dot" aria-hidden="true"></span>
       {/if}
-      <span>{view.updated}</span>
-      {#if view.next}
-        <span class="freshness-next">· {view.next}</span>
-      {/if}
+      <span>{view.text}</span>
     </div>
     <TooltipContent slot="tooltip-content" maxWidth="300px">
       {#each view.tooltip as line}
@@ -109,16 +107,5 @@
     height: 7px;
     flex: none;
     background: var(--bratrax-tomato, #e63226);
-  }
-
-  /* The badge overlays the right end of the centred filter row; the ETA is
-     the part that can go, and it stays available in the tooltip. */
-  .freshness-next {
-    display: none;
-  }
-  @media (min-width: 1280px) {
-    .freshness-next {
-      display: inline;
-    }
   }
 </style>

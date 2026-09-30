@@ -98,8 +98,7 @@
     {/if}
 
     <!-- Here rather than beside the filter bar as on /canvas: this page has no
-         Edit link to share that slot with, and the header has the room. At
-         iframe width the ETA collapses into the tooltip. -->
+         Edit link to share that slot with, and the header has the room. -->
     <DataFreshnessBadge />
 
     <!-- No active state: this switches the theme rather than opening a panel,

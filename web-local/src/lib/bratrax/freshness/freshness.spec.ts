@@ -35,19 +35,25 @@ describe("formatEta", () => {
 });
 
 describe("freshnessView", () => {
-  it("current: shows age and the next update", () => {
+  it("current: shows only the next update; the age moves to the tooltip", () => {
     const view = freshnessView(freshness({}), NOW);
     expect(view).not.toBeNull();
     expect(view!.tone).toBe("current");
-    expect(view!.updated).toBe("Updated 23 min ago");
-    expect(view!.next).toBe("Next update in 17 min");
+    expect(view!.text).toBe("Next update in 17 min");
     expect(view!.tooltip).toHaveLength(2);
+    expect(view!.tooltip[0]).toMatch(/^Updated 23 min ago — includes data /);
   });
 
-  it("current without an ETA (client config has no offset)", () => {
-    const view = freshnessView(freshness({ next_update_at: null }), NOW);
-    expect(view!.next).toBeNull();
-    expect(view!.tooltip).toHaveLength(1);
+  it("current after the tick passed but before the refetch", () => {
+    const view = freshnessView(
+      freshness({ next_update_at: "2026-09-28T14:15:00Z" }),
+      NOW,
+    );
+    expect(view!.text).toBe("Next update any minute");
+  });
+
+  it("current without an ETA (client config has no offset) renders nothing", () => {
+    expect(freshnessView(freshness({ next_update_at: null }), NOW)).toBeNull();
   });
 
   it("delayed: the stalled-client case never promises an update", () => {
@@ -61,8 +67,8 @@ describe("freshnessView", () => {
       NOW,
     );
     expect(view!.tone).toBe("delayed");
-    expect(view!.updated).toBe("Updated 17 days ago");
-    expect(view!.next).toBeNull();
+    expect(view!.text).toBe("Updated 17 days ago");
+    expect(view!.text).not.toMatch(/Next update/);
     expect(view!.tooltip[0]).toMatch(/^No new data since /);
   });
 
@@ -71,7 +77,7 @@ describe("freshnessView", () => {
       freshness({ status: "delayed", data_as_of: "2026-09-27T10:00:00Z" }),
       NOW,
     );
-    expect(view!.updated).toBe("Updated yesterday");
+    expect(view!.text).toBe("Updated yesterday");
   });
 
   it("renders nothing for unknown, null, or a missing timestamp", () => {

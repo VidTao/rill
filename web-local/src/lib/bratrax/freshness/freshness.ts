@@ -27,10 +27,13 @@ export interface DataFreshness {
 
 export interface FreshnessView {
   tone: "current" | "delayed";
-  /** "Updated 23 min ago" */
-  updated: string;
-  /** "Next update in 17 min" — null when no update is expected. */
-  next: string | null;
+  /**
+   * The one line the badge shows. Current: "Next update in 17 min" — the data
+   * age lives in the tooltip, to keep the badge short enough not to collide
+   * with the centred filter bar. Delayed: "Updated 17 days ago", since there
+   * is no next update to promise and the age is the warning.
+   */
+  text: string;
   /** Absolute-time detail for the tooltip, one line per entry. */
   tooltip: string[];
 }
@@ -89,8 +92,7 @@ export function freshnessView(
   if (data.status === "delayed") {
     return {
       tone: "delayed",
-      updated,
-      next: null,
+      text: updated,
       tooltip: [
         `No new data since ${absolute(data.data_as_of)}.`,
         "Numbers may be out of date — check that your platforms are still connected.",
@@ -98,19 +100,16 @@ export function freshnessView(
     };
   }
 
+  // Current but no ETA (the client's config.yaml has no mv_refresh offset):
+  // with the age moved to the tooltip there is nothing left to show.
   const eta = data.next_update_at ? formatEta(data.next_update_at, now) : "";
-  const tooltip = [
-    `Includes data received up to ${absolute(data.data_as_of)}.`,
-  ];
-  if (data.next_update_at) {
-    tooltip.push(
-      `Dashboards update hourly — next update around ${absolute(data.next_update_at)}.`,
-    );
-  }
+  if (!data.next_update_at || !eta) return null;
   return {
     tone: "current",
-    updated,
-    next: eta ? `Next update ${eta}` : null,
-    tooltip,
+    text: `Next update ${eta}`,
+    tooltip: [
+      `${updated} — includes data received up to ${absolute(data.data_as_of)}.`,
+      `Dashboards update hourly — next update around ${absolute(data.next_update_at)}.`,
+    ],
   };
 }
