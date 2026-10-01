@@ -15,18 +15,18 @@
 </script>
 
 <title>Bratrax for Claude — ask your store and ad data anything</title>
-<meta name="description" content="Connect Bratrax to Claude and ask about your Shopify orders and ad spend in plain English. Answers come from your own attributed data, with charts right in the conversation.">
+<meta name="description" content="Connect Bratrax to Claude and ask about your Shopify or WooCommerce orders and ad spend in plain English. Answers come from your own attributed data, with charts right in the conversation.">
 <link rel="canonical" href="https://bratrax.com/integrations/claude">
 <meta name="robots" content="index, follow">
 
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://bratrax.com/integrations/claude">
 <meta property="og:title" content="Ask Claude what actually earned the sale.">
-<meta property="og:description" content="Connect Bratrax to Claude and ask about your Shopify orders and ad spend in plain English. Answers come from your own attributed data, with charts right in the conversation.">
+<meta property="og:description" content="Connect Bratrax to Claude and ask about your Shopify or WooCommerce orders and ad spend in plain English. Answers come from your own attributed data, with charts right in the conversation.">
 <meta property="og:site_name" content="Bratrax">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Ask Claude what actually earned the sale.">
-<meta name="twitter:description" content="Connect Bratrax to Claude and ask about your Shopify orders and ad spend in plain English. Answers come from your own attributed data, with charts right in the conversation.">
+<meta name="twitter:description" content="Connect Bratrax to Claude and ask about your Shopify or WooCommerce orders and ad spend in plain English. Answers come from your own attributed data, with charts right in the conversation.">
 
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
@@ -475,6 +475,17 @@
   .prompt-list li::before { content: "“"; color: #D4FF00; margin-right: 4px; }
   .prompt-list li::after { content: "”"; color: #D4FF00; margin-left: 2px; }
   code.url { font-family: 'Space Mono', monospace; font-size: 14px; color: #D4FF00; word-break: break-all; }
+
+  /* Light motion: content fades up as it scrolls into view. */
+  .js-motion .reveal { opacity: 0; transform: translateY(14px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); transition-delay: var(--d, 0s); }
+  .js-motion .reveal.in { opacity: 1; transform: none; }
+  .js-motion .steps li.in::before { animation: step-glow 1.2s ease-out var(--d, 0s) 1; }
+  @media print { .js-motion .reveal { opacity: 1; transform: none; } }
+  @keyframes step-glow {
+    0% { box-shadow: 0 0 0 0 rgba(212,255,0,0.45); }
+    100% { box-shadow: 0 0 0 10px rgba(212,255,0,0); }
+  }
 </style>
 </head>
 <body>
@@ -514,7 +525,7 @@
       <span class="eyebrow">Bratrax for Claude</span>
       <h1>Ask Claude what actually <span class="serif-accent">earned</span> the sale.</h1>
     </div>
-    <p class="hero-sub">Connect Bratrax to Claude and ask about your Shopify orders and ad spend in plain English. Claude answers from your own attributed data &mdash; revenue, ROAS and cost per order by channel, campaign and ad &mdash; and draws the charts right in the conversation.</p>
+    <p class="hero-sub">Connect Bratrax to Claude and ask about your Shopify or WooCommerce orders and ad spend in plain English. Claude answers from your own attributed data &mdash; revenue, ROAS and cost per order by channel, campaign and ad &mdash; and draws the charts right in the conversation.</p>
     <div class="hero-cta">
       <a href="#connect" class="btn btn-primary btn-large btn-arrow">Connect in two steps</a>
       <a href="https://bratrax.com/signup" class="btn btn-outline btn-large">New to Bratrax? Start here</a>
@@ -522,27 +533,35 @@
   </div>
 </section>
 
-<!-- ─────────── CONNECT ─────────── -->
-<section class="band" id="connect">
+<!-- ─────────── HOW IT WORKS ─────────── -->
+<section class="band" id="how-it-works">
   <div class="wrap split">
     <div>
-      <h2>Already on Bratrax? <span class="serif-accent">Two</span> steps.</h2>
-      <ol class="steps">
-        <li><strong>In Claude, open the connectors directory and choose Bratrax, then Connect.</strong> If Bratrax isn't listed for your account yet, choose <em>Add custom connector</em> and paste <code class="url">https://bratrax.com/bratrax/mcp</code>.</li>
-        <li><strong>Sign in to Bratrax and approve.</strong> If you run several stores, pick the one Claude should see. You're sent straight back to Claude.</li>
-      </ol>
-      <p style="font-size:15px;margin-top:22px">Then turn Bratrax on in a chat from the tools menu, and ask away.</p>
+      <h2>How it <span class="serif-accent">works</span>.</h2>
+      <p class="lead">Bratrax is a connector for Claude. Once it's connected, Claude can look up your Bratrax numbers while it answers you.</p>
     </div>
     <div>
-      <h2>New to Bratrax? Set up <span class="serif-accent">first</span>.</h2>
-      <p style="font-size:16px">Click <em>Create one</em> on the sign-in screen. You'll go through the normal Bratrax setup &mdash; choose your plan, connect your Shopify store and your ad platforms &mdash; and land back in Claude when you're done.</p>
       <ul class="facts">
-        <li><strong>Last 14 days &mdash; minutes.</strong> Recent orders and spend arrive within 10&ndash;20 minutes of finishing setup. Until then Claude tells you the data is still importing.</li>
-        <li><strong>Full history &mdash; hours.</strong> A year of store history backfills in the background.</li>
+        <li><strong>You sign in on bratrax.com.</strong> Claude never sees your Bratrax password. You approve the connection on our site, and Claude gets a key that only works for the store you chose.</li>
+        <li><strong>Claude only reads.</strong> It can look up your metrics, list your dashboards, read the business notes saved in your workspace and draw charts. It can't change anything in Bratrax.</li>
+        <li><strong>The numbers match your dashboards.</strong> Claude queries the same attributed metrics your Bratrax dashboards use, for the store you connected.</li>
+        <li><strong>You can stop it any time.</strong> Access ends the moment you disconnect.</li>
       </ul>
-      <div class="notes" style="margin-top:22px">
-        <p>You need a Bratrax plan and a Claude plan that supports connectors. Bratrax doesn't charge extra for the connector; Claude's usage counts toward your Claude plan.</p>
-      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── CONNECT ─────────── -->
+<section class="band" id="connect">
+  <div class="wrap">
+    <h2>Set up in <span class="serif-accent">two</span> steps.</h2>
+    <ol class="steps">
+      <li><strong>In Claude, open the connectors directory and choose Bratrax, then Connect.</strong> If Bratrax isn't listed for your account yet, choose <em>Add custom connector</em> and paste <code class="url">https://bratrax.com/bratrax/mcp</code>.</li>
+      <li><strong>Sign in to Bratrax and approve.</strong> If you run several stores, pick the one Claude should see. You're sent straight back to Claude.</li>
+    </ol>
+    <p style="font-size:15px;margin-top:22px">Then turn Bratrax on in a chat from the tools menu, and ask away.</p>
+    <div class="notes" style="margin-top:22px">
+      <p>You need a Bratrax account and a Claude plan that supports connectors.</p>
     </div>
   </div>
 </section>
@@ -559,6 +578,7 @@
       <li>What does a new customer cost me on Meta versus Google?</li>
       <li>Show my top ten products by revenue this month as a bar chart.</li>
     </ul>
+    <p style="font-size:16px;margin-top:28px"><strong>Pick your attribution model.</strong> Ask for the model you trust, for example &ldquo;use first-touch&rdquo;, and Claude re-runs the numbers with it.</p>
   </div>
 </section>
 
@@ -588,6 +608,79 @@
   </div>
 </section>
 
+<!-- ─────────── TROUBLESHOOTING ─────────── -->
+<section class="band" id="troubleshooting">
+  <div class="wrap">
+    <h2>If something <span class="serif-accent">goes wrong</span>.</h2>
+    <div class="faqs">
+      <div class="faq-item">
+        <h3>Bratrax doesn't show up in my chat.</h3>
+        <p>Turn it on from the tools menu in that chat. Connectors are switched on per chat.</p>
+      </div>
+      <div class="faq-item">
+        <h3>The sign-in page says the request expired or was already used.</h3>
+        <p>Each connection request is good for a limited time and works only once. Go back to Claude and click Connect again.</p>
+      </div>
+      <div class="faq-item">
+        <h3>The sign-in page says the request was started by a different Bratrax account.</h3>
+        <p>You're signed in to Bratrax with a different login than the one you started with. Sign out, sign in with the account you want to connect, then click Connect again in Claude.</p>
+      </div>
+      <div class="faq-item">
+        <h3>The sign-in page says my workspace hasn't finished setup.</h3>
+        <p>Your workspace admin needs to finish setting up Bratrax first. Once they have, click Connect again in Claude.</p>
+      </div>
+      <div class="faq-item">
+        <h3>The sign-in page says my account doesn't have a workspace yet.</h3>
+        <p>Email <a href="mailto:support@bratrax.com" class="inline-a">support@bratrax.com</a> and we&rsquo;ll set you up.</p>
+      </div>
+      <div class="faq-item">
+        <h3>One of my stores is greyed out.</h3>
+        <p>That store hasn't finished setup. Finish setting it up in Bratrax, or connect a store that's ready.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Claude says Bratrax is still setting up or importing.</h3>
+        <p>Your first data import is running. Recent data is usually ready 10 to 20 minutes after you finish setup. Ask again then.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Claude says Bratrax hit a problem setting up my workspace.</h3>
+        <p>Our team is alerted automatically. If it isn&rsquo;t fixed within a few hours, email <a href="mailto:support@bratrax.com" class="inline-a">support@bratrax.com</a>.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Claude says Bratrax is temporarily unavailable or warming up.</h3>
+        <p>This can happen for a few seconds while your workspace starts up. Wait a moment and ask again.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Claude asks me to sign in again.</h3>
+        <p>This happens if you disconnected, if your Bratrax login was removed, or if you haven't used Bratrax in Claude for about 30 days. Click Connect and sign in again.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Claude says the connected workspace no longer exists.</h3>
+        <p>The store you approved was removed from Bratrax. Remove the connector in Claude and connect again, picking a current store.</p>
+      </div>
+      <div class="faq-item">
+        <h3>The answer seems cut off.</h3>
+        <p>Very long results are shortened so they fit in the chat. Ask for fewer rows, such as &ldquo;top 20&rdquo;, or a shorter date range.</p>
+      </div>
+      <div class="faq-item">
+        <h3>A question takes too long and fails.</h3>
+        <p>A single query has a two-minute limit. Ask about a shorter period, or one channel at a time.</p>
+      </div>
+      <div class="faq-item">
+        <h3>A chart came back empty.</h3>
+        <p>There's no data for the period you asked about, for example because a store or ad account stopped syncing. Claude is told how recent your data is, so ask about a period that ends then. Reconnect the source in Bratrax under Connectors.</p>
+      </div>
+      <div class="faq-item">
+        <h3>I can't see some data or dashboards.</h3>
+        <p>Claude sees what your Bratrax role allows, the same as in the app. Ask your workspace admin.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Still stuck?</h3>
+        <p>Remove the connector in Claude and connect again. That fixes most sign-in problems. If it doesn&rsquo;t, email <a href="mailto:support@bratrax.com" class="inline-a">support@bratrax.com</a> and tell us what Claude said.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ─────────── FAQ ─────────── -->
 <section class="band" id="faq">
   <div class="wrap">
@@ -595,27 +688,19 @@
     <div class="faqs">
       <div class="faq-item">
         <h3>Can Bratrax read my Claude conversations?</h3>
-        <p><strong>No.</strong> Bratrax only receives the specific requests Claude makes to it, such as &ldquo;attributed revenue by channel for last week&rdquo;, and answers them from your workspace. Your chats stay with Claude.</p>
+        <p><strong>No.</strong> Bratrax only receives the specific requests Claude makes to it, such as &ldquo;attributed revenue by channel for last week&rdquo;, and answers them from your workspace. Your chats stay with Claude. How we handle your data is in the <a href="https://bratrax.com/privacy-policy" class="inline-a">privacy policy</a>.</p>
       </div>
       <div class="faq-item">
         <h3>Does it cost extra?</h3>
         <p><strong>Not from Bratrax.</strong> The connector is included in your Bratrax plan. The questions you ask count toward your Claude plan&rsquo;s usage, like any other chat.</p>
       </div>
       <div class="faq-item">
-        <h3>Claude says my data is still importing.</h3>
-        <p>Your workspace is still being set up or your first data import is running. Recent data is usually ready within 10&ndash;20 minutes of finishing setup; ask again then.</p>
-      </div>
-      <div class="faq-item">
-        <h3>A chart came back empty.</h3>
-        <p>There's no data in the period you asked about &mdash; for example, if a connected store or ad account stopped syncing. Claude is told when your latest data is from, so ask for a period that ends then, and reconnect the source in Bratrax under Connectors.</p>
-      </div>
-      <div class="faq-item">
         <h3>Can my team use it too?</h3>
         <p><strong>Yes.</strong> Each teammate connects with their own Bratrax login, and sees what their role allows in the app.</p>
       </div>
       <div class="faq-item">
-        <h3>Something isn't working.</h3>
-        <p>Remove the connector in Claude and connect again &mdash; that fixes most sign-in problems. Otherwise email <a href="mailto:support@bratrax.com" class="inline-a">support@bratrax.com</a>. How we handle your data is in the <a href="https://bratrax.com/privacy-policy" class="inline-a">privacy policy</a>.</p>
+        <h3>Is this the same as the AI chat inside Bratrax?</h3>
+        <p><strong>No.</strong> The chat inside Bratrax runs on your workspace&rsquo;s own Anthropic key. This connector runs in Claude, on your Claude plan. Both read the same numbers.</p>
       </div>
     </div>
   </div>
@@ -636,6 +721,37 @@
     </p>
   </div>
 </section>
+
+<script>
+  (function () {
+    if (!('IntersectionObserver' in window)) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var groups = [
+      ['.hero-head, .hero-sub, .hero-cta', 0.08],
+      ['.band h2, .band .lead, .closer h2', 0],
+      ['.facts li, .steps li, .prompt-list li', 0.07],
+      ['.faq-item', 0.04]
+    ];
+    var els = [];
+    groups.forEach(function (g) {
+      var list = document.querySelectorAll(g[0]);
+      var prev = null, i = 0;
+      list.forEach(function (el) {
+        if (el.parentElement !== prev) { prev = el.parentElement; i = 0; }
+        el.classList.add('reveal');
+        el.style.setProperty('--d', Math.min(i++ * g[1], 0.5) + 's');
+        els.push(el);
+      });
+    });
+    document.documentElement.classList.add('js-motion');
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -8% 0px' });
+    els.forEach(function (el) { io.observe(el); });
+  })();
+</script>
 
 <!-- ─────────── DYNAMIC FOOTER (Bratrax shared partial, with inline fallback) ─────────── -->
 <div id="brx-footer" style="position:relative;z-index:1">
