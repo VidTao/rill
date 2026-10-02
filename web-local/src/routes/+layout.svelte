@@ -309,8 +309,11 @@
               ? { href: "/onboarding", label: "Getting started" }
               : null}
           >
-            <svelte:fragment slot="header-extras">
+            <svelte:fragment slot="center">
               <CommandPaletteTrigger />
+            </svelte:fragment>
+
+            <svelte:fragment slot="header-extras">
               {#if isSuper || isMultiStore}
                 <ClientSwitcher />
               {/if}

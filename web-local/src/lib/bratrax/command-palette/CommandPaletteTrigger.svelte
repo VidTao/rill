@@ -31,15 +31,19 @@
 </button>
 
 <style>
-  /* Same weight and border treatment as AddStoreButton, its neighbour in the
-     header-extras slot. */
+  /* Same weight and border treatment as AddStoreButton in the header's right
+     cluster. */
   .bratrax-palette-trigger {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     /* Twice its natural ~135px content width, so it reads as a search field
-       rather than a button; the shortcut hint sits at the right edge. */
-    width: 270px;
+       rather than a button; the shortcut hint sits at the right edge. It is
+       a flex item of ApplicationHeader's "center" slot, which squeezes it
+       toward icon-only (36px) when both clusters crowd it. */
+    flex: 0 1 270px;
+    min-width: 36px;
+    overflow: hidden;
     height: 32px;
     padding: 0 10px;
     font-family: "Space Mono", "JetBrains Mono", monospace;
@@ -64,18 +68,31 @@
     outline-offset: 2px;
   }
 
+  .bratrax-palette-trigger svg {
+    flex: none;
+  }
+
+  .bratrax-palette-trigger-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .bratrax-palette-trigger-kbd {
+    flex: none;
     margin-left: auto;
     font-family: inherit;
     font-size: 10px;
     letter-spacing: 0.5px;
+    white-space: nowrap;
     color: var(--color-text-muted, var(--fg-muted));
   }
 
   /* Icon-only on narrow headers; the title attribute still names it. */
   @media (max-width: 1100px) {
     .bratrax-palette-trigger {
-      width: auto;
+      flex-basis: auto;
     }
     .bratrax-palette-trigger-label,
     .bratrax-palette-trigger-kbd {

@@ -86,20 +86,27 @@
 </script>
 
 <header class:border-b={!onDeployPage} class="bg-surface-base">
-  {#if !onDeployPage}
-    <BratraxLogo />
+  <div class="left-cluster">
+    {#if !onDeployPage}
+      <BratraxLogo />
 
-    <span class="role-badge {roleClass}">{roleLabel ?? mode}</span>
-  {/if}
+      <span class="role-badge {roleClass}">{roleLabel ?? mode}</span>
+    {/if}
 
-  <!-- Primary nav (e.g. DASHBOARDS link): top-level destinations rendered
-       next to the role tag so the user has a constant anchor back to the
-       dashboards view from any surface (Settings, Customize, etc.). -->
-  <div class="primary-nav-slot">
-    <slot name="primary-nav" />
+    <!-- Primary nav (e.g. DASHBOARDS link): top-level destinations rendered
+         next to the role tag so the user has a constant anchor back to the
+         dashboards view from any surface (Settings, Customize, etc.). -->
+    <div class="primary-nav-slot">
+      <slot name="primary-nav" />
+    </div>
   </div>
 
-  <div class="right-cluster ml-auto flex h-full items-center">
+  <!-- Centered between the two clusters (the global search field). No wrapper:
+       the slotted element is a flex item of the header itself, so it sets its
+       own preferred and minimum width. -->
+  <slot name="center" />
+
+  <div class="right-cluster flex h-full items-center">
     <!-- Bratrax header-extras (ClientSwitcher for super_admins, AddStoreButton
          for multi-store) render in both preview and dev/edit modes. -->
     <slot name="header-extras" />
@@ -201,7 +208,8 @@
   }
 
   .nav-tabs-slot,
-  .primary-nav-slot {
+  .primary-nav-slot,
+  .left-cluster {
     @apply flex items-center h-full;
     gap: 22px;
   }
@@ -210,6 +218,33 @@
      22px gap between the three groups; icons within icon-cluster stay tight. */
   .right-cluster {
     gap: 22px;
+    justify-content: flex-end;
+  }
+
+  /* Both clusters share the free space equally, which puts the center slot
+     on the header's midline. When one cluster outgrows its half, its
+     max-content floor pushes the center toward the other side instead of
+     overlapping it or wrapping the cluster's labels; past that, the center
+     item gives up its own width before anything overflows. */
+  .left-cluster,
+  .right-cluster {
+    flex: 1 1 0;
+    min-width: max-content;
+  }
+
+  /* Narrow screens: the old layout, center item packed against the right
+     cluster. A max-content floor here would clip the avatar where the old
+     layout could still wrap a nav label to fit. 1100px is where the search
+     field collapses to an icon (CommandPaletteTrigger). */
+  @media (max-width: 1100px) {
+    .left-cluster {
+      flex: 1 1 auto;
+      min-width: auto;
+    }
+    .right-cluster {
+      flex: 0 1 auto;
+      min-width: auto;
+    }
   }
 
   /* Logo markup and styles live in BratraxLogo.svelte — Svelte scopes CSS per
