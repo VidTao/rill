@@ -472,10 +472,11 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 		observability.Middleware("bratrax", logger,
 			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/integrations/shopify/index.html")))
 
-	// Claude connector docs page (integrations_claude.go). Exact match like the
-	// two above, so it shadows nothing else under /integrations.
+	// Claude connector docs page, same shape as Shopify. The Claude directory
+	// listing and the OAuth metadata link it, so keep the URL stable.
 	observability.MuxHandle(mux, "GET /integrations/claude",
-		observability.Middleware("bratrax", logger, http.HandlerFunc(serveIntegrationsClaude)))
+		observability.Middleware("bratrax", logger,
+			serveGithubHTML("https://raw.githubusercontent.com/yuolel/bratrax-wip/refs/heads/bratrax-com-static/integrations/claude/index.html")))
 
 	// /slack is the short vanity URL that appears in the Slack app listing and
 	// marketing copy; /integrations/slack is canonical. A 301 consolidates link
