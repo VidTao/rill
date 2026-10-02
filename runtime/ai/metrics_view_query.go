@@ -48,7 +48,7 @@ Request:
 
 Response:
 - Returns aggregated data matching your query parameters
-- Includes an 'open_url' field: a shareable link that opens the same query in the Bratrax UI
+- Includes an 'open_url' field: a shareable link that opens the same query in Bratrax, for citing the numbers it returns
 
 Example: Get the total revenue by country and product category for 2024:
     {
