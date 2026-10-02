@@ -60,7 +60,7 @@ func (t *ListCanvases) Spec() *mcp.Tool {
 		Name:  ListCanvasesName,
 		Title: "List Canvases",
 		Description: "List the canvas dashboards in the current project. Each entry includes an " +
-			"open_url that opens that dashboard — link it verbatim rather than building a URL.",
+			"open_url that opens that dashboard.",
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Listing dashboards...",
 			"openai/toolInvocation/invoked":  "Listed dashboards",
