@@ -956,6 +956,13 @@
                 Expires {formatDate(billing.current_period_end)}
               </p>
             {/if}
+            {#if billing.billed_through}
+              <p
+                class="mt-2 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted"
+              >
+                Covers all your stores · billed through {billing.billed_through}
+              </p>
+            {/if}
             <div class="mt-3 flex items-center gap-2">
               <!--
                 Shopify-billed workspaces must be sent to Shopify's hosted plan

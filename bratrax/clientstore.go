@@ -141,8 +141,12 @@ func (s *ClientStore) GetByMCPToken(ctx context.Context, token string) (*Client,
 
 // GetByUserID returns the client linked to the given user via rill_users.client_id.
 // This is a proper FK lookup replacing the legacy 1:1 user.id == organization_id mapping.
-// One client can have many users (future multi-user tenancy); a user has at most one client.
+// One client can have many users; a user has at most one home client.
 // Returns (nil, nil) if the user has no client or the user does not exist.
+//
+// For a multi-store user this is the HOME store, the one they started in: the
+// column does not follow switch-client. It is the right answer for "which store
+// is this request for" only when nothing better is known; see resolveActiveClient.
 //
 // Note: super_admin users have client_id=NULL; this returns nil for them. Use
 // GetByClientID after resolving the super_admin's active client (cookie /
@@ -150,7 +154,8 @@ func (s *ClientStore) GetByMCPToken(ctx context.Context, token string) (*Client,
 func (s *ClientStore) GetByUserID(ctx context.Context, userID int) (*Client, error) {
 	var c Client
 	err := s.db.GetContext(ctx, &c,
-		`SELECT c.client_id, c.company_name, c.clickhouse_db, c.rill_project_id, c.created_at
+		`SELECT c.client_id, c.company_name, c.clickhouse_db, c.rill_project_id,
+		        c.multi_client_id, c.created_at
 		 FROM rill_clients c
 		 INNER JOIN rill_users u ON u.client_id = c.client_id
 		 WHERE u.id = $1`,
@@ -266,7 +271,10 @@ func (s *ClientStore) ListByMultiClientID(ctx context.Context, multiClientID str
 // ListAllWithAdminEmail returns every client with the earliest-created admin
 // user's email attached. NULL when no admin exists for a client (e.g. a
 // half-onboarded row). The subquery filters `role = 'admin'` so super_admins
-// — who have client_id IS NULL per Track K — are correctly excluded.
+// — who have client_id IS NULL per Track K — are correctly excluded. A
+// multi-store sub-store usually has no admin of its own (users keep their
+// first store's client_id), so the parent's admins count for it too, preferring
+// the store's own.
 //
 // Ordering: active clients first (alphabetical), then the rest
 // (alphabetical). `rill_clients.active` is the SoT flag the reconcile +
@@ -279,8 +287,9 @@ func (s *ClientStore) ListAllWithAdminEmail(ctx context.Context) ([]ClientWithAd
 		   c.client_id, c.company_name, c.clickhouse_db, c.rill_project_id, c.created_at,
 		   (SELECT u.email
 		      FROM rill_users u
-		     WHERE u.client_id = c.client_id AND u.role = 'admin'
-		     ORDER BY u.created_at ASC
+		     WHERE (u.client_id = c.client_id OR u.multi_client_id = c.multi_client_id)
+		       AND u.role = 'admin'
+		     ORDER BY CASE WHEN u.client_id = c.client_id THEN 0 ELSE 1 END, u.created_at ASC
 		     LIMIT 1) AS admin_email
 		 FROM rill_clients c
 		 ORDER BY (c.active IS TRUE) DESC, c.company_name ASC, c.created_at ASC`,

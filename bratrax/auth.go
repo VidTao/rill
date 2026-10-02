@@ -19,10 +19,18 @@ import (
 type bratraxClaims = jwt.RegisteredClaims
 
 // activeClientCookieName carries the currently-selected client_id for
-// cross-client super_admins. Set by /bratrax/auth/switch-client (and by
-// the middleware on first request, falling back to last_client_id then
-// to the first client in the list). Empty / missing for non-super_admins.
+// super_admins and multi-store users. Set by /bratrax/auth/switch-client (and,
+// for super_admins, by the middleware on first request, falling back to
+// last_client_id then to the first client in the list). Empty / missing for
+// single-store users.
 const activeClientCookieName = "bratrax_active_client"
+
+// shopifySessionHeader carries an App Bridge session token ALONGSIDE a bratrax
+// JWT bearer. Inside the Shopify admin iframe the active-client cookie can never
+// be stored (SameSite=Lax), so a JWT names the user but not the store; this
+// header names the shop the iframe belongs to. Only ever narrows the choice to
+// a store the user may already open — see clientFromShopifySessionHeader.
+const shopifySessionHeader = "X-Shopify-Session-Token"
 
 // headersToStrip lists request headers that the middleware must remove
 // before forwarding, to prevent spoofing from untrusted clients.
@@ -164,8 +172,9 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 4. Resolve active client.
-		//    - admin/viewer: rill_users.client_id FK (one user → one client)
+		// 4. Resolve active client (see resolveActiveClient for the full order).
+		//    - admin/viewer, single-store: rill_users.client_id FK
+		//    - admin/viewer, multi-store: cookie → last_client_id → rill_users.client_id
 		//    - super_admin: bratrax_active_client cookie → last_client_id → first-in-list
 		//    Users without a linked client are allowed through for onboarding routes
 		//    (their client is created by /onboard/start).
@@ -390,10 +399,14 @@ func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, e
 
 // resolveActiveClient picks the client to use for this request.
 //
+//   - Any role, inside the Shopify admin iframe: the store that owns the shop
+//     named by the X-Shopify-Session-Token header, when the user may open it.
 //   - admin/viewer (single-store): rill_users.client_id (existing FK).
 //   - admin/viewer (multi-store, multi_client_id != NULL): bratrax_active_client
-//     cookie if it points at a sibling under the same multi_client_id;
-//     otherwise rill_users.client_id (the "home" sub-store).
+//     cookie if it points at a sibling under the same multi_client_id; else
+//     last_client_id (where they last switched to) if it is a sibling;
+//     otherwise rill_users.client_id (the "home" sub-store, which never
+//     follows a switch).
 //   - super_admin: reads the bratrax_active_client cookie; if missing or
 //     stale, falls back to user.last_client_id, then to the first client
 //     by company_name. The second return value is the cookie value the
@@ -403,22 +416,38 @@ func (a *AuthMapper) ResolveClientFromCookie(r *http.Request) (*User, *Client, e
 // Returns (nil, "", nil) if no client could be resolved (e.g. mid-onboarding,
 // or zero clients in the system). The caller decides whether that's an error.
 func (a *AuthMapper) resolveActiveClient(ctx context.Context, user *User, r *http.Request) (*Client, string, error) {
+	if client := a.clientFromShopifySessionHeader(ctx, user, r); client != nil {
+		return client, "", nil
+	}
+
 	if user.Role != "super_admin" {
-		// Multi-store user: cookie wins if it points at a sibling. Falls back
-		// to the home sub-store on rill_users.client_id. Guards against
-		// hijacking: even if a hostile cookie names another tenant's client,
-		// it only takes effect when that client is under the user's parent.
+		// Multi-store user: cookie wins if it points at a sibling, then
+		// last_client_id. Guards against hijacking: even if a hostile cookie
+		// names another tenant's client, it only takes effect when that client
+		// is under the user's parent.
 		if user.MultiClientID != nil && *user.MultiClientID != "" {
 			if cookie, cookieErr := r.Cookie(activeClientCookieName); cookieErr == nil && cookie.Value != "" {
 				client, err := a.clientStore.GetByClientID(ctx, cookie.Value)
 				if err != nil {
 					return nil, "", err
 				}
-				if client != nil && client.MultiClientID != nil &&
-					*client.MultiClientID == *user.MultiClientID {
+				if client != nil && userCanOpenClient(user, client) {
 					return client, "", nil
 				}
 				// Cookie missing / pointing at a foreign client — fall through.
+			}
+			// HandleSwitchClient persists last_client_id so the next session
+			// lands where the user left off. Without this only super_admins got
+			// that: a multi-store user whose cookie expired, or who opened a new
+			// browser, was silently put back on their first store.
+			if user.LastClientID != nil && *user.LastClientID != "" {
+				client, err := a.clientStore.GetByClientID(ctx, *user.LastClientID)
+				if err != nil {
+					return nil, "", err
+				}
+				if client != nil && userCanOpenClient(user, client) {
+					return client, "", nil
+				}
 			}
 		}
 		client, err := a.clientStore.GetByUserID(ctx, user.ID)
@@ -459,6 +488,55 @@ func (a *AuthMapper) resolveActiveClient(ctx context.Context, user *User, r *htt
 	}
 	first := all[0]
 	return &first, first.ClientID, nil
+}
+
+// clientFromShopifySessionHeader returns the store that owns the shop named by
+// the X-Shopify-Session-Token header, or nil to fall through to the normal
+// resolution order.
+//
+// Only reached on the JWT path: when the session token is itself the bearer,
+// serveShopifySession already resolves shop -> client. This covers a merchant
+// who signed in inside the iframe, whose requests carry a bratrax JWT that
+// names them but not the store. Without it, a multi-store merchant working in
+// their second shop's admin saw and wrote to their first store.
+//
+// The token is verified, and the shop's store is used only if the user may
+// already open it, so the header can only choose between stores the user
+// could switch to anyway. Any failure falls through rather than erroring: the
+// header is a hint about which store, never the credential.
+func (a *AuthMapper) clientFromShopifySessionHeader(ctx context.Context, user *User, r *http.Request) *Client {
+	token := r.Header.Get(shopifySessionHeader)
+	if token == "" {
+		return nil
+	}
+	shop, err := verifyShopifySessionToken(token, a.shopifyClientID, a.shopifyClientSecret)
+	if err != nil {
+		return nil
+	}
+	client, err := a.clientStore.GetByShopifyShop(ctx, shop)
+	if err != nil {
+		a.logger.Warn("shopify session header: shop lookup failed", zap.String("shop", shop), zap.Error(err))
+		return nil
+	}
+	if client == nil || !userCanOpenClient(user, client) {
+		return nil
+	}
+	return client
+}
+
+// userCanOpenClient reports whether the user may act on the client: any client
+// for a super_admin, otherwise their own client or a sibling under the same
+// multi-store parent. The same rule HandleSwitchClient enforces.
+func userCanOpenClient(user *User, client *Client) bool {
+	switch {
+	case user.Role == "super_admin":
+		return true
+	case user.ClientID != nil && *user.ClientID == client.ClientID:
+		return true
+	default:
+		return user.MultiClientID != nil && *user.MultiClientID != "" &&
+			client.MultiClientID != nil && *client.MultiClientID == *user.MultiClientID
+	}
 }
 
 // stripBratraxHeaders removes all Bratrax identity headers from a request

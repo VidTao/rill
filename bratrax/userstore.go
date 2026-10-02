@@ -22,9 +22,9 @@ type User struct {
 	Role         string    `db:"role"          json:"role"`
 	ProjectID    *string   `db:"project_id"    json:"project_id"`
 	ClientID     *string   `db:"client_id"     json:"client_id,omitempty"`
-	// LastClientID is the most recent client a super_admin was active on. Used
-	// as a fallback when the bratrax_active_client cookie is missing/invalid
-	// (e.g. fresh login). NULL for new super_admins until their first switch.
+	// LastClientID is the most recent client a super_admin or multi-store user
+	// switched to. Used as a fallback when the bratrax_active_client cookie is
+	// missing/invalid (e.g. fresh login). NULL until their first switch.
 	LastClientID *string   `db:"last_client_id" json:"last_client_id,omitempty"`
 	// MultiClientID ties a non-super_admin user to a rill_multi_clients parent.
 	// NULL for legacy single-store users (no behavior change). When set, the
@@ -115,8 +115,13 @@ func (s *UserStore) GetByID(ctx context.Context, id int) (*User, error) {
 }
 
 // GetPrimaryUserForClient returns the account a Shopify session token should
-// act as: the earliest-created admin on the client, falling back to the
-// earliest non-viewer.
+// act as: the earliest-created admin whose rill_users.client_id is this client,
+// falling back to the earliest admin bound to the client's multi-store parent.
+//
+// The fallback is what makes a sibling store reachable at all. Users keep the
+// client_id of the store they started in, so a store added later under a
+// multi-store parent usually has no admin of its own, and every session token
+// from its shop used to fail with "no account provisioned for this shop".
 //
 // A session token proves which SHOP the request came from, not which person is
 // driving it — Shopify's `sub` claim is a Shopify user id with no Bratrax
@@ -138,8 +143,11 @@ func (s *UserStore) GetPrimaryUserForClient(ctx context.Context, clientID string
 		`SELECT id, email, '' AS password_hash, name, role, project_id, client_id,
 		        last_client_id, multi_client_id, created_at, updated_at
 		   FROM rill_users
-		  WHERE client_id = $1 AND role = 'admin'
-		  ORDER BY created_at ASC
+		  WHERE role = 'admin'
+		    AND (client_id = $1
+		         OR multi_client_id = (SELECT multi_client_id FROM rill_clients
+		                                WHERE client_id = $1))
+		  ORDER BY CASE WHEN client_id = $1 THEN 0 ELSE 1 END, created_at ASC
 		  LIMIT 1`,
 		clientID,
 	)
@@ -204,9 +212,9 @@ func (s *UserStore) LinkUserToClient(ctx context.Context, userID int, clientID s
 	return nil
 }
 
-// SetLastClientID records the last client a super_admin was active on so the
-// next login lands them back on it. Also written when a super_admin switches
-// clients via /bratrax/auth/switch-client.
+// SetLastClientID records the last client a super_admin or multi-store user
+// switched to via /bratrax/auth/switch-client, so a session without an
+// active-client cookie lands them back on it (resolveActiveClient).
 func (s *UserStore) SetLastClientID(ctx context.Context, userID int, clientID string) error {
 	_, err := s.db.ExecContext(ctx,
 		"UPDATE rill_users SET last_client_id = $1, updated_at = NOW() WHERE id = $2",

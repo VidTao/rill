@@ -12,12 +12,14 @@ export interface BratraxUser {
   name: string;
   role: "super_admin" | "admin" | "viewer";
   project_id: string | null;
-  // Bratrax client the user is bound to (null for super_admins who can switch).
-  // Already serialized by the Go proxy's User struct; surfaced here so frontend
-  // code can gate features per-client without an extra round trip.
+  // The user's HOME client: rill_users.client_id, null for super_admins. NOT the
+  // store currently selected — for a multi-store user it stays on the store
+  // they started in after a switch. For the active store use onboardMe(),
+  // whose client_id comes from the proxy's X-Bratrax-Client-Id.
   client_id?: string | null;
-  // For super_admins: the most recent client they were active on, used to
-  // resolve the active client when no bratrax_active_client cookie is set.
+  // For super_admins and multi-store users: the most recent client they
+  // switched to, used to resolve the active client when no
+  // bratrax_active_client cookie is set.
   last_client_id?: string | null;
   // For multi-store admins/viewers: the rill_multi_clients parent that owns
   // the user's sub-stores. NULL for legacy single-store users. When set, the

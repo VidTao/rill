@@ -187,11 +187,33 @@ async function embeddedBearer(): Promise<string | null> {
 //
 // Deliberately narrow:
 //   * only installed when embedded
-//   * only touches same-origin /bratrax/* and /shopify/install/* requests
+//   * only touches same-origin /bratrax/* and /shopify/install/* requests,
+//     plus same-origin /v1/* runtime requests for the shop header below
 //   * never overwrites an Authorization header a caller already set
-// The Rill runtime client is not covered here on purpose — it authenticates
-// through runtime.jwt (see startRuntimeSessionSync below), and its transport
-// sets its own Authorization header.
+// The Rill runtime client's Authorization is not set here on purpose — it
+// authenticates through runtime.jwt (see startRuntimeSessionSync below), and
+// its transport sets its own Authorization header.
+//
+// While a bratrax JWT holds the session, every one of these requests also
+// carries X-Shopify-Session-Token. The JWT names the user but not the store,
+// and the store normally comes from the bratrax_active_client cookie, which
+// this iframe can't store (SameSite=Lax). Without the header a multi-store
+// merchant in their second shop's admin was shown, and wrote to, their first
+// store. The Go proxy verifies it and picks the shop's store only if the user
+// may already open it (clientFromShopifySessionHeader in rill/bratrax/auth.go).
+
+const SHOP_SESSION_HEADER = "X-Shopify-Session-Token";
+
+/**
+ * Session token to send in X-Shopify-Session-Token, or null.
+ *
+ * Only while a bratrax JWT is the bearer: when the session token is the bearer
+ * itself, it already names the shop.
+ */
+async function shopSessionBesideJwt(): Promise<string | null> {
+  if (!getEmbeddedToken()) return null;
+  return await getShopifySessionToken();
+}
 
 let fetchPatched = false;
 
@@ -219,19 +241,32 @@ export function installEmbeddedAuthFetch(): void {
 
     const ours =
       path.startsWith("/bratrax/") || path.startsWith("/shopify/install");
-    if (!ours) return original(input, init);
+    const runtimeCall = path.startsWith("/v1/");
+    if (!ours && !runtimeCall) return original(input, init);
 
-    // Respect a header the caller set explicitly.
     const existing = new Headers(
       init?.headers ?? (input instanceof Request ? input.headers : undefined),
     );
-    if (existing.has("Authorization")) return original(input, init);
+    let changed = false;
 
-    const auth = await shopifyAuthHeader();
-    if (!auth.Authorization) return original(input, init);
+    const shopSession = await shopSessionBesideJwt();
+    if (shopSession && !existing.has(SHOP_SESSION_HEADER)) {
+      existing.set(SHOP_SESSION_HEADER, shopSession);
+      changed = true;
+    }
 
-    existing.set("Authorization", auth.Authorization);
-    return original(input, { ...init, headers: existing });
+    // Respect an Authorization header the caller set explicitly.
+    if (ours && !existing.has("Authorization")) {
+      const auth = await shopifyAuthHeader();
+      if (auth.Authorization) {
+        existing.set("Authorization", auth.Authorization);
+        changed = true;
+      }
+    }
+
+    return changed
+      ? original(input, { ...init, headers: existing })
+      : original(input, init);
   };
 }
 

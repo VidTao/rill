@@ -93,6 +93,11 @@ export interface BillingSummary {
    * Lemon Squeezy's portal is a fixed URL, so that branch keeps it hardcoded.
    */
   manage_url?: string | null;
+  /**
+   * Name of the store whose subscription this is, set only when it isn't the
+   * store being viewed: a multi-store account pays once, through one store.
+   */
+  billed_through?: string | null;
 }
 
 export interface InvitationPreview {

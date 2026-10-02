@@ -99,7 +99,7 @@ func (s *EmbedHandoffService) HandleHandoff(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	userID, err := s.consumeToken(r, token)
+	userID, clientID, err := s.consumeToken(r, token)
 	if err != nil {
 		// Expired, already used, or forged. Deliberately not distinguished in
 		// the response — the merchant's next move is the same either way.
@@ -133,6 +133,29 @@ func (s *EmbedHandoffService) HandleHandoff(w http.ResponseWriter, r *http.Reque
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	// Open the new tab on the store the merchant was in. Flask records the
+	// embedded request's active client on the token; without the active-client
+	// cookie the tab resolves it afresh and a multi-store merchant who clicked
+	// "Open in Bratrax" in their second shop landed on their first store.
+	// Re-checked against the user here, same rule as switch-client.
+	if clientID != nil && *clientID != "" {
+		client, err := NewClientStore(s.db).GetByClientID(r.Context(), *clientID)
+		switch {
+		case err != nil:
+			s.logger.Warn("embed hand-off client lookup failed", zap.String("client_id", *clientID), zap.Error(err))
+		case client != nil && userCanOpenClient(user, client):
+			http.SetCookie(w, &http.Cookie{
+				Name:     activeClientCookieName,
+				Value:    client.ClientID,
+				Path:     "/",
+				MaxAge:   int(bratraxTokenTTL.Seconds()),
+				HttpOnly: true,
+				Secure:   s.secureCookie,
+				SameSite: http.SameSiteLaxMode,
+			})
+		}
+	}
+
 	s.logger.Info("embed hand-off completed", zap.Int("user_id", user.ID), zap.String("next", next))
 	http.Redirect(w, r, next, http.StatusTemporaryRedirect)
 }
@@ -140,23 +163,27 @@ func (s *EmbedHandoffService) HandleHandoff(w http.ResponseWriter, r *http.Reque
 // consumeToken atomically claims an unused, unexpired token and returns its
 // user_id. The UPDATE ... WHERE used_at IS NULL RETURNING does the check and
 // the claim in one statement, so two concurrent requests with the same token
-// cannot both succeed — the second matches zero rows.
-func (s *EmbedHandoffService) consumeToken(r *http.Request, token string) (int, error) {
-	var userID int
-	err := s.db.GetContext(r.Context(), &userID,
+// cannot both succeed — the second matches zero rows. Also returns the client
+// the embedded request was on, NULL when it had none.
+func (s *EmbedHandoffService) consumeToken(r *http.Request, token string) (int, *string, error) {
+	var row struct {
+		UserID   int     `db:"user_id"`
+		ClientID *string `db:"client_id"`
+	}
+	err := s.db.GetContext(r.Context(), &row,
 		`UPDATE rill_embed_handoff_tokens
 		    SET used_at = NOW()
 		  WHERE token = $1
 		    AND used_at IS NULL
 		    AND expires_at > NOW()
-		RETURNING user_id`,
+		RETURNING user_id, client_id`,
 		token,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, errors.New("bratrax: hand-off token unknown, expired, or already used")
+			return 0, nil, errors.New("bratrax: hand-off token unknown, expired, or already used")
 		}
-		return 0, fmt.Errorf("bratrax: hand-off token lookup failed: %w", err)
+		return 0, nil, fmt.Errorf("bratrax: hand-off token lookup failed: %w", err)
 	}
-	return userID, nil
+	return row.UserID, row.ClientID, nil
 }
