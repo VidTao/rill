@@ -81,11 +81,10 @@ func (t *ShowChart) Spec() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  ShowChartName,
 		Title: "Show chart",
-		Description: "Draw an interactive chart of store and ad performance for the user. " +
-			"Use it whenever a trend over time or a comparison across channels, campaigns or products is easier to see than read. " +
-			"Omit dimension for a time series of the measures; set dimension for a bar chart of its top values. " +
-			"Call list_metrics_views and get_metrics_view first to find valid metrics view, measure and dimension names. " +
-			"The result also carries the plotted rows, so you can describe what the chart shows.",
+		Description: "Draws an interactive chart of store and ad performance from a metrics view query. " +
+			"Without a dimension it plots the measures as a time series; with a dimension it draws a bar chart of that dimension's top values. " +
+			"Metrics view, measure and dimension names are the ones returned by list_metrics_views and get_metrics_view. " +
+			"The result also contains the plotted rows.",
 		Meta: map[string]any{
 			// MCP Apps: the host renders this resource with the tool result.
 			// The flat key is the legacy spelling some hosts still read.

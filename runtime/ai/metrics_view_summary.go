@@ -32,7 +32,7 @@ func (t *QueryMetricsViewSummary) Spec() *mcp.Tool {
 			Retrieve summary statistics for a metrics view including:
 			- Total time range available
 			- Sample values and data types for each dimension
-			Note: All subsequent queries of the metrics view should be constrained to this time range to ensure accurate results.
+			Data exists only within the returned time range.
 		`,
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Summarizing metrics...",

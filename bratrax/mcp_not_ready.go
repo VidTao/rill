@@ -54,7 +54,7 @@ func notReadyHandler(step string) http.Handler {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        notReadyToolName,
 		Title:       "Check Bratrax setup status",
-		Description: "Reports whether this Bratrax workspace is ready to answer questions about store and ad performance, and when it will be. Call this before anything else.",
+		Description: "Reports whether this Bratrax workspace is ready to answer questions about store and ad performance, and when it will be.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Check Bratrax setup status",
 			ReadOnlyHint:    true,

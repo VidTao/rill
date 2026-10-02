@@ -48,9 +48,7 @@ Request:
 
 Response:
 - Returns aggregated data matching your query parameters
-- Includes 'open_url' field with a shareable link to view results in the Bratrax UI
-- Always cite the source of quantitative claims by including 'open_url' as a markdown link
-- When presenting insights from multiple queries, cite each query's 'open_url' inline; when presenting multiple insights from the same query, cite once at the end
+- Includes an 'open_url' field: a shareable link that opens the same query in Bratrax, for citing the numbers it returns
 
 Example: Get the total revenue by country and product category for 2024:
     {
