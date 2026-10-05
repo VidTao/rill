@@ -37,7 +37,8 @@ export const googleTrackingWarnings = [
 export const metaTrackingWarnings = [
   "Do not include a leading ?.",
   "Paste this into URL Parameters, not Website URL.",
-  "Apply this at campaign level in Meta Ads Manager; Meta does not reliably support this as an account-level URL setting.",
+  "Meta only has this field on each ad (Ad setup > Tracking > URL parameters). There is no campaign- or account-level setting.",
+  "Duplicated ads keep it; new ads need it pasted. Keep the macros exactly as given: {{campaign_name}} is not a Meta macro and lands in your links as text.",
 ];
 
 export const taboolaTrackingWarnings = [
@@ -85,8 +86,8 @@ export const TRACKING_TEMPLATE_CARDS: TrackingTemplateCard[] = [
     id: "meta-params",
     apiKey: "facebook_ads",
     kicker: "Meta Ads",
-    subtitle: "Campaign-level URL Parameters",
-    note: "Paste this into URL Parameters on each campaign in Meta Ads Manager. Meta does not provide a reliable account-level URL parameter setting for this setup.",
+    subtitle: "Ad-level URL Parameters",
+    note: "Paste this into URL Parameters on each ad in Meta Ads Manager (Ad setup > Tracking > URL parameters). Meta has no campaign- or account-level field for it.",
     copyLabel: "URL Parameters",
     markColor: "#1877f2",
     defaultTemplate: META_URL_PARAMETERS,
