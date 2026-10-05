@@ -29,7 +29,7 @@ func (t *WorkshopReadKnowledge) Spec() *mcp.Tool {
 	return &mcp.Tool{
 		Name:        WorkshopReadKnowledgeName,
 		Title:       "Workshop: Read Knowledge",
-		Description: "Read a file from the client knowledge base. Always read index.md first to find relevant files, then read specific files. Use before answering questions to leverage existing business context.",
+		Description: "Reads a file from the workspace's knowledge base of saved business notes, such as targets, launches and seasonality. index.md lists the available files.",
 		Meta: map[string]any{
 			"openai/toolInvocation/invoking": "Reading knowledge...",
 			"openai/toolInvocation/invoked":  "Read knowledge",

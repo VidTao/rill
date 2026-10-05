@@ -21,7 +21,6 @@ This server exposes APIs for querying **metrics views**, which represent Bratrax
 4. **Query the metrics:** Use "query_metrics_view" to run queries to get aggregated results.
 
 In the workflow, do not proceed with the next step until the previous step has been completed. If the information from the previous step is already known (let's say for subsequent queries), you can skip it.
-If a response contains an "ai_instructions" field, you should interpret it as additional instructions for how to behave in subsequent responses that relate to that tool call.
 `
 
 // MCPServer returns a new MCP server scoped to the current session.
