@@ -62,7 +62,7 @@ See [Billing & subscription](/help/admin/billing).
 Bring your own Anthropic API key to power Claude chat inside Bratrax. When you
 save a key, Bratrax verifies it with a live test call before storing it.
 Removing the key disables Claude chat for the whole workspace until a new one
-is added. See [AI chat & Anthropic API key](/help/admin/ai-and-api-keys).
+is added. Admins also choose the **Chat model** here (Sonnet 5 by default, or Opus 5 or Haiku 4.5). See [AI chat & Anthropic API key](/help/admin/ai-and-api-keys).
 
 ### MCP
 

@@ -41,4 +41,5 @@ store's data stays completely separate.
 One subscription covers the whole account. Your plan and payment live on the
 parent account — manage them from
 [Settings → Billing](https://bratrax.com/settings/billing) on any store. There's
-no extra charge to add a store.
+no extra charge to add a store. The Billing tab shows the same subscription from every
+store, with a line such as "Covers all your stores · billed through *Store name*".
