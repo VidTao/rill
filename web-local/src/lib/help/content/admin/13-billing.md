@@ -32,3 +32,7 @@ Your subscription is billed by **Shopify**, not through our billing portal — s
 - **Change your plan:** Open [**Settings → Billing**](https://bratrax.com/settings/billing) in Bratrax and click **Manage Subscription** — it takes you to Shopify's hosted plan page, where you can upgrade or downgrade.
 - **Payment method & invoices:** these live in your **Shopify admin** (Settings → Billing), alongside your other Shopify charges.
 - **Cancel:** uninstall the Bratrax app from your Shopify admin — Shopify ends the subscription when the app is removed.
+
+## If you have more than one store
+
+A [multi-store account](/help/admin/multi-store) pays once. Open [**Settings → Billing**](https://bratrax.com/settings/billing) from any of your stores and you'll see the same subscription, with a line such as "Covers all your stores · billed through *Store name*". Manage Subscription, payment method and cancellation all work from there, whichever store you're in.

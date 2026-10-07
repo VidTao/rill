@@ -22,3 +22,13 @@ To use Bratrax data from Claude itself instead, connect Bratrax from Claude's co
 4. Paste it into Bratrax at [bratrax.com/settings](https://bratrax.com/settings) under the **AI** tab.
 
 Your Anthropic usage costs go directly to Anthropic, not to us. We don't mark up or take a cut.
+
+## Which Claude model does the in-app chat use?
+
+By default, **Claude Sonnet 5**. Admins can change it under the [**AI**](https://bratrax.com/settings/ai) tab with the **Chat model** dropdown:
+
+- **Claude Sonnet 5** (default): strong analysis at a moderate cost.
+- **Claude Opus 5**: the most capable, for complex analysis. Roughly 2.5× the cost of Sonnet 5.
+- **Claude Haiku 4.5**: the fastest and cheapest, for simple lookups. Roughly half the cost of Sonnet 5.
+
+The change applies to the whole workspace. When you pick a model, Bratrax checks that your Anthropic key can use it before saving. Usage is billed to your Anthropic key at Anthropic's prices.
