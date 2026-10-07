@@ -3,6 +3,7 @@ import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
 import type {
   AccountInfo,
   AISettings,
+  BillingCheckoutResult,
   BillingSummary,
   BrandDomains,
   InvitationPreview,
@@ -147,6 +148,20 @@ export function revokeInvitation(token: string): Promise<{ revoked: string }> {
 
 export function getBilling(): Promise<BillingSummary> {
   return apiFetch<BillingSummary>("/bratrax/settings/billing");
+}
+
+// Lemon Squeezy rail only. Shopify-billed workspaces go to Shopify's plan page
+// (BillingSummary.manage_url) and the server refuses them here. `embedded`
+// makes the post-payment landing /payment-complete instead of this page,
+// since checkout then runs in its own tab outside the Shopify admin iframe.
+export function createBillingCheckout(
+  embedded: boolean,
+): Promise<BillingCheckoutResult> {
+  return apiFetch<BillingCheckoutResult>("/bratrax/settings/billing/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ embedded }),
+  });
 }
 
 // ----- AI (BYOK) -------------------------------------------------------------

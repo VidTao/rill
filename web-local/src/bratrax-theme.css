@@ -835,6 +835,26 @@ a.bg-bratrax-acid svg,
   border-color: #E8E4DC !important;
 }
 
+/* Ghost — full-contrast outline + matching text, transparent bg. Sits beside a
+   primary CTA when the secondary action must stay readable but not compete
+   (Billing: Manage Subscription next to Upgrade). White in dark theme;
+   near-black in light, where white would vanish on the cream canvas. */
+.btn-bratrax.btn-ghost {
+  background-color: transparent !important;
+  border-color: #1A1A18 !important;
+  color: #1A1A18 !important;
+}
+.btn-bratrax.btn-ghost:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+:root.dark .btn-bratrax.btn-ghost {
+  border-color: #FFFFFF !important;
+  color: #FFFFFF !important;
+}
+:root.dark .btn-bratrax.btn-ghost:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
 /* Highlighter status pill — Owner, Active, Connected, etc.
    Matches the "Connected" pill on the Connectors page so every state
    indicator across the app reads the same way. Same in both themes. */
@@ -851,7 +871,7 @@ a.bg-bratrax-acid svg,
   white-space: nowrap;
 }
 
-/* Danger variant — cancelled / terminal subscription states. Uses the
+/* Danger variant — inactive / lapsed / cancelled subscription states. Uses the
    design-system tomato token which resolves to #FF3B30 in dark theme and the
    AA-tuned #E63226 in light theme. White text keeps WCAG contrast on both. */
 .bratrax-status-pill.bratrax-status-pill--danger {

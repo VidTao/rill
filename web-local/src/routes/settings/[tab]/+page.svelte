@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import {
@@ -11,6 +11,7 @@
     removeMember,
     revokeInvitation,
     getBilling,
+    createBillingCheckout,
     getAISettings,
     updateAISettings,
     deleteAISettings,
@@ -40,6 +41,11 @@
     TeamData,
     TeamMember,
   } from "$lib/bratrax/settings/types";
+  import {
+    isShopifyEmbedded,
+    navigateTopLevel,
+    reserveTopLevelTab,
+  } from "$lib/bratrax/shopify-embed";
   import BrandDomainsEditor from "$lib/bratrax/BrandDomainsEditor.svelte";
   import OrderExclusionsEditor from "$lib/bratrax/OrderExclusionsEditor.svelte";
 
@@ -122,6 +128,24 @@
   // ----- Billing state -------------------------------------------------------
   let billing: BillingSummary | null = null;
   let billingError = "";
+
+  // Upgrade (reactivation) flow. Mirrors the onboarding paywall in
+  // routes/onboard/payment: Lemon Squeezy can't render inside the Shopify
+  // admin iframe, so embedded callers get a tab of their own and this page
+  // polls until the webhook has reactivated the workspace.
+  const embedded = isShopifyEmbedded();
+  const UPGRADE_POLL_INTERVAL_MS = 2000;
+  // Same budgets as the paywall. Outside the iframe LS has already redirected
+  // back and we only wait on the webhook; embedded, polling starts as checkout
+  // opens, so the clock has to cover the merchant actually paying.
+  const UPGRADE_POLL_MAX_ATTEMPTS = embedded ? 900 : 15; // ~30min vs ~30s
+  let upgradeBusy = false;
+  let upgradeError = "";
+  // Set when the popup was blocked, so we can offer a plain link instead.
+  let upgradeManualUrl = "";
+  let upgradeConfirming = false;
+  let upgradeTimedOut = false;
+  let upgradePoll: ReturnType<typeof setInterval> | null = null;
 
   // ----- AI state ------------------------------------------------------------
   let ai: AISettings | null = null;
@@ -209,6 +233,81 @@
       billing = await getBilling();
     } catch (e: any) {
       billingError = e.message ?? "Failed to load billing";
+    }
+  }
+
+  function stopUpgradePoll() {
+    if (upgradePoll) {
+      clearInterval(upgradePoll);
+      upgradePoll = null;
+    }
+  }
+
+  function pollUntilReactivated() {
+    stopUpgradePoll();
+    upgradeConfirming = true;
+    upgradeTimedOut = false;
+    let attempts = 0;
+    upgradePoll = setInterval(async () => {
+      attempts++;
+      try {
+        const b = await getBilling();
+        if (!b.can_resubscribe) {
+          billing = b;
+          stopUpgradePoll();
+          upgradeConfirming = false;
+          upgradeManualUrl = "";
+          return;
+        }
+      } catch {
+        // Transient — keep polling. Real failures fall through to timeout.
+      }
+      if (attempts >= UPGRADE_POLL_MAX_ATTEMPTS) {
+        stopUpgradePoll();
+        upgradeConfirming = false;
+        upgradeTimedOut = true;
+      }
+    }, UPGRADE_POLL_INTERVAL_MS);
+  }
+
+  async function startUpgrade() {
+    if (!billing) return;
+    upgradeError = "";
+    upgradeManualUrl = "";
+    upgradeTimedOut = false;
+
+    // Shopify-billed: their plan page is the only checkout App Store
+    // requirement 1.2.1 allows, and it lives inside the Shopify admin, so it
+    // replaces the top-level window. Called synchronously on purpose — the
+    // top-level navigation needs the click's user activation, which an await
+    // would lose, and the URL is already in the billing payload.
+    if (billing.billing_provider === "shopify") {
+      if (billing.manage_url) navigateTopLevel(billing.manage_url);
+      return;
+    }
+
+    upgradeBusy = true;
+    // Reserve the tab NOW, while the click's popup grant is still live; it
+    // does not survive the await below.
+    const tab = embedded ? reserveTopLevelTab() : null;
+    try {
+      const { checkout_url } = await createBillingCheckout(embedded);
+      if (!embedded) {
+        // LS redirects back to /settings/billing?checkout=return on success.
+        window.location.href = checkout_url;
+        return;
+      }
+      if (tab?.ok) {
+        tab.navigate(checkout_url);
+      } else {
+        upgradeManualUrl = checkout_url;
+      }
+      pollUntilReactivated();
+    } catch (e) {
+      tab?.close();
+      upgradeError = e instanceof Error ? e.message : String(e);
+    } finally {
+      upgradeBusy = false;
     }
   }
 
@@ -615,12 +714,22 @@
     return `$${(cents / 100).toFixed(2)} ${currency}`;
   }
 
-  // Paint the billing status pill red when the subscription has been
-  // cancelled. Accept both spellings just in case the LS API ever returns
-  // the US form alongside the UK one it currently uses.
-  function isCancelled(status: string | undefined | null): boolean {
-    const s = (status ?? "").toLowerCase();
-    return s === "cancelled" || s === "canceled";
+  // Paint the billing status pill red whenever the subscription isn't doing
+  // its job — never started, lapsed, cancelled, or stuck on a failed payment —
+  // so it can't be mistaken for ACTIVE at a glance. Both cancel spellings, in
+  // case the LS API ever returns the US form alongside the UK one it uses.
+  const ALERT_STATUSES = new Set([
+    "inactive",
+    "expired",
+    "cancelled",
+    "canceled",
+    "past_due",
+    "unpaid",
+    "paused",
+  ]);
+
+  function isAlertStatus(status: string | undefined | null): boolean {
+    return ALERT_STATUSES.has((status ?? "").toLowerCase());
   }
 
   function roleLabel(r: Role): string {
@@ -642,6 +751,20 @@
   // The dropdown links to /settings/<tab> directly; in-page tab clicks
   // navigate via goto() so the URL stays in sync.
   onMount(async () => {
+    // Back from the Upgrade button's Lemon Squeezy checkout. The webhook that
+    // reactivates the workspace can land a moment after the redirect, so poll
+    // rather than trust the first read. Scrub the marker so a refresh doesn't
+    // replay the confirmation.
+    const checkoutReturn =
+      new URLSearchParams(window.location.search).get("checkout") === "return";
+    if (checkoutReturn) {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname,
+      );
+    }
+
     await Promise.all([
       loadAccount(),
       loadTeam(),
@@ -650,7 +773,11 @@
       loadMCP(),
       loadSlack(),
     ]);
+
+    if (checkoutReturn && billing?.can_resubscribe) pollUntilReactivated();
   });
+
+  onDestroy(stopUpgradePoll);
 </script>
 
 <div
@@ -944,7 +1071,9 @@
               </div>
               <span
                 class="bratrax-status-pill"
-                class:bratrax-status-pill--danger={isCancelled(billing.status)}
+                class:bratrax-status-pill--danger={isAlertStatus(
+                  billing.status,
+                )}
               >
                 {billing.status}
               </span>
@@ -963,22 +1092,49 @@
                 Covers all your stores · billed through {billing.billed_through}
               </p>
             {/if}
-            <div class="mt-3 flex items-center gap-2">
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <!--
+                Upgrade: the self-serve way back for a workspace whose
+                subscription has lapsed, so it leads as the primary CTA.
+                Shopify-billed workspaces go to Shopify's plan page instead of
+                Lemon Squeezy (App Store requirement 1.2.1). If they uninstalled
+                the app there is no plan page to link to, and reconnecting
+                Shopify — which reinstalls the app — is the way back to it.
+              -->
+              {#if billing.can_resubscribe}
+                {#if billing.shopify_reconnect_required}
+                  <a href="/connectors" class="btn-bratrax btn-primary btn-compact">
+                    Reconnect Shopify
+                  </a>
+                {:else}
+                  <button
+                    type="button"
+                    on:click={startUpgrade}
+                    disabled={upgradeBusy || upgradeConfirming}
+                    class="btn-bratrax btn-primary btn-compact"
+                  >
+                    {upgradeBusy ? "Opening checkout…" : "Upgrade"}
+                  </button>
+                {/if}
+              {/if}
               <!--
                 Shopify-billed workspaces must be sent to Shopify's hosted plan
                 page, not the Lemon Squeezy portal: no LS customer record exists
-                for them, so join.bratrax.com/billing is a dead end. That page is
-                also what satisfies App Store requirement 1.2.3 — merchants must
-                be able to change plan without contacting support.
+                for them, so join.bratrax.com/billing is a dead end — which is
+                why the link is hidden while their plan page is unavailable.
+                That page is also what satisfies App Store requirement 1.2.3 —
+                merchants must be able to change plan without contacting support.
               -->
-              <a
-                href={billing.manage_url ?? "https://join.bratrax.com/billing"}
-                target="_blank"
-                rel="noopener"
-                class="border border-bratrax-acid bg-bratrax-acid/10 px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-acid hover:bg-bratrax-acid/20"
-              >
-                Manage Subscription
-              </a>
+              {#if billing.billing_provider !== "shopify" || billing.manage_url}
+                <a
+                  href={billing.manage_url ?? "https://join.bratrax.com/billing"}
+                  target="_blank"
+                  rel="noopener"
+                  class="btn-bratrax btn-ghost btn-compact"
+                >
+                  Manage Subscription
+                </a>
+              {/if}
               {#if billing.billing_provider === "shopify"}
                 <span
                   class="font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted"
@@ -987,6 +1143,39 @@
                 </span>
               {/if}
             </div>
+            {#if upgradeConfirming}
+              <p
+                class="mt-3 font-mono text-[11px] uppercase tracking-wider text-bratrax-text-muted"
+              >
+                {embedded
+                  ? "Complete payment in the new tab — this page updates on its own."
+                  : "Payment received — activating your subscription…"}
+              </p>
+            {/if}
+            {#if upgradeManualUrl}
+              <p class="mt-2 font-mono text-xs text-bratrax-text-muted">
+                Your browser blocked the checkout window.
+                <a
+                  href={upgradeManualUrl}
+                  target="_blank"
+                  rel="noopener"
+                  class="underline">Open checkout</a
+                >
+              </p>
+            {/if}
+            {#if upgradeTimedOut}
+              <p class="mt-3 font-mono text-xs text-bratrax-text-muted">
+                We haven't seen the payment yet. If you completed checkout,
+                refresh this page in a minute.
+              </p>
+            {/if}
+            {#if upgradeError}
+              <div
+                class="mt-3 border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato"
+              >
+                {upgradeError}
+              </div>
+            {/if}
           </div>
         </div>
       {:else}

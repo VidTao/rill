@@ -98,6 +98,22 @@ export interface BillingSummary {
    * store being viewed: a multi-store account pays once, through one store.
    */
   billed_through?: string | null;
+  /**
+   * True when the paying store has no live subscription, i.e. the Upgrade
+   * button should show. Read off is_paid_subscriber server-side, not off
+   * `status`: a subscription cancelled but still inside its paid period is
+   * false here (Manage → un-cancel is the way back), as are comped workspaces.
+   */
+  can_resubscribe?: boolean;
+  /**
+   * Shopify rail only: the app was uninstalled, which drops the stored shop,
+   * so there is no plan page to link to until Shopify is reconnected.
+   */
+  shopify_reconnect_required?: boolean;
+}
+
+export interface BillingCheckoutResult {
+  checkout_url: string;
 }
 
 export interface InvitationPreview {
