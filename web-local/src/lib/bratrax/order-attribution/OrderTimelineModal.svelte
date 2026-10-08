@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatMoney } from "@rilldata/web-common/lib/client-currency";
   import * as Dialog from "@rilldata/web-common/components/dialog";
   import {
     createQueryServiceMetricsViewRows,
@@ -132,11 +133,7 @@
 
   function fmtMoney(n: number | undefined): string {
     if (n == null) return "—";
-    return n.toLocaleString(undefined, {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 2,
-    });
+    return formatMoney(n, { maximumFractionDigits: 2 });
   }
 </script>
 

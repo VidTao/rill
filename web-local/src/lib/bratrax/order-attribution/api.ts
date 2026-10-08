@@ -7,7 +7,9 @@ import {
   createAndExpression,
   createInExpression,
 } from "@rilldata/web-common/features/dashboards/stores/filter-utils";
+import { clientCurrency } from "@rilldata/web-common/lib/client-currency";
 import type { V1Expression } from "@rilldata/web-common/runtime-client";
+import { get } from "svelte/store";
 import type {
   CancelledOrderGroup,
   CancelledOrderItemRow,
@@ -354,7 +356,7 @@ export function groupCancelledOrderItems(
           cancelled_at: row.cancelled_at,
           cancel_reason: row.cancel_reason,
           order_total: Number(row.order_total ?? 0),
-          currency: row.currency || "USD",
+          currency: row.currency || get(clientCurrency),
           attribution_weight: 0,
           items: [],
         },

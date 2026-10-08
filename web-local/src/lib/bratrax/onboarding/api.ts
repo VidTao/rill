@@ -59,6 +59,11 @@ export interface OnboardMeResult {
    * that predates the second rail.
    */
   billing_provider?: "lemon_squeezy" | "shopify";
+  /**
+   * The store's ISO 4217 currency (config.yaml `currency:`), for money the
+   * frontend formats itself. Optional so an older Flask build reads as USD.
+   */
+  currency?: string;
   step: string;
   connected_platforms: PlatformConnection[];
   stack_selections: Record<string, unknown>;

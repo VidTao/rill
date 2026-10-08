@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MeasureCellClickContext } from "@rilldata/web-common/features/canvas/components/pivot/drilldown-context";
   import * as Dialog from "@rilldata/web-common/components/dialog";
+  import { formatMoney } from "@rilldata/web-common/lib/client-currency";
   import {
     createQueryServiceMetricsViewRows,
     type V1MetricsViewRowsResponseDataItem,
@@ -74,11 +75,7 @@
         });
   }
   function fmtMoney(value: number, currency: string): string {
-    return value.toLocaleString(undefined, {
-      style: "currency",
-      currency: currency || "USD",
-      maximumFractionDigits: 2,
-    });
+    return formatMoney(value, { maximumFractionDigits: 2 }, currency || undefined);
   }
   function selectOrder(orderId: string, event: KeyboardEvent | MouseEvent) {
     if (

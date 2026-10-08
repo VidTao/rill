@@ -2,6 +2,7 @@
   import LoadingSpinner from "@rilldata/web-common/components/icons/LoadingSpinner.svelte";
   import { createQueryServiceMetricsViewAggregation } from "@rilldata/web-common/runtime-client";
   import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+  import { clientCurrency } from "@rilldata/web-common/lib/client-currency";
   import ComponentHeader from "../../ComponentHeader.svelte";
   import type { FinancialStatementComponent } from "./index";
   import { buildFinancialStatementWhere } from "./query";
@@ -144,9 +145,11 @@
   }
 
   $: statement = buildStatement(rawRows, selectedGrain);
+  // An explicit `currency:` on the component wins; otherwise the active
+  // store's, rather than USD for every store.
   $: currency = new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: spec.currency || "USD",
+    currency: spec.currency || $clientCurrency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });

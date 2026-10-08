@@ -769,7 +769,7 @@
                           {product.sku || "—"}
                         </td>
                         <td class="px-3 py-2 text-right text-bratrax-text-body">
-                          {product.price ? `$ ${product.price}` : "$ 0"}
+                          {symbol} {product.price || 0}
                         </td>
                         <td class="px-3 py-2 text-right">
                           <input
@@ -1199,7 +1199,7 @@
                           {gw.percentage_fee ? `${gw.percentage_fee}%` : "—"}
                         </td>
                         <td class="px-3 py-2 text-bratrax-text-body">
-                          {gw.fixed_fee ? `$${gw.fixed_fee}` : "—"}
+                          {gw.fixed_fee ? `${symbol}${gw.fixed_fee}` : "—"}
                         </td>
                         <td class="px-3 py-2 text-right">
                           <button

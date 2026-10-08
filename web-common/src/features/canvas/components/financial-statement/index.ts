@@ -32,9 +32,11 @@ export class FinancialStatementComponent extends BaseCanvasComponent<FinancialSt
   component = FinancialStatementDisplay;
 
   constructor(resource: V1Resource, parent: CanvasEntity, path: ComponentPath) {
+    // No default `currency`: these defaults are merged into every spec, so a
+    // "USD" here would override the active store's currency for any statement
+    // that doesn't set one (FinancialStatementDisplay falls back to it).
     super(resource, parent, path, {
       metrics_view: "",
-      currency: "USD",
       grain: "Daily",
     });
   }
@@ -61,7 +63,7 @@ export class FinancialStatementComponent extends BaseCanvasComponent<FinancialSt
     metricsViewName: string,
     _metricsViewSpec?: V1MetricsViewSpec,
   ): FinancialStatementSpec {
-    return { metrics_view: metricsViewName, currency: "USD", grain: "Daily" };
+    return { metrics_view: metricsViewName, grain: "Daily" };
   }
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatMoney } from "@rilldata/web-common/lib/client-currency";
   import { formatOrderLabel } from "./api";
   import type { OrderTimelineRow } from "./types";
 
@@ -75,9 +76,8 @@
     {/if}
     {#if rowType === "conversion" && row.revenue != null}
       <div class="meta">
-        Order {formatOrderLabel(row.order_number, row.order_id)} · {row.revenue.toLocaleString(
-          undefined,
-          { style: "currency", currency: "USD" },
+        Order {formatOrderLabel(row.order_number, row.order_id)} · {formatMoney(
+          row.revenue,
         )}
       </div>
     {/if}

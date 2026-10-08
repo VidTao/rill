@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Handle, Position } from "@xyflow/svelte";
+  import { formatMoney } from "../../../../lib/client-currency";
   import { nodeTypeTheme } from "./node-types";
   import { statusLabel, statusTheme } from "./status";
   import type { MetricTreeNodeData } from "./types";
@@ -65,12 +66,10 @@
     const n = typeof v === "number" ? v : Number(v);
     if (Number.isFinite(n)) {
       if (unit === "percent") return `${n.toLocaleString()}%`;
+      // "usd" is the historical name for a money unit, not a currency: format
+      // it in the active store's currency.
       if (unit === "usd" || unit === "currency") {
-        return n.toLocaleString(undefined, {
-          style: "currency",
-          currency: "USD",
-          maximumFractionDigits: 0,
-        });
+        return formatMoney(n, { maximumFractionDigits: 0 });
       }
       if (unit === "count") return n.toLocaleString();
       return `${n.toLocaleString()}${unit ? ` ${unit}` : ""}`;

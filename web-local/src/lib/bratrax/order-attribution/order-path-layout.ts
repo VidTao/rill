@@ -20,6 +20,7 @@
 
 import { graphlib, layout as dagreLayout } from "@dagrejs/dagre";
 import { Position, type Edge, type Node } from "@xyflow/svelte";
+import { formatMoney } from "@rilldata/web-common/lib/client-currency";
 import { formatOrderLabel } from "./api";
 import type { OrderTimelineRow } from "./types";
 
@@ -139,11 +140,7 @@ export function sourceColor(src: string | undefined): string {
 
 function fmtMoney(n: number | undefined): string | undefined {
   if (n == null) return undefined;
-  return n.toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
+  return formatMoney(n, { maximumFractionDigits: 2 });
 }
 
 function touchpointNodeData(

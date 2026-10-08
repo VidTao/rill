@@ -1,3 +1,4 @@
+import { formatMoney } from "@rilldata/web-common/lib/client-currency";
 import type {
   AuthoredMetricNode,
   AuthoredMetricTree,
@@ -355,7 +356,7 @@ export function isHealthy(node: AuthoredMetricNode): boolean | null {
 export function formatValue(value: number | null | undefined, unit: string | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "-";
   if (unit === "currency") {
-    return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    return formatMoney(value, { maximumFractionDigits: 0 });
   }
   if (unit === "percent") return `${(value * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
   if (unit === "count") return value.toLocaleString(undefined, { maximumFractionDigits: 0 });

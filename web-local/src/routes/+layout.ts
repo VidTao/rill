@@ -2,6 +2,7 @@ export const ssr = false;
 
 import { redirect } from "@sveltejs/kit";
 import { runtime } from "@rilldata/web-common/runtime-client/runtime-store";
+import { clientCurrency } from "@rilldata/web-common/lib/client-currency";
 import { get } from "svelte/store";
 import { bratraxGetMe } from "$lib/bratrax/auth";
 import {
@@ -219,6 +220,11 @@ export async function load({ url, depends, untrack, fetch }) {
     // client with no multi_client_id yet; the button promotes on click. `me` is
     // null for super-admins, who get the switcher via their own path anyway.
     bratraxAllowMultiStore.set(!!me?.allow_multi_store);
+
+    // The active store's currency, for money formatted outside a metrics-view
+    // measure (order drill-downs, metric trees). Set before the page renders,
+    // and again on every navigation, so a store switch picks it up.
+    clientCurrency.set(me?.currency || "USD");
 
     // Connectors whose token has died and need the merchant to reconnect —
     // drives the blinking header CTA (ReconnectPill). Derived from the
