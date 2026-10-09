@@ -26,6 +26,14 @@ export interface GatewayFee {
   percentage_fee: number;
   fixed_fee: number;
   is_shopify_imported: boolean;
+  /**
+   * WooCommerce only: the store's own name for the method ("Dobírka (+49 Kč)"),
+   * '' when it has none. gateway_name stays the payment_method id fees are
+   * saved under.
+   */
+  label?: string;
+  /** WooCommerce only: how many orders used this method. */
+  orders?: number;
 }
 
 export interface ShippingProfile {

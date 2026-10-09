@@ -68,6 +68,9 @@
   let products: ProductCogs[] = [];
   let marketplaceProducts: MarketplaceProductCogs[] = [];
   let gateways: GatewayFee[] = [];
+  // WooCommerce stores report how many orders used each method; Shopify's
+  // transaction-based list doesn't, so the column only shows when it can.
+  $: hasGatewayOrderCounts = gateways.some((g) => g.orders != null);
   let expenseRules: ExpenseRule[] = [];
   let mediaScopeRules: MediaSpendScopeRule[] = [];
   let mediaScopeAvailableAccounts: MediaSpendScopeAccountOption[] = [];
@@ -1138,6 +1141,9 @@
                     class="border-b border-bratrax-border font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
                   >
                     <th class="px-3 py-2 text-left">Payment Gateway Name</th>
+                    {#if hasGatewayOrderCounts}
+                      <th class="px-3 py-2 text-right">Orders</th>
+                    {/if}
                     <th class="px-3 py-2 text-left">Cost</th>
                     <th class="px-3 py-2 text-left">Fee</th>
                     <th class="px-3 py-2 text-right w-24"></th>
@@ -1148,9 +1154,21 @@
                     <tr
                       class="border-b border-bratrax-border/50 hover:bg-bratrax-hover"
                     >
-                      <td class="px-3 py-2 text-bratrax-text-body"
-                        >{gw.gateway_name}</td
-                      >
+                      <td class="px-3 py-2 text-bratrax-text-body">
+                        {gw.label || gw.gateway_name}
+                        {#if gw.label}
+                          <div
+                            class="font-mono text-[11px] text-bratrax-text-muted"
+                          >
+                            {gw.gateway_name}
+                          </div>
+                        {/if}
+                      </td>
+                      {#if hasGatewayOrderCounts}
+                        <td class="px-3 py-2 text-right text-bratrax-text-muted">
+                          {(gw.orders ?? 0).toLocaleString()}
+                        </td>
+                      {/if}
 
                       {#if gw.is_shopify_imported}
                         <td
@@ -1215,8 +1233,8 @@
 
               {#if gateways.length === 0}
                 <p class="py-8 text-center text-sm text-bratrax-text-muted">
-                  No payment gateways found. Connect Shopify to see your
-                  gateways.
+                  No payment gateways yet. They appear here once your store
+                  has orders.
                 </p>
               {/if}
             </div>
