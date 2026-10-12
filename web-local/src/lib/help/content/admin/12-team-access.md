@@ -22,3 +22,5 @@ Pick the role that matches what each teammate actually needs. You can change a t
 ## If you have a multi-store account
 
 In a [multi-store account](/help/admin/multi-store), the **Team** tab lists everyone with access to your account, not just the people who started in the store you're viewing. Changing or removing someone who has access to the whole account can only be done by another person with access to the whole account. An admin who was invited to just one store can't change them.
+
+**Giving someone every store.** When you invite from a multi-store account, choose **All stores** (the default) to give access to every store, including ones you add later, or **This store only**. It's one store or all of them: one email address is one Bratrax login, so you can't send separate invites per store. If the person already has one of your stores, inviting them with **All stores** gives them the rest straight away — no new link. Only someone who has every store can invite to all of them.

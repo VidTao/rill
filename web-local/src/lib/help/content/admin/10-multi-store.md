@@ -36,6 +36,8 @@ store's data stays completely separate.
 - **Admins** can add stores and switch between them.
 - **View-only teammates** see the stores they've been given access to, but can't
   add new ones.
+- A teammate has access to **all stores** in the account or to **one store**,
+  chosen when you invite them. There's no in-between.
 
 ## Billing
 One subscription covers the whole account. Your plan and payment live on the

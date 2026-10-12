@@ -62,19 +62,34 @@ export interface PendingInvite {
   expires_at: string;
   created_at: string;
   accept_url: string;
+  /** "account" = every store of the multi-store account, "store" = this one. */
+  scope?: InviteScope;
 }
+
+/**
+ * What a team invite gives: every store of a multi-store account, or only the
+ * store it was sent from. Those are the only two shapes access can take — one
+ * email is one user, with one home store, optionally bound to the account.
+ */
+export type InviteScope = "account" | "store";
 
 export interface TeamData {
   members: TeamMember[];
   pending: PendingInvite[];
+  /** The caller may invite to all stores (multi-store account, and they have it all). */
+  account_scope_available?: boolean;
 }
 
 export interface InviteResult {
-  token: string;
-  accept_url: string;
-  expires_at: string;
+  /** Absent when `granted`: an existing teammate was given access directly. */
+  token?: string;
+  accept_url?: string;
+  expires_at?: string;
   email: string;
   role: Exclude<Role, "super_admin">;
+  scope?: InviteScope;
+  /** Already on one store of this account, so given all stores without an invite. */
+  granted?: boolean;
 }
 
 export interface BillingSummary {
@@ -129,6 +144,8 @@ export interface InvitationPreview {
   inviter_name: string;
   expired: boolean;
   accepted: boolean;
+  /** "account": accepting gives every store of company_name's account. */
+  scope?: InviteScope;
 }
 
 // Demo visitors share one workspace and can never add their own key, so they

@@ -8,6 +8,7 @@ import type {
   BrandDomains,
   InvitationPreview,
   InviteResult,
+  InviteScope,
   MCPConnection,
   MCPSettings,
   OrderExclusions,
@@ -111,15 +112,18 @@ export function getTeam(): Promise<TeamData> {
   return apiFetch<TeamData>("/bratrax/settings/team");
 }
 
+// `scope` omitted lets the server pick: all stores when the caller may grant
+// them, else this store.
 export function inviteMember(
   email: string,
   role: Exclude<Role, "super_admin">,
   name = "",
+  scope?: InviteScope,
 ): Promise<InviteResult> {
   return apiFetch<InviteResult>("/bratrax/settings/team/invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, role, name }),
+    body: JSON.stringify({ email, role, name, scope }),
   });
 }
 

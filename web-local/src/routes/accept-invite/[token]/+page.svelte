@@ -238,6 +238,9 @@
           Set a password and your company name to start onboarding{invite.inviter_name ? `, invited by ${invite.inviter_name}` : ""}.
         {:else}
           Joining as <strong>{roleLabel(invite.role)}</strong>{invite.inviter_name ? `, invited by ${invite.inviter_name}` : ""}.
+          {#if invite.scope === "account"}
+            You'll have access to every store in this account.
+          {/if}
         {/if}
       </p>
 
@@ -314,6 +317,9 @@
         {#if submitError}
           <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
             {submitError}
+            {#if /already have a Bratrax account/i.test(submitError)}
+              <a href="/login" class="underline">Log in</a>
+            {/if}
           </div>
         {/if}
 

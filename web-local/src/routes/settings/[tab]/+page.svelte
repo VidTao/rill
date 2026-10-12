@@ -34,6 +34,7 @@
     BillingSummary,
     MCPConnection,
     MCPSettings,
+    InviteScope,
     PendingInvite,
     Role,
     SlackLinkCode,
@@ -61,6 +62,10 @@
   ];
 
   const INVITE_ROLE_OPTIONS: ("admin" | "viewer")[] = ["admin", "viewer"];
+  const INVITE_SCOPE_OPTIONS: { value: InviteScope; label: string }[] = [
+    { value: "account", label: "All stores" },
+    { value: "store", label: "This store only" },
+  ];
 
   // ---------------------------------------------------------------------------
   // Common timezones (curated list; full pytz catalog is overkill for D2C clients)
@@ -121,6 +126,14 @@
   let inviteResultExpiresAt = "";
   let inviteResultEmail = "";
   let inviteCopied = false;
+  // Multi-store accounts: an invite gives every store or just this one (the
+  // only two shapes access can take). Offered only to someone who has them all.
+  let inviteScope: InviteScope = "account";
+  let inviteResultScope: InviteScope = "store";
+  // Set when the invitee already had one store of this account: they were
+  // given the rest directly, so there is no link to send.
+  let inviteGranted = false;
+  $: accountScopeAvailable = !!team.account_scope_available;
 
   let confirmRemoveOpen = false;
   let confirmTarget: TeamMember | null = null;
@@ -610,6 +623,8 @@
     inviteResultEmail = "";
     inviteResultExpiresAt = "";
     inviteCopied = false;
+    inviteScope = "account";
+    inviteGranted = false;
     inviteOpen = true;
   }
 
@@ -622,10 +637,16 @@
         inviteEmail.trim().toLowerCase(),
         inviteRole,
         inviteName.trim(),
+        accountScopeAvailable ? inviteScope : undefined,
       );
-      inviteResultUrl = result.accept_url;
-      inviteResultExpiresAt = result.expires_at;
       inviteResultEmail = result.email;
+      inviteResultScope = result.scope ?? "store";
+      if (result.granted) {
+        inviteGranted = true;
+      } else {
+        inviteResultUrl = result.accept_url ?? "";
+        inviteResultExpiresAt = result.expires_at ?? "";
+      }
       await loadTeam();
     } catch (e: any) {
       topError = e.message ?? "Invite failed";
@@ -1015,7 +1036,9 @@
                 <div
                   class="truncate font-mono text-[10px] text-bratrax-text-muted"
                 >
-                  {roleLabel(p.role)} · expires {formatDate(p.expires_at)}
+                  {roleLabel(p.role)}{p.scope === "account"
+                    ? " · all stores"
+                    : ""} · expires {formatDate(p.expires_at)}
                 </div>
               </div>
               <button
@@ -1815,7 +1838,11 @@
         <div
           class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
         >
-          {inviteResultUrl ? "Invite link" : "Invite teammate"}
+          {inviteGranted
+            ? "Access granted"
+            : inviteResultUrl
+              ? "Invite link"
+              : "Invite teammate"}
         </div>
         <button
           on:click={() => (inviteOpen = false)}
@@ -1825,7 +1852,25 @@
         </button>
       </div>
 
-      {#if !inviteResultUrl}
+      {#if inviteGranted}
+        <h2 class="text-lg font-black text-bratrax-text-headline">
+          {inviteResultEmail} now has access to all stores
+        </h2>
+        <p class="mt-2 text-sm font-light text-bratrax-text-body">
+          They already had a Bratrax login for one of your stores, so there's
+          no link to send. They'll see every store in the store switcher next
+          time they open Bratrax.
+        </p>
+        <div class="mt-6 flex items-center justify-end">
+          <button
+            type="button"
+            on:click={() => (inviteOpen = false)}
+            class="border border-bratrax-border bg-bratrax-surface px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+          >
+            Done
+          </button>
+        </div>
+      {:else if !inviteResultUrl}
         <h2 class="text-lg font-black text-bratrax-text-headline">
           Generate invite link
         </h2>
@@ -1881,6 +1926,34 @@
               {/each}
             </div>
           </div>
+          {#if accountScopeAvailable}
+            <div>
+              <label
+                class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+              >
+                Access
+              </label>
+              <div class="flex gap-2">
+                {#each INVITE_SCOPE_OPTIONS as opt}
+                  <button
+                    type="button"
+                    on:click={() => (inviteScope = opt.value)}
+                    class="flex-1 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {inviteScope ===
+                    opt.value
+                      ? 'border-bratrax-acid bg-bratrax-acid/10 text-bratrax-acid'
+                      : 'border-bratrax-border bg-bratrax-bg text-bratrax-text-muted hover:border-bratrax-text-muted'}"
+                  >
+                    {opt.label}
+                  </button>
+                {/each}
+              </div>
+              <p class="mt-1.5 text-xs font-light text-bratrax-text-muted">
+                {inviteScope === "account"
+                  ? "Every store in this account, including stores you add later."
+                  : "Only the store you're in now. A person can't be given a few stores — it's one or all."}
+              </p>
+            </div>
+          {/if}
         </div>
 
         <div class="mt-6 flex items-center justify-end gap-2">
@@ -1906,7 +1979,9 @@
         </h2>
         <p class="mt-2 text-sm font-light text-bratrax-text-body">
           The link expires {formatDate(inviteResultExpiresAt)}. Anyone with the
-          link can sign up using this email.
+          link can sign up using this email{inviteResultScope === "account"
+            ? ", and gets access to every store in this account"
+            : ""}.
         </p>
 
         <div class="mt-4 flex items-center gap-2">
