@@ -33,6 +33,16 @@ Your subscription is billed by **Shopify**, not through our billing portal — s
 - **Payment method & invoices:** these live in your **Shopify admin** (Settings → Billing), alongside your other Shopify charges.
 - **Cancel:** uninstall the Bratrax app from your Shopify admin — Shopify ends the subscription when the app is removed.
 
+## If your subscription has lapsed
+
+When your subscription has ended — or a payment failed and wasn't recovered — the [**Billing**](https://bratrax.com/settings/billing) tab shows a red status and an **Upgrade** button (workspace admins only). Your data and setup were kept, so a new subscription picks up where you left off.
+
+- **Billed through our website:** click **Upgrade**, complete checkout, and you're returned to the Billing tab, which confirms once your workspace is active again.
+- **More than one store:** a store that doesn't pay for itself reactivates through the store that does — **Upgrade** works from any store in the account.
+- **Billed through Shopify:** **Upgrade** takes you to Shopify's hosted plan page. If you've uninstalled the app, the button reads **Reconnect Shopify** instead — reinstall Bratrax to resume.
+
+If you cancelled but your paid period hasn't ended yet, you don't need Upgrade: use **Manage Subscription** to resume.
+
 ## If you have more than one store
 
 A [multi-store account](/help/admin/multi-store) pays once. Open [**Settings → Billing**](https://bratrax.com/settings/billing) from any of your stores and you'll see the same subscription, with a line such as "Covers all your stores · billed through *Store name*". Manage Subscription, payment method and cancellation all work from there, whichever store you're in.
