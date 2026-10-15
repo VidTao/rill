@@ -66,18 +66,20 @@ is added. Admins also choose the **Chat model** here (Sonnet 5 by default, or Op
 
 ### MCP
 
-Connect Claude to your Bratrax data. Most people don't need anything from this
-tab: connect Bratrax from Claude's own connector settings instead (see
-[bratrax.com/integrations/claude](https://bratrax.com/integrations/claude)).
+Connect Claude to your Bratrax data. The tab opens with **Connect Claude**:
+add Bratrax from Claude's connectors directory (or **Add custom connector** with
+the URL shown), sign in to Bratrax and approve. No token or config file is
+needed. Full walkthrough:
+[bratrax.com/integrations/claude](https://bratrax.com/integrations/claude#connect).
 
 - **Connected AI assistants** lists every assistant connected that way, with
   who connected it and when it was last used. **Disconnect** cuts it off
   immediately.
-- For Claude Desktop setups that use a config file, **Generate token** creates
-  a workspace MCP token, and the tab shows a ready-to-paste
-  `claude_desktop_config.json` block.
-- **Regenerate** or **Revoke** the token at any time. Anyone holding the token
-  can query your data, so treat it like a password.
+- **Advanced: connect with a token** is only for MCP clients that can't use
+  the connector, such as a hand-edited `claude_desktop_config.json`.
+  **Generate token** creates a workspace MCP token and shows a ready-to-paste
+  config block; **Regenerate** or **Revoke** it at any time. Anyone holding
+  the token can query your data, so treat it like a password.
 
 ### Slack
 
