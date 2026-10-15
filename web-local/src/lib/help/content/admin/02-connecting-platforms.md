@@ -90,6 +90,17 @@ Yes. Bratrax pulls every Facebook ad account your connected login can access —
 
 If an ad account doesn't appear, the Facebook login you connected with doesn't have access to it. Grant that login access in Business Settings → Ad Accounts → People, or reconnect with a login that already has access — then the account shows up for selection.
 
+### My ad spend is in a different currency than my store
+
+Bratrax converts it for you. Dashboards show money in your store's currency, and
+ad spend from an ad account that bills in another currency is converted using
+daily European Central Bank exchange rates, so spend, ROAS and margins compare
+like with like. Conversion is supported for **USD, EUR, GBP, CAD, AUD, HKD, INR,
+BRL, CHF, SEK, DKK, NOK, PLN, JPY, CZK and HUF**. If your store or an ad account
+uses a currency that isn't on that list (you can see your connected ad accounts on
+[Connectors](https://bratrax.com/connectors)), email [support@bratrax.com](mailto:support@bratrax.com)
+so we can add it.
+
 ### I connected Google Ads but it doesn't show as connected
 
 Give it 30–60 seconds and refresh the connectors page at [bratrax.com/connectors](https://bratrax.com/connectors) — the connection state can lag briefly after authorization.
