@@ -96,8 +96,8 @@ Bratrax converts it for you. Dashboards show money in your store's currency, and
 ad spend from an ad account that bills in another currency is converted using
 daily European Central Bank exchange rates, so spend, ROAS and margins compare
 like with like. Conversion is supported for **USD, EUR, GBP, CAD, AUD, HKD, INR,
-BRL, CHF, SEK, DKK, NOK, PLN, JPY, CZK and HUF**. If an ad account uses a
-currency that isn't on that list, email [support@bratrax.com](mailto:support@bratrax.com)
+BRL, CHF, SEK, DKK, NOK, PLN, JPY, CZK and HUF**. If your store or an ad account
+uses a currency that isn't on that list, email [support@bratrax.com](mailto:support@bratrax.com)
 so we can add it.
 
 ### I connected Google Ads but it doesn't show as connected
