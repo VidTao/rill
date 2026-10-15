@@ -22,7 +22,8 @@ accurate your margins, but partial data still produces useful numbers.
 ### Cost of Goods
 Per-product / per-SKU product costs. On **Shopify** these are **auto-filled**
 from the cost-per-item on your products, so if you already keep costs in Shopify
-there's nothing to enter. On **WooCommerce**, enter them manually — once entered,
+there's nothing to enter. On **WooCommerce**, enter them manually on the **Cost of Goods** tab of
+[Cost Settings](https://bratrax.com/cost-settings) — once entered,
 each product's cost is counted on every order that contains it and flows straight
 into your profit numbers. Don't have SKU-level costs yet? Set a **single global percentage** (e.g. COGS = 35% of
 revenue) instead. Your manual edits always take priority over auto-filled values.
@@ -47,7 +48,8 @@ numbers.
 - **WooCommerce:** every payment method your store has taken an order with is listed
   — including ones like cash on delivery — under the name your store gives it, with
   an **Orders** column showing how many orders used it. Enter a percentage and a
-  fixed fee for each one you want counted.
+  fixed fee for each one you want counted, on the **Gateway Costs** tab of
+  [Cost Settings](https://bratrax.com/cost-settings).
 
 Fees you've saved stay listed even if a method has no recent orders. The list fills
 in once your store has orders.
