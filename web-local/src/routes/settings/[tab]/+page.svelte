@@ -181,6 +181,7 @@
   let mcpDeleting = false;
   let mcpConfigCopied = false;
   let mcpTokenCopied = false;
+  let mcpUrlCopied = false;
   let mcpConfirmRegenerateOpen = false;
   let mcpConfirmRemoveOpen = false;
   // AI assistants connected by OAuth. null = not loaded or unavailable, in
@@ -466,6 +467,17 @@
       setTimeout(() => (mcpConfigCopied = false), 2000);
     } catch {
       // ignore
+    }
+  }
+
+  async function copyMCPUrl() {
+    if (!mcp?.mcp_url) return;
+    try {
+      await navigator.clipboard.writeText(mcp.mcp_url);
+      mcpUrlCopied = true;
+      setTimeout(() => (mcpUrlCopied = false), 2000);
+    } catch {
+      // Clipboard can be blocked (iframe, permissions); the field is selectable.
     }
   }
 
@@ -1365,6 +1377,75 @@
         </div>
       {:else if mcp}
         <div class="flex flex-col gap-4">
+          <!-- The Claude connector (OAuth) is the default path; the token
+               below is only for config-file clients that can't sign in. -->
+          <div>
+            <h2 class="text-lg font-black text-bratrax-text-headline">
+              Connect Claude
+            </h2>
+            <p class="mt-2 text-sm font-light text-bratrax-text-body">
+              Add Bratrax as a connector in Claude and ask about your data in
+              plain English. Claude reads your metrics and dashboards, draws
+              charts, and uses your business notes. No token or config file
+              needed: you sign in to Bratrax, approve, and you're sent straight
+              back to Claude.
+            </p>
+          </div>
+
+          <div class="border border-bratrax-border bg-bratrax-bg p-4">
+            <ol class="flex flex-col gap-3 text-sm font-light text-bratrax-text-body">
+              <li class="flex gap-3">
+                <span class="font-mono text-xs font-bold text-bratrax-acid">1</span>
+                <div class="min-w-0 flex-1">
+                  In Claude, open the connectors directory, choose
+                  <span class="font-semibold text-bratrax-text-headline">Bratrax</span>,
+                  then <span class="font-semibold text-bratrax-text-headline">Connect</span>.
+                  If Bratrax isn't listed for your account yet, choose
+                  <span class="font-semibold text-bratrax-text-headline">Add custom connector</span>
+                  and paste this URL:
+                  <div class="mt-2 flex items-center gap-2">
+                    <input
+                      type="text"
+                      readonly
+                      value={mcp.mcp_url}
+                      class="w-full border border-bratrax-border bg-bratrax-surface px-3 py-2 font-mono text-xs text-bratrax-text-body focus:border-bratrax-acid focus:outline-none"
+                      on:click={selectAllOnClick}
+                    />
+                    <button
+                      type="button"
+                      on:click={copyMCPUrl}
+                      class="flex-shrink-0 border border-bratrax-border bg-bratrax-surface px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+                    >
+                      {mcpUrlCopied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+              </li>
+              <li class="flex gap-3">
+                <span class="font-mono text-xs font-bold text-bratrax-acid">2</span>
+                <div class="min-w-0 flex-1">
+                  Sign in to Bratrax and approve. If you run several stores,
+                  pick the one Claude should see. Then turn Bratrax on in a
+                  chat from the tools menu, and ask away.
+                </div>
+              </li>
+            </ol>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <!-- Served by the Go proxy, not the SPA: a plain new-tab link. -->
+              <a
+                href="https://bratrax.com/integrations/claude#connect"
+                target="_blank"
+                rel="noopener"
+                class="btn-bratrax btn-primary btn-compact"
+              >
+                Step-by-step guide ↗
+              </a>
+              <p class="font-mono text-[10px] text-bratrax-text-muted">
+                Needs a Claude plan that supports connectors.
+              </p>
+            </div>
+          </div>
+
           {#if mcpConnections}
             <div>
               <h2 class="text-lg font-black text-bratrax-text-headline">
@@ -1376,7 +1457,8 @@
               </p>
               {#if mcpConnections.length === 0}
                 <p class="mt-3 font-mono text-xs text-bratrax-text-muted">
-                  No assistants connected.
+                  No assistants connected yet. Once you approve Claude, it
+                  shows up here.
                 </p>
               {:else}
                 <div class="mt-3 flex flex-col gap-2">
@@ -1409,143 +1491,147 @@
             </div>
           {/if}
 
-          <div>
-            <h2 class="text-lg font-black text-bratrax-text-headline">
-              Connect Claude Desktop
-            </h2>
-            <p class="mt-2 text-sm font-light text-bratrax-text-body">
-              Paste the config below into Claude Desktop's
-              <code class="font-mono text-[11px] text-bratrax-acid"
-                >claude_desktop_config.json</code
-              >
-              to query your Bratrax data with Claude. The token authenticates as
-              your workspace and lets Claude read your metrics and dashboards,
-              draw charts, and read your business notes.
-            </p>
-            <p class="mt-2 font-mono text-[10px] text-bratrax-text-muted">
-              On macOS the config file lives at
-              <code class="text-bratrax-text-body"
-                >~/Library/Application Support/Claude/claude_desktop_config.json</code
-              >. Restart Claude Desktop after pasting.
-            </p>
-          </div>
-
-          {#if mcp.token_set && mcp.claude_desktop_config}
-            <!-- Status row + revoke button -->
-            <div class="border border-bratrax-border bg-bratrax-bg p-4">
-              <div class="flex items-baseline justify-between">
-                <div>
-                  <div
-                    class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
-                  >
-                    Token status
+          <!-- Legacy token flow: kept for config-file clients. Open by
+               default only for workspaces that already have a token. -->
+          <details
+            open={mcp.token_set}
+            class="group border border-bratrax-border bg-bratrax-bg"
+          >
+            <summary
+              class="cursor-pointer select-none px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted hover:text-bratrax-text-body"
+            >
+              Advanced: connect with a token
+            </summary>
+            <div class="flex flex-col gap-4 border-t border-bratrax-border p-4">
+              <p class="text-sm font-light text-bratrax-text-body">
+                Only for MCP clients that can't use the connector above, such
+                as a hand-edited
+                <code class="font-mono text-[11px] text-bratrax-acid"
+                  >claude_desktop_config.json</code
+                >. The token authenticates as your workspace. On macOS the
+                config file lives at
+                <code class="font-mono text-[11px] text-bratrax-text-body"
+                  >~/Library/Application Support/Claude/claude_desktop_config.json</code
+                >; restart Claude Desktop after pasting.
+              </p>
+              {#if mcp.token_set && mcp.claude_desktop_config}
+                <!-- Status row + revoke button -->
+                <div class="border border-bratrax-border bg-bratrax-bg p-4">
+                  <div class="flex items-baseline justify-between">
+                    <div>
+                      <div
+                        class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-acid/70"
+                      >
+                        Token status
+                      </div>
+                      <div
+                        class="mt-1 font-mono text-sm text-bratrax-text-headline"
+                      >
+                        Active{mcp.created_at
+                          ? ` · created ${formatDate(mcp.created_at)}`
+                          : ""}
+                      </div>
+                    </div>
+                    <span class="bratrax-status-pill flex-shrink-0">
+                      Connected
+                    </span>
                   </div>
-                  <div
-                    class="mt-1 font-mono text-sm text-bratrax-text-headline"
-                  >
-                    Active{mcp.created_at
-                      ? ` · created ${formatDate(mcp.created_at)}`
-                      : ""}
+                  <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      on:click={requestRegenerateMCP}
+                      disabled={mcpRegenerating}
+                      class="btn-bratrax btn-neutral btn-compact"
+                    >
+                      {mcpRegenerating ? "Regenerating…" : "Regenerate token"}
+                    </button>
+                    <button
+                      type="button"
+                      on:click={requestRemoveMCP}
+                      disabled={mcpDeleting}
+                      class="btn-bratrax btn-destructive btn-compact"
+                    >
+                      {mcpDeleting ? "Revoking…" : "Revoke"}
+                    </button>
                   </div>
                 </div>
-                <span class="bratrax-status-pill flex-shrink-0">
-                  Connected
-                </span>
-              </div>
-              <div class="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  on:click={requestRegenerateMCP}
-                  disabled={mcpRegenerating}
-                  class="btn-bratrax btn-neutral btn-compact"
-                >
-                  {mcpRegenerating ? "Regenerating…" : "Regenerate token"}
-                </button>
-                <button
-                  type="button"
-                  on:click={requestRemoveMCP}
-                  disabled={mcpDeleting}
-                  class="btn-bratrax btn-destructive btn-compact"
-                >
-                  {mcpDeleting ? "Revoking…" : "Revoke"}
-                </button>
-              </div>
-            </div>
 
-            <!-- Token (separately copyable) -->
-            <div>
-              <label
-                class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
-              >
-                Token
-              </label>
-              <div class="flex items-center gap-2">
-                <input
-                  type="text"
-                  readonly
-                  value={mcp.token}
-                  class="w-full border border-bratrax-border bg-bratrax-bg px-3 py-2 font-mono text-xs text-bratrax-text-body focus:border-bratrax-acid focus:outline-none"
-                  on:click={selectAllOnClick}
-                />
-                <button
-                  type="button"
-                  on:click={copyMCPToken}
-                  class="flex-shrink-0 border border-bratrax-border bg-bratrax-surface px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
-                >
-                  {mcpTokenCopied ? "Copied!" : "Copy"}
-                </button>
-              </div>
-            </div>
+                <!-- Token (separately copyable) -->
+                <div>
+                  <label
+                    class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+                  >
+                    Token
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readonly
+                      value={mcp.token}
+                      class="w-full border border-bratrax-border bg-bratrax-bg px-3 py-2 font-mono text-xs text-bratrax-text-body focus:border-bratrax-acid focus:outline-none"
+                      on:click={selectAllOnClick}
+                    />
+                    <button
+                      type="button"
+                      on:click={copyMCPToken}
+                      class="flex-shrink-0 border border-bratrax-border bg-bratrax-surface px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-body hover:border-bratrax-text-muted hover:bg-bratrax-hover"
+                    >
+                      {mcpTokenCopied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                </div>
 
-            <!-- Full config JSON (the canonical paste-into-Claude-Desktop blob) -->
-            <div>
-              <label
-                class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
-              >
-                claude_desktop_config.json
-              </label>
-              <pre
-                class="border border-bratrax-border bg-bratrax-bg px-3 py-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body overflow-x-auto">{JSON.stringify(
-                  mcp.claude_desktop_config,
-                  null,
-                  2,
-                )}</pre>
-              <div class="mt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  on:click={copyMCPConfig}
-                  class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
-                >
-                  {mcpConfigCopied ? "Copied!" : "Copy config"}
-                </button>
-                <p class="font-mono text-[10px] text-bratrax-text-muted">
-                  Anyone with this token can query your Bratrax data — keep it
-                  private.
-                </p>
-              </div>
+                <!-- Full config JSON (the canonical paste-into-Claude-Desktop blob) -->
+                <div>
+                  <label
+                    class="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-text-muted"
+                  >
+                    claude_desktop_config.json
+                  </label>
+                  <pre
+                    class="border border-bratrax-border bg-bratrax-bg px-3 py-3 font-mono text-[11px] leading-relaxed text-bratrax-text-body overflow-x-auto">{JSON.stringify(
+                      mcp.claude_desktop_config,
+                      null,
+                      2,
+                    )}</pre>
+                  <div class="mt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      on:click={copyMCPConfig}
+                      class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
+                    >
+                      {mcpConfigCopied ? "Copied!" : "Copy config"}
+                    </button>
+                    <p class="font-mono text-[10px] text-bratrax-text-muted">
+                      Anyone with this token can query your Bratrax data — keep it
+                      private.
+                    </p>
+                  </div>
+                </div>
+              {:else}
+                <div class="border border-bratrax-border bg-bratrax-bg p-4">
+                  <div
+                    class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
+                  >
+                    Status
+                  </div>
+                  <p class="mt-2 font-mono text-xs text-bratrax-text-muted">
+                    No token yet. You only need one for a config-file setup.
+                  </p>
+                  <div class="mt-3">
+                    <button
+                      type="button"
+                      on:click={requestRegenerateMCP}
+                      disabled={mcpRegenerating}
+                      class="btn-bratrax btn-neutral btn-compact"
+                    >
+                      {mcpRegenerating ? "Generating…" : "Generate token"}
+                    </button>
+                  </div>
+                </div>
+              {/if}
             </div>
-          {:else}
-            <div class="border border-bratrax-border bg-bratrax-bg p-4">
-              <div
-                class="font-mono text-[10px] font-bold uppercase tracking-[2px] text-bratrax-text-muted"
-              >
-                Status
-              </div>
-              <p class="mt-2 font-mono text-xs text-bratrax-text-muted">
-                No token yet. Generate one to connect Claude Desktop.
-              </p>
-              <div class="mt-3">
-                <button
-                  type="button"
-                  on:click={requestRegenerateMCP}
-                  disabled={mcpRegenerating}
-                  class="btn-bratrax btn-primary btn-compact"
-                >
-                  {mcpRegenerating ? "Generating…" : "Generate token"}
-                </button>
-              </div>
-            </div>
-          {/if}
+          </details>
 
           {#if mcpError}
             <div
