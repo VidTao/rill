@@ -38,7 +38,10 @@ export const initialHeights: Record<CanvasComponentType, number> = {
 export const MIN_HEIGHT = 40;
 export const MIN_WIDTH = 3;
 export const COLUMN_COUNT = 12;
-export const DEFAULT_DASHBOARD_WIDTH = 1200;
+// Bratrax: 1400 (upstream 1200). The max width of the filter bar and the tile
+// area for every canvas whose YAML sets no `max_width`; the extra room keeps
+// the KPI and pivot columns from cramping on wide screens.
+export const DEFAULT_DASHBOARD_WIDTH = 1400;
 
 export const mousePosition = (() => {
   const store = writable({ x: 0, y: 0 });

@@ -35,9 +35,10 @@
             <!-- Freshness badge + Edit-dashboard button — rendered into
                  CanvasDashboardWrapper's filter-right slot, which sits INSIDE
                  the same max-width relative wrapper as CanvasFilters. The
-                 slotted row is absolutely positioned to that wrapper's right
-                 edge, so it lines up with the filter bar's right edge
-                 regardless of viewport width. svelte:fragment is required so
+                 wrapper positions it at that wrapper's top right edge and
+                 reserves its width in the filter bar's first row, so the
+                 pills wrap instead of overlapping it at any width (e.g. with
+                 the chat or support sidebar open). svelte:fragment is required so
                  the {#if} lives INSIDE the slot (Svelte 4 requires slot="..."
                  on a direct child of the component). -->
             <svelte:fragment slot="filter-right">
@@ -71,11 +72,10 @@
     position: relative;
   }
 
+  /* Positioned (top right of the filter bar) and measured by
+     CanvasDashboardWrapper, which keeps its width free in the filter bar's
+     first row so the pills wrap instead of sliding underneath. */
   :global(.canvas-filter-right) {
-    position: absolute;
-    top: 0;
-    right: var(--filter-slot-right, 0);
-    z-index: 60;
     display: flex;
     align-items: center;
     gap: 8px;

@@ -131,8 +131,16 @@
   class="flex flex-col gap-y-2 size-full pointer-events-none"
   style:max-width="{maxWidth}px"
 >
+  <!-- The first row keeps clear of the right-hand slot (Bratrax: freshness
+       badge + Edit dashboard), which CanvasDashboardWrapper positions
+       absolutely over it and measures into `--filter-slot-reserve`. Padding
+       by that width makes the pills wrap before reaching it. Unset (0) when
+       nothing is slotted, so other uses of CanvasFilters are unchanged. -->
   {#if hasTimeSeries}
-    <div class="p-2 flex justify-between size-full py-0">
+    <div
+      class="p-2 flex justify-between size-full py-0"
+      style:padding-right="max(0.5rem, var(--filter-slot-reserve, 0px))"
+    >
       <div class="flex items-center size-full">
         <div class="flex-none h-full pt-1.5 pointer-events-auto">
           <Tooltip.Root openDelay={0}>
@@ -150,6 +158,7 @@
         </div>
         <div
           class="flex flex-wrap gap-x-2 gap-y-1.5 pl-2 pointer-events-auto size-full pr-2"
+          data-filter-first-row
         >
           <SuperPill
             context={canvasName}
@@ -206,7 +215,12 @@
       </div>
     </div>
   {/if}
-  <div class="relative flex flex-row gap-x-2 gap-y-2 items-start ml-2">
+  <div
+    class="relative flex flex-row gap-x-2 gap-y-2 items-start ml-2"
+    style:padding-right={hasTimeSeries
+      ? undefined
+      : "var(--filter-slot-reserve, 0px)"}
+  >
     {#if !readOnly}
       <Filter size="16px" className="text-fg-secondary flex-none mt-[5px]" />
     {/if}

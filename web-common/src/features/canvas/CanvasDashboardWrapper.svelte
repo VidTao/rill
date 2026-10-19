@@ -29,14 +29,27 @@
   // Rather than reproduce that math, we bind both wrappers, measure their
   // getBoundingClientRect().right at runtime, and expose the difference
   // as the `--filter-slot-right` CSS variable on the filter wrapper. The
-  // slotted right-side content (Bratrax's Edit-dashboard button) reads
-  // that variable for its `right:` offset — pixel-aligned regardless of
+  // slot container below (Bratrax's freshness badge + Edit-dashboard
+  // button) uses it for its `right:` offset — pixel-aligned regardless of
   // browser scrollbar behaviour.
   let scrollContainerEl: HTMLDivElement;
   let dashboardWrapperEl: HTMLDivElement;
   let filterWrapperEl: HTMLDivElement;
+  let filterSlotEl: HTMLDivElement;
   let scrollbarWidth = 0;
   let filterSlotRight = 0;
+  // Width the slotted right-hand group (Bratrax: freshness badge + Edit
+  // dashboard) takes out of the filter bar's first row, published as
+  // `--filter-slot-reserve`. CanvasFilters pads that row by it, so the time
+  // and comparison pills wrap to the next line before reaching the group
+  // instead of sliding underneath it — which they did whenever a sidebar
+  // narrowed the page, since the group is absolutely positioned.
+  let filterSlotReserve = 0;
+  // When even the widest first-row pill (the time range) can't fit beside the
+  // slotted group, wrapping can't help: the group moves onto its own line
+  // above the filters instead, still right-aligned.
+  let filterSlotStacked = false;
+  const FILTER_SLOT_GAP_PX = 8;
 
   function measureScrollbar() {
     if (!scrollContainerEl) return;
@@ -61,9 +74,33 @@
     filterSlotRight = Math.max(0, filterRight - dashRight);
   }
 
+  function measureFilterSlotReserve() {
+    const slotWidth = filterSlotEl?.offsetWidth ?? 0;
+    const reserve =
+      slotWidth > 0 ? slotWidth + filterSlotRight + FILTER_SLOT_GAP_PX : 0;
+    // Room the first row needs for its widest pill, from the wrapper's left
+    // edge. Measured independently of the reserve (pill widths and the
+    // wrapper's width don't depend on it), so stacking can't oscillate.
+    let needed = 0;
+    const pills = filterWrapperEl?.querySelector("[data-filter-first-row]");
+    if (pills && reserve > 0) {
+      const wrapperLeft = filterWrapperEl.getBoundingClientRect().left;
+      const pillsLeft = pills.getBoundingClientRect().left;
+      const widest = Math.max(
+        0,
+        ...Array.from(pills.children, (el) => (el as HTMLElement).offsetWidth),
+      );
+      needed = pillsLeft - wrapperLeft + widest + FILTER_SLOT_GAP_PX;
+    }
+    filterSlotStacked =
+      reserve > 0 && needed + reserve > (filterWrapperEl?.clientWidth ?? 0);
+    filterSlotReserve = filterSlotStacked ? 0 : reserve;
+  }
+
   function measureAll() {
     measureScrollbar();
     measureFilterSlotRight();
+    measureFilterSlotReserve();
   }
 
   $: ({ instanceId } = $runtime);
@@ -86,6 +123,9 @@
     if (scrollContainerEl) observer.observe(scrollContainerEl);
     if (dashboardWrapperEl) observer.observe(dashboardWrapperEl);
     if (filterWrapperEl) observer.observe(filterWrapperEl);
+    // The slotted content changes width on its own (the freshness badge's
+    // text changes between "Updated 3 hours ago" and "Next update in …").
+    if (filterSlotEl) observer.observe(filterSlotEl);
     return () => observer.disconnect();
   });
 </script>
@@ -104,20 +144,32 @@
         on:click|self={onClick}
       >
         <!-- Max-width relative wrapper: CanvasFilters fills it; the
-             `filter-right` slot is absolutely positioned by the consumer
-             relative to this wrapper. The wrapper's right edge is measured
-             at runtime against the dashboard wrapper's right edge below;
-             the diff is exposed as `--filter-slot-right` so slotted
-             content (Bratrax Edit-dashboard button) can offset itself
-             precisely instead of guessing geometry. -->
+             `filter-right` slot sits absolutely positioned at its top right.
+             The wrapper's right edge is measured at runtime against the
+             dashboard wrapper's right edge below; the diff
+             (`--filter-slot-right`) offsets the slot so it lines up with the
+             tiles, and the slot's own width (`--filter-slot-reserve`) is kept
+             free in CanvasFilters' first row so nothing slides under it. -->
         <div
           bind:this={filterWrapperEl}
           class="relative w-full flex justify-center"
+          class:flex-col={filterSlotStacked}
           style:max-width="{maxWidth}px"
           style:--filter-slot-right="{filterSlotRight}px"
+          style:--filter-slot-reserve="{filterSlotReserve}px"
         >
           <CanvasFilters {canvasName} {maxWidth} {builder} />
-          <slot name="filter-right" />
+          <div
+            bind:this={filterSlotEl}
+            class="filter-right-slot"
+            class:stacked={filterSlotStacked}
+            style:right={filterSlotStacked ? undefined : `${filterSlotRight}px`}
+            style:margin-right={filterSlotStacked
+              ? `${filterSlotRight}px`
+              : undefined}
+          >
+            <slot name="filter-right" />
+          </div>
         </div>
       </header>
     {/if}
@@ -152,5 +204,22 @@
   div {
     container-type: inline-size;
     container-name: canvas-container;
+  }
+
+  .filter-right-slot {
+    position: absolute;
+    top: 0;
+    z-index: 60;
+    /* Not a size container: inline-size containment would stop this box
+       from sizing to its content, so it would measure (and render) 0 wide. */
+    container-type: normal;
+  }
+
+  /* Too narrow to sit beside the pills: its own right-aligned line, above. */
+  .filter-right-slot.stacked {
+    position: static;
+    order: -1;
+    align-self: flex-end;
+    margin-bottom: 8px;
   }
 </style>
