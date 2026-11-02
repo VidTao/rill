@@ -102,10 +102,10 @@ func (s *Server) AnalyzeConnectors(ctx context.Context, req *runtimev1.AnalyzeCo
 		c := &runtimev1.AnalyzedConnector{
 			Name:               connector.Name,
 			Driver:             driverSpecToPB(connector.Driver, connector.Spec),
-			Config:             cfgConfigPB,
-			PresetConfig:       presetConfigPB,
-			ProjectConfig:      projectConfigPB, // NOTE: Could also use cfg.Project, but connector.DefaultConfig might be slightly more up-to-date
-			EnvConfig:          cfg.Env,
+			Config:             redactStruct(cfgConfigPB),
+			PresetConfig:       redactStruct(presetConfigPB),
+			ProjectConfig:      redactStruct(projectConfigPB), // NOTE: Could also use cfg.Project, but connector.DefaultConfig might be slightly more up-to-date
+			EnvConfig:          redactStringMap(cfg.Env),
 			Provision:          cfg.Provision,
 			ProvisionArgs:      provisionArgsPB,
 			HasAnonymousAccess: connector.AnonymousAccess,

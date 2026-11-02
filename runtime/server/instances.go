@@ -327,10 +327,10 @@ func instanceToPB(inst *drivers.Instance, featureFlags map[string]bool, sensitiv
 		pb.RepoConnector = inst.RepoConnector
 		pb.AdminConnector = inst.AdminConnector
 		pb.AiConnector = aiConnector
-		pb.Connectors = inst.Connectors
-		pb.ProjectConnectors = inst.ProjectConnectors
-		pb.Variables = inst.Variables
-		pb.ProjectVariables = inst.ProjectVariables
+		pb.Connectors = redactConnectors(inst.Connectors)
+		pb.ProjectConnectors = redactConnectors(inst.ProjectConnectors)
+		pb.Variables = redactStringMap(inst.Variables)
+		pb.ProjectVariables = redactStringMap(inst.ProjectVariables)
 		pb.Annotations = inst.Annotations
 	}
 
