@@ -87,7 +87,14 @@ const SETTINGS_TABS: Destination[] = [
     label: "MCP",
     href: "/settings/mcp",
     section: "Settings",
-    keywords: ["model context protocol", "claude", "token", "integration"],
+    keywords: [
+      "model context protocol",
+      "claude",
+      "connector",
+      "connect claude",
+      "token",
+      "integration",
+    ],
   },
   {
     id: "settings-slack",
