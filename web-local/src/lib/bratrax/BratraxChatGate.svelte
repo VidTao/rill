@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { openStartAttribution } from "./members";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { getAISettings } from "$lib/bratrax/settings/api";
@@ -65,20 +66,11 @@
   }
 
   function goToSignup() {
-    // Deliberately a button + explicit navigation, NOT an <a href>. The app sets
-    // `data-sveltekit-preload-data="hover"`, so SvelteKit runs a link target's
-    // load() on hover — and signup/+page.ts's load() is side-effecting: with
-    // ?logout=1 it ends the session and redirects. As a link, merely hovering
-    // this control logged the user out. A button is not preloadable.
-    //
-    // ?logout=1 itself is load-bearing: /signup bounces an authenticated visitor
-    // to /developer, and a demo visitor still holds a live session, so without
-    // it this control silently returned them to the dashboard.
-    //
-    // location.assign rather than goto() so it is a real page load — an SPA hop
-    // would leave the demo identity in bratraxUser, because +layout.ts
-    // short-circuits /signup as a public route without touching the store.
-    window.location.assign("/signup?logout=1");
+    // The demo account becomes the visitor's own, same login: "Start
+    // attribution" (mounted by the root layout for demo-workspace viewers)
+    // converts it in place, no sign-out and no second signup form.
+    sidebarActions.closeChat();
+    openStartAttribution();
   }
 </script>
 
@@ -109,15 +101,15 @@
         <span class="font-serif italic text-bratrax-acid">AI prompts</span>
       </h2>
       <p class="text-sm font-light text-bratrax-text-body">
-        The demo account comes with {demoAI.limit} prompts on us. Create your own
-        real account to keep going with your own Anthropic key.
+        The demo account comes with {demoAI.limit} prompts on us. Start
+        attribution on your own store to keep going with your own Anthropic key.
       </p>
       <button
         type="button"
         on:click={goToSignup}
         class="bg-bratrax-acid px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-bratrax-bg hover:opacity-90"
       >
-        Create your account →
+        Start attribution →
       </button>
       <button
         type="button"

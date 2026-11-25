@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/rilldata/rill/runtime"
@@ -113,6 +114,20 @@ func (m *mockUserStore) SetLastClientID(_ context.Context, userID int, clientID 
 
 func (m *mockUserStore) UpdateLastLogin(_ context.Context, _ int) error {
 	return nil
+}
+
+// EmailAccount: in the mock a user's ClientID stands in for its clickhouse_db.
+func (m *mockUserStore) EmailAccount(_ context.Context, email, demoClientSlug string) (EmailAccount, error) {
+	for i := range m.users {
+		u := &m.users[i]
+		if strings.EqualFold(u.Email, strings.TrimSpace(email)) {
+			return EmailAccount{
+				Exists:     true,
+				DemoViewer: u.Role == "viewer" && u.ClientID != nil && *u.ClientID == demoClientSlug,
+			}, nil
+		}
+	}
+	return EmailAccount{}, nil
 }
 
 const (

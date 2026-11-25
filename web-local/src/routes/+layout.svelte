@@ -56,6 +56,7 @@
   } from "$lib/bratrax/shopify-embed";
   import ClientSwitcher from "$lib/bratrax/ClientSwitcher.svelte";
   import AddStoreButton from "$lib/bratrax/AddStoreButton.svelte";
+  import StartAttribution from "$lib/bratrax/StartAttribution.svelte";
   import CommandPalette from "$lib/bratrax/command-palette/CommandPalette.svelte";
   import CommandPaletteTrigger from "$lib/bratrax/command-palette/CommandPaletteTrigger.svelte";
   import OrderDrilldownProvider from "$lib/bratrax/order-attribution/OrderDrilldownProvider.svelte";
@@ -319,6 +320,12 @@
               {/if}
               {#if canAddStore && !isViewer && !onOnboardPage}
                 <AddStoreButton />
+              {/if}
+              <!-- Demo visitors and directory members (viewers on the shared
+                   demo workspace): their one call to action. Also hosts the
+                   modal the demo AI gate and the demo tour open. -->
+              {#if isViewer && $bratraxIsDemo}
+                <StartAttribution />
               {/if}
             </svelte:fragment>
 

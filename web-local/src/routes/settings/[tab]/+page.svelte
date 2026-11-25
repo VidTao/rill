@@ -47,6 +47,7 @@
     navigateTopLevel,
     reserveTopLevelTab,
   } from "$lib/bratrax/shopify-embed";
+  import { bratraxIsDemo, bratraxUser } from "$lib/bratrax/auth-store";
   import BrandDomainsEditor from "$lib/bratrax/BrandDomainsEditor.svelte";
   import OrderExclusionsEditor from "$lib/bratrax/OrderExclusionsEditor.svelte";
 
@@ -107,6 +108,14 @@
   // [tab]/+page.ts load() validates the segment, so the fallback to "account"
   // here is purely defensive (TS narrowing — params.tab is `string | undefined`).
   $: activeTab = (($page.params.tab as TabId) ?? "account") as TabId;
+
+  // The shared demo workspace has no team to manage: its viewers are demo
+  // visitors and directory members, and the API answers only with the caller.
+  $: hideTeam = $bratraxIsDemo && $bratraxUser?.role !== "super_admin";
+  $: visibleTabs = TABS.filter((t) => !(t.id === "team" && hideTeam));
+  $: if (hideTeam && activeTab === "team") {
+    void goto("/settings/account", { replaceState: true });
+  }
   let topError = "";
 
   // ----- Account state -------------------------------------------------------
@@ -833,7 +842,7 @@
 
     <!-- Tab strip -->
     <div class="mb-6 flex items-center gap-1 border-b border-bratrax-border">
-      {#each TABS as tab}
+      {#each visibleTabs as tab}
         <button
           type="button"
           class="border-b-2 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors {activeTab ===

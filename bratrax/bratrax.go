@@ -113,7 +113,8 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	// Let the self-authenticating handlers (auth/me, auth/users, the client
 	// switcher) resolve Shopify session tokens too. Wired after construction
 	// because the mapper depends on authSvc, not the other way round.
-	authSvc.WithSessionResolver(authMapper)
+	authSvc.WithSessionResolver(authMapper).WithDemoClientSlug(cfg.DemoClientSlug)
+	authMapper.WithSessionRefresh(authSvc)
 
 	// Local health endpoint — confirms the proxy layer is alive.
 	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -564,6 +565,15 @@ func RegisterHandlers(mux *http.ServeMux, logger *zap.Logger, ensureReady Ensure
 	// forwards into the runtime's existing per-instance MCP handler.
 	// Registered before the catch-all proxy so it takes precedence.
 	RegisterMCPHandler(mux, clientStore, authSvc, oauthSvc, cfg.RuntimeAddr, ensureReady, logger)
+
+	// Keeps a directory member's session alive: the stores site calls this once
+	// a day for signed-in visitors (they may never open the app, where every
+	// request slides the session). The auth middleware does the refresh.
+	observability.MuxHandle(mux, "POST /bratrax/auth/refresh",
+		observability.Middleware("bratrax", logger, authMapper.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			w.WriteHeader(http.StatusNoContent)
+		}))))
 
 	// Middleware chain: observability → auth → proxy (catch-all)
 	proxyHandler := observability.Middleware("bratrax", logger, authMapper.Middleware(proxy))

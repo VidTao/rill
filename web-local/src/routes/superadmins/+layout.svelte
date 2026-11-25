@@ -6,6 +6,7 @@
   const TABS = [
     { href: "/superadmins", label: "Overview" },
     { href: "/superadmins/email-log", label: "Email log" },
+    { href: "/superadmins/members", label: "Members" },
     { href: "/superadmins/client-stats", label: "Client stats" },
   ];
 

@@ -89,7 +89,12 @@ export async function bratraxSignup(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `Signup failed (${res.status})`);
+    // `code` lets the page act on an existing address: "member_exists" (a
+    // demo visitor or directory member, who signs in by emailed link) or
+    // "email_taken" (anyone else).
+    const err = new Error(body.error ?? `Signup failed (${res.status})`) as Error & { code?: string };
+    err.code = typeof body.code === "string" ? body.code : undefined;
+    throw err;
   }
   const data = await res.json();
   rememberTokenIfEmbedded(data?.token);

@@ -698,3 +698,43 @@ export function recomputeAttributionStats(): Promise<AttributionRecomputeResult>
     { method: "POST" },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Directory members (free accounts from bratrax.com/stores): their own list,
+// not customers and not quiet workspaces. GET /superadmins/members.
+// ---------------------------------------------------------------------------
+
+export interface DirectoryMember {
+  user_id: number;
+  email: string;
+  source: string;
+  /** Page type they signed up from: explore, store, emails, track, ... */
+  signup_page: string;
+  store_url: string;
+  country: string;
+  marketing_consent: boolean;
+  created_at: string | null;
+  last_login_at: string | null;
+  /** Set once they pressed Start attribution. */
+  converted_at: string | null;
+  client_id: string | null;
+}
+
+export interface DirectoryMembersResponse {
+  members: DirectoryMember[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export function listDirectoryMembers(
+  params: { q?: string; converted?: boolean; limit?: number; offset?: number } = {},
+): Promise<DirectoryMembersResponse> {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set("q", params.q);
+  if (params.converted) qs.set("converted", "1");
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  if (params.offset != null) qs.set("offset", String(params.offset));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<DirectoryMembersResponse>(`/bratrax/superadmins/members${suffix}`);
+}

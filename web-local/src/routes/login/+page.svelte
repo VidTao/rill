@@ -6,6 +6,8 @@
   import { queryClient } from "@rilldata/web-common/lib/svelte-query/globalQueryClient";
   import { onMount } from "svelte";
   import { getPendingInfo, resumeIdFromRedirect } from "$lib/bratrax/oauth-connect";
+  import { requestSigninLink } from "$lib/bratrax/members";
+  import { safeRedirect } from "$lib/bratrax/safe-redirect";
 
   // Arriving from an AI assistant's Connect button: say so, and keep the
   // consent destination when the visitor chooses to create an account instead.
@@ -34,12 +36,33 @@
       // Clear stale query cache from previous session/instance.
       // Without this, dashboards can show infinite spinner instead of rendering.
       queryClient.clear();
-      const redirect = $page.url.searchParams.get("redirect") || "/developer";
-      await goto(redirect);
+      await goto(safeRedirect($page.url.searchParams.get("redirect")));
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
+    }
+  }
+
+  // Emailed one-time sign-in link: for directory members and demo visitors,
+  // who have no password they know, and anyone who forgot theirs. The answer
+  // is the same whether or not the address has an account.
+  let linkBusy = false;
+  let linkSent = false;
+  async function emailLink() {
+    error = "";
+    if (!email.trim() || !email.includes("@")) {
+      error = "Enter your email first.";
+      return;
+    }
+    linkBusy = true;
+    try {
+      await requestSigninLink(email, safeRedirect($page.url.searchParams.get("redirect"), "/"));
+      linkSent = true;
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      linkBusy = false;
     }
   }
 </script>
@@ -86,6 +109,12 @@
         </div>
       {/if}
 
+      {#if linkSent}
+        <div class="border border-bratrax-acid/30 bg-bratrax-acid/10 px-3 py-2 font-mono text-xs text-bratrax-text-primary" role="status">
+          If that address has an account, a sign-in link is on its way. It works once, for 30 minutes.
+        </div>
+      {/if}
+
       <div class="flex flex-col gap-1">
         <label for="email" class="font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-text-muted">
           Email
@@ -127,6 +156,15 @@
         class="mt-2 w-full bg-bratrax-acid px-4 py-3 font-mono text-xs font-bold uppercase tracking-[1.5px] text-bratrax-bg transition-all hover:opacity-90 hover:-translate-y-px disabled:opacity-50"
       >
         {loading ? "SIGNING IN..." : "SIGN IN →"}
+      </button>
+
+      <button
+        type="button"
+        on:click={emailLink}
+        disabled={linkBusy}
+        class="w-full font-mono text-[11px] text-bratrax-acid hover:underline disabled:opacity-50"
+      >
+        {linkBusy ? "Sending…" : "Email me a sign-in link instead"}
       </button>
     </form>
 

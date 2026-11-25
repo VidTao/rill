@@ -24,11 +24,14 @@ import (
 )
 
 const (
-	bratraxCookieName  = "bratrax_auth"
-	bratraxTokenTTL    = 14 * 24 * time.Hour
-	maxRequestBodySize = 1 << 20 // 1 MB
-	minPasswordLength  = 8
-	maxPasswordLength  = 72 // bcrypt truncates beyond 72 bytes
+	bratraxCookieName = "bratrax_auth"
+	bratraxTokenTTL   = 14 * 24 * time.Hour
+	// sessionRefreshAfter: a valid session older than this gets a fresh 14-day
+	// cookie on its next request, so people who keep using Bratrax stay signed in.
+	sessionRefreshAfter = 24 * time.Hour
+	maxRequestBodySize  = 1 << 20 // 1 MB
+	minPasswordLength   = 8
+	maxPasswordLength   = 72 // bcrypt truncates beyond 72 bytes
 )
 
 // AuthService handles authentication endpoints for Bratrax.
@@ -42,6 +45,9 @@ type AuthService struct {
 	secureCookie       bool
 	onlyInvitationLink bool
 	allowWoocommerce   bool
+	// demoClientSlug is the clickhouse_db of the shared demo workspace, so signup
+	// can tell a demo visitor or directory member from a customer (WithDemoClientSlug).
+	demoClientSlug string
 
 	// sessionResolver, when set, lets cookie-less handlers fall back to Shopify
 	// App Bridge session tokens. Injected after construction because the mapper
@@ -54,6 +60,13 @@ type AuthService struct {
 // app in a fresh tab — no cookie, no stored JWT — is still recognised.
 func (s *AuthService) WithSessionResolver(m *AuthMapper) *AuthService {
 	s.sessionResolver = m
+	return s
+}
+
+// WithDemoClientSlug names the shared demo workspace (DEMO_CLIENT_SLUG). Signup
+// uses it to answer "member_exists" for its viewers instead of a bare conflict.
+func (s *AuthService) WithDemoClientSlug(slug string) *AuthService {
+	s.demoClientSlug = slug
 	return s
 }
 
@@ -381,10 +394,31 @@ func (s *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
+	// An existing address gets a reason the page can act on. A demo visitor or
+	// directory member already has an account with no password they know: the
+	// page offers an emailed sign-in link, and "Start attribution" in the app
+	// turns that same account into a customer.
+	existing, err := s.store.EmailAccount(r.Context(), req.Email, s.demoClientSlug)
+	if err != nil {
+		s.logger.Error("signup: email lookup failed", zap.Error(err))
+		writeJSONError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if existing.Exists {
+		code, msg := "email_taken", "An account with this email already exists. Sign in instead."
+		if existing.DemoViewer {
+			code, msg = "member_exists", "You already have a free Bratrax account. We can email you a sign-in link."
+		}
+		writeJSON(w, http.StatusConflict, map[string]any{"error": msg, "code": code})
+		return
+	}
+
 	user, err := s.store.CreateUser(r.Context(), req.Email, req.Password, req.CompanyName, "admin", nil)
 	if err != nil {
 		s.logger.Error("signup: create user failed", zap.Error(err))
-		writeJSONError(w, http.StatusConflict, "email already registered")
+		writeJSONError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
@@ -486,6 +520,32 @@ func (s *AuthService) authenticateRequest(r *http.Request) (*User, error) {
 		return nil, fmt.Errorf("user not found")
 	}
 	return user, nil
+}
+
+// timeNow is time.Now, swappable in tests of the sliding session.
+var timeNow = time.Now
+
+// refreshSession re-issues the session cookie when the token it came in on is
+// older than sessionRefreshAfter (sliding expiry). Best effort: a failure only
+// means the old cookie runs its course.
+func (s *AuthService) refreshSession(w http.ResponseWriter, user *User, issuedAt *jwt.NumericDate) {
+	if issuedAt == nil || timeNow().Sub(issuedAt.Time) < sessionRefreshAfter {
+		return
+	}
+	token, err := s.issueToken(user)
+	if err != nil {
+		s.logger.Warn("session refresh failed", zap.Int("user_id", user.ID), zap.Error(err))
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     bratraxCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(bratraxTokenTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   s.secureCookie,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 // issueToken creates a signed JWT for the given user.

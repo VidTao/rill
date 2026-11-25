@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -15,17 +16,17 @@ import (
 
 // User represents a row in the rill_users table.
 type User struct {
-	ID           int       `db:"id"            json:"id"`
-	Email        string    `db:"email"         json:"email"`
-	PasswordHash string    `db:"password_hash" json:"-"`
-	Name         string    `db:"name"          json:"name"`
-	Role         string    `db:"role"          json:"role"`
-	ProjectID    *string   `db:"project_id"    json:"project_id"`
-	ClientID     *string   `db:"client_id"     json:"client_id,omitempty"`
+	ID           int     `db:"id"            json:"id"`
+	Email        string  `db:"email"         json:"email"`
+	PasswordHash string  `db:"password_hash" json:"-"`
+	Name         string  `db:"name"          json:"name"`
+	Role         string  `db:"role"          json:"role"`
+	ProjectID    *string `db:"project_id"    json:"project_id"`
+	ClientID     *string `db:"client_id"     json:"client_id,omitempty"`
 	// LastClientID is the most recent client a super_admin or multi-store user
 	// switched to. Used as a fallback when the bratrax_active_client cookie is
 	// missing/invalid (e.g. fresh login). NULL until their first switch.
-	LastClientID *string   `db:"last_client_id" json:"last_client_id,omitempty"`
+	LastClientID *string `db:"last_client_id" json:"last_client_id,omitempty"`
 	// MultiClientID ties a non-super_admin user to a rill_multi_clients parent.
 	// NULL for legacy single-store users (no behavior change). When set, the
 	// user can switch between sibling sub-stores via the same client-switcher
@@ -46,6 +47,16 @@ type UserStoreInterface interface {
 	LinkUserToClient(ctx context.Context, userID int, clientID string) error
 	SetLastClientID(ctx context.Context, userID int, clientID string) error
 	UpdateLastLogin(ctx context.Context, userID int) error
+	EmailAccount(ctx context.Context, email, demoClientSlug string) (EmailAccount, error)
+}
+
+// EmailAccount says whether an email (any letter case) already has an account,
+// and whether that account is a viewer on the shared demo workspace: a demo
+// visitor or a directory member, who has no password they know of and signs in
+// by emailed link instead.
+type EmailAccount struct {
+	Exists     bool
+	DemoViewer bool
 }
 
 // UserStore provides CRUD operations on rill_users.
@@ -81,8 +92,11 @@ func (s *UserStore) Close() error {
 func (s *UserStore) Authenticate(ctx context.Context, email, password string) (*User, error) {
 	var u User
 	err := s.db.GetContext(ctx, &u,
-		"SELECT id, email, password_hash, name, role, project_id, client_id, last_client_id, multi_client_id, created_at, updated_at FROM rill_users WHERE email = $1",
-		email,
+		// Any letter case: Flask and the directories store addresses lower-cased,
+		// older accounts may not be. No two rows differ only by case (checked
+		// 2026-11-25), and ORDER BY keeps it deterministic if one ever did.
+		"SELECT id, email, password_hash, name, role, project_id, client_id, last_client_id, multi_client_id, created_at, updated_at FROM rill_users WHERE lower(email) = lower($1) ORDER BY id LIMIT 1",
+		strings.TrimSpace(email),
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -185,6 +199,31 @@ func (s *UserStore) CreateUser(ctx context.Context, email, password, name, role 
 	}
 
 	return &u, nil
+}
+
+// EmailAccount looks an email up for the signup form; see the EmailAccount type.
+func (s *UserStore) EmailAccount(ctx context.Context, email, demoClientSlug string) (EmailAccount, error) {
+	var row struct {
+		Role         string `db:"role"`
+		ClickhouseDB string `db:"clickhouse_db"`
+	}
+	err := s.db.GetContext(ctx, &row,
+		`SELECT u.role, COALESCE(c.clickhouse_db, '') AS clickhouse_db
+		   FROM rill_users u LEFT JOIN rill_clients c ON c.client_id = u.client_id
+		  WHERE lower(u.email) = lower($1)
+		  ORDER BY u.id LIMIT 1`,
+		strings.TrimSpace(email),
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return EmailAccount{}, nil
+	}
+	if err != nil {
+		return EmailAccount{}, fmt.Errorf("bratrax userstore: email lookup failed: %w", err)
+	}
+	return EmailAccount{
+		Exists:     true,
+		DemoViewer: row.Role == "viewer" && demoClientSlug != "" && row.ClickhouseDB == demoClientSlug,
+	}, nil
 }
 
 // ListUsers returns all users, ordered by ID.

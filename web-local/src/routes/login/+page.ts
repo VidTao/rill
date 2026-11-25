@@ -1,5 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 import { bratraxGetMe } from "$lib/bratrax/auth";
+import { safeRedirect } from "$lib/bratrax/safe-redirect";
 
 export async function load({ url, fetch }) {
   // If the user is already authenticated, don't show the login form again —
@@ -8,8 +9,8 @@ export async function load({ url, fetch }) {
   // admin/viewer redirect to first dashboard) via its own onMount logic.
   const user = await bratraxGetMe(fetch);
   if (user) {
-    const target = url.searchParams.get("redirect") || "/developer";
-    throw redirect(307, target);
+    // Same-site paths only: never forward a signed-in visitor off the site.
+    throw redirect(307, safeRedirect(url.searchParams.get("redirect")));
   }
   return {};
 }

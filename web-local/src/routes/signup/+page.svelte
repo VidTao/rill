@@ -28,6 +28,8 @@
     resumeIdFromRedirect,
     type OAuthPendingInfo,
   } from "$lib/bratrax/oauth-connect";
+  import { requestSigninLink } from "$lib/bratrax/members";
+  import { safeRedirect } from "$lib/bratrax/safe-redirect";
 
   // Signing up from an AI assistant's Connect button (Claude, ChatGPT): the
   // redirect is the consent page, which sends the new account through normal
@@ -44,6 +46,36 @@
   let companyName = "";
   let error = "";
   let loading = false;
+
+  // The address already has an account (409 from signup): "member_exists" is
+  // a demo visitor or directory member, who has no password they know and
+  // signs in by emailed link; "email_taken" is anyone else.
+  let existing: "" | "member_exists" | "email_taken" = "";
+  let linkBusy = false;
+  let linkSent = false;
+  let linkError = "";
+  $: if (email) resetExisting(email);
+  let existingFor = "";
+  function resetExisting(value: string) {
+    if (existing && value !== existingFor) {
+      existing = "";
+      linkSent = false;
+      linkError = "";
+    }
+  }
+
+  async function emailLink() {
+    linkBusy = true;
+    linkError = "";
+    try {
+      await requestSigninLink(email, "/");
+      linkSent = true;
+    } catch (e) {
+      linkError = e instanceof Error ? e.message : String(e);
+    } finally {
+      linkBusy = false;
+    }
+  }
 
   // Confirm-password match check — mirrors the accept-invite/[token] form
   // so the two account-creation surfaces validate identically. Empty
@@ -185,9 +217,16 @@
 
       // Connecting an AI assistant: the consent page takes over and routes the
       // new account through onboarding. Otherwise, Connect your store (Screen 2).
-      await goto(oauthResume && oauthRedirect ? oauthRedirect : "/onboard/store");
+      await goto(oauthResume && oauthRedirect ? safeRedirect(oauthRedirect, "/onboard/store") : "/onboard/store");
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      const code = (e as { code?: string })?.code;
+      if (code === "member_exists" || code === "email_taken") {
+        existing = code;
+        existingFor = email;
+        error = "";
+      } else {
+        error = e instanceof Error ? e.message : String(e);
+      }
     } finally {
       loading = false;
     }
@@ -322,6 +361,41 @@
         {#if error}
           <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato">
             {error}
+          </div>
+        {/if}
+
+        {#if existing === "member_exists"}
+          <div class="border border-bratrax-acid/40 bg-bratrax-acid/10 px-4 py-3" role="status">
+            <p class="mb-1 font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-acid">
+              You already have a free Bratrax account
+            </p>
+            {#if linkSent}
+              <p class="text-sm font-light text-bratrax-text-body">
+                Check your inbox: we sent a sign-in link to {email}. It works once, for 30 minutes.
+                Once you're in, press <b>Start attribution</b> to set up your own workspace.
+              </p>
+            {:else}
+              <p class="mb-3 text-sm font-light text-bratrax-text-body">
+                You made it on Bratrax Stores or for the demo. Sign in with an emailed link, then press
+                <b>Start attribution</b> to set up your own workspace on the same login.
+              </p>
+              <button
+                type="button"
+                on:click={emailLink}
+                disabled={linkBusy}
+                class="w-full bg-bratrax-acid px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[1.5px] text-bratrax-bg hover:opacity-90 disabled:opacity-50"
+              >
+                {linkBusy ? "Sending…" : "Email me a sign-in link"}
+              </button>
+              {#if linkError}
+                <p class="mt-2 font-mono text-[10px] text-bratrax-tomato">{linkError}</p>
+              {/if}
+            {/if}
+          </div>
+        {:else if existing === "email_taken"}
+          <div class="border border-bratrax-tomato/30 bg-bratrax-tomato/10 px-3 py-2 font-mono text-xs text-bratrax-tomato" role="alert">
+            An account with this email already exists.
+            <a href={loginHref} class="underline">Sign in</a> instead.
           </div>
         {/if}
 

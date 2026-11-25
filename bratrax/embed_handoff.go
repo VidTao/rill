@@ -94,8 +94,15 @@ func (s *EmbedHandoffService) HandleHandoff(w http.ResponseWriter, r *http.Reque
 	if next == "" {
 		next = handoffRedirectPath
 	}
+	// A directory member's sign-in (next under /stores) that fails goes back to
+	// the directory's sign-in page, which offers a new link; everyone else to
+	// /login, which they can use.
+	failTo := "/login"
+	if next == "/stores" || strings.HasPrefix(next, "/stores/") || strings.HasPrefix(next, "/stores?") {
+		failTo = "/stores/signin?expired=1"
+	}
 	if token == "" {
-		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, failTo, http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -104,21 +111,21 @@ func (s *EmbedHandoffService) HandleHandoff(w http.ResponseWriter, r *http.Reque
 		// Expired, already used, or forged. Deliberately not distinguished in
 		// the response — the merchant's next move is the same either way.
 		s.logger.Info("embed hand-off rejected", zap.Error(err))
-		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, failTo, http.StatusTemporaryRedirect)
 		return
 	}
 
 	user, err := s.auth.store.GetByID(r.Context(), userID)
 	if err != nil || user == nil {
 		s.logger.Error("embed hand-off user lookup failed", zap.Int("user_id", userID), zap.Error(err))
-		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, failTo, http.StatusTemporaryRedirect)
 		return
 	}
 
 	jwtToken, err := s.auth.issueToken(user)
 	if err != nil {
 		s.logger.Error("embed hand-off token issuance failed", zap.Error(err))
-		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, failTo, http.StatusTemporaryRedirect)
 		return
 	}
 

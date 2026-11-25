@@ -3,6 +3,7 @@ export const ssr = false;
 
 import { redirect } from "@sveltejs/kit";
 import { bratraxGetMe, bratraxLogout } from "$lib/bratrax/auth";
+import { safeRedirect } from "$lib/bratrax/safe-redirect";
 
 export async function load({ url, fetch }) {
   // If the user is already authenticated, don't show the signup form —
@@ -28,8 +29,8 @@ export async function load({ url, fetch }) {
       window.location.replace("/signup");
       return {};
     }
-    const target = url.searchParams.get("redirect") || "/developer";
-    throw redirect(307, target);
+    // Same-site paths only: never forward a signed-in visitor off the site.
+    throw redirect(307, safeRedirect(url.searchParams.get("redirect")));
   }
   return {};
 }

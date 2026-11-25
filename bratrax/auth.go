@@ -58,6 +58,17 @@ type AuthMapper struct {
 	// empty disables that path entirely; see WithShopifySessionAuth.
 	shopifyClientID     string
 	shopifyClientSecret string
+
+	// sessions, when set, re-issues cookies older than sessionRefreshAfter.
+	sessions *AuthService
+}
+
+// WithSessionRefresh lets the middleware re-issue an ageing session cookie
+// (AuthService.refreshSession). A setter for the same reason as
+// WithShopifySessionAuth: the mapper is built before the service is wired to it.
+func (a *AuthMapper) WithSessionRefresh(s *AuthService) *AuthMapper {
+	a.sessions = s
+	return a
 }
 
 // WithShopifySessionAuth enables the Shopify embedded-admin auth path, where a
@@ -103,6 +114,7 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 			strings.HasPrefix(r.URL.Path, "/bratrax/access-requests") ||
 			strings.HasPrefix(r.URL.Path, "/bratrax/demo-request") ||
 			strings.HasPrefix(r.URL.Path, "/bratrax/signup-link") ||
+			r.URL.Path == "/bratrax/signin-link" ||
 			r.URL.Path == "/bratrax/onboard/check-company" {
 			stripBratraxHeaders(r.Header)
 			next.ServeHTTP(w, r)
@@ -208,6 +220,13 @@ func (a *AuthMapper) Middleware(next http.Handler) http.Handler {
 				HttpOnly: true,
 				SameSite: http.SameSiteLaxMode,
 			})
+		}
+
+		// Sliding session: a cookie older than a day gets a fresh one. Cookie
+		// sessions only; a bearer token belongs to whoever holds it (the
+		// embedded admin), not to this browser's cookie jar.
+		if a.sessions != nil && bearerToken == "" {
+			a.sessions.refreshSession(w, user, claims.IssuedAt)
 		}
 
 		// 5+6. Strip incoming identity headers (anti-spoofing) and set ours.
